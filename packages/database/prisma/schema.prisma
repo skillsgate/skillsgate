@@ -7,3 +7,31 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+model Skill {
+  id          String   @id
+  slug        String   @unique
+  name        String
+  description String
+
+  // Source
+  sourceType String  @default("direct") @map("source_type")
+  githubRepo String? @map("github_repo")
+  githubPath String? @map("github_path")
+
+  // Stats
+  downloads Int @default(0)
+
+  // Vectorization
+  vectorizedAt DateTime? @map("vectorized_at") @db.Timestamptz
+
+  // Timestamps
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  publishedAt DateTime? @map("published_at") @db.Timestamptz
+
+  @@index([githubRepo, githubPath], map: "idx_skills_github")
+  @@index([downloads(sort: Desc)], map: "idx_skills_downloads")
+  @@index([createdAt(sort: Desc)], map: "idx_skills_created")
+  @@map("skills")
+}

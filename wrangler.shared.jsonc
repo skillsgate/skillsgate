@@ -1,0 +1,5 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	// Shared resources for all apps in the monorepo
+	"r2_buckets": [],
+}

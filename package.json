@@ -1,0 +1,23 @@
+{
+  "name": "openskills-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w apps/web",
+    "build": "npm run build -w apps/web",
+    "deploy": "npm run deploy -w apps/web",
+    "preview": "npm run preview -w apps/web",
+    "db:generate": "npm run generate -w @openskills/database",
+    "db:migrate:dev": "npm run migrate:dev -w @openskills/database",
+    "db:migrate:deploy": "npm run migrate:deploy -w @openskills/database",
+    "db:push": "npm run db:push -w @openskills/database",
+    "db:studio": "npm run studio -w @openskills/database"
+  },
+  "devDependencies": {
+    "wrangler": "^4.63.0"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "@openskills/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "generate": "prisma generate",
+    "migrate:dev": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:create": "prisma migrate dev --create-only",
+    "db:push": "prisma db push",
+    "studio": "prisma studio",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/adapter-neon": "^7.3.0",
+    "@prisma/client": "^7.3.0",
+    "@neondatabase/serverless": "^1.0.0"
+  },
+  "devDependencies": {
+    "prisma": "^7.3.0",
+    "typescript": "^5.7.4"
+  }
+}

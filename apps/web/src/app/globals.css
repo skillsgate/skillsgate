@@ -1,26 +1,81 @@
 @import "tailwindcss";
 
 :root {
-	--background: #ffffff;
-	--foreground: #171717;
+	--background: #08080a;
+	--foreground: #e4e4e7;
+	--muted: #71717a;
+	--accent: #a1a1aa;
+	--glow: rgba(200, 200, 220, 0.06);
 }
 
 @theme inline {
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
-	--font-sans: var(--font-geist-sans);
+	--color-muted: var(--muted);
+	--color-accent: var(--accent);
+	--font-sans: var(--font-sora);
 	--font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-	:root {
-		--background: #0a0a0a;
-		--foreground: #ededed;
-	}
 }
 
 body {
 	background: var(--background);
 	color: var(--foreground);
-	font-family: Arial, Helvetica, sans-serif;
+	font-family: var(--font-sans), system-ui, sans-serif;
+	overflow-x: hidden;
+}
+
+/* Noise grain overlay */
+body::before {
+	content: "";
+	position: fixed;
+	inset: 0;
+	z-index: 50;
+	pointer-events: none;
+	opacity: 0.03;
+	background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+	background-repeat: repeat;
+	background-size: 256px 256px;
+}
+
+/* Entrance animations */
+@keyframes fade-up {
+	from {
+		opacity: 0;
+		transform: translateY(20px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+@keyframes glow-pulse {
+	0%, 100% { opacity: 0.4; }
+	50% { opacity: 0.7; }
+}
+
+@keyframes subtle-float {
+	0%, 100% { transform: translateY(0px); }
+	50% { transform: translateY(-6px); }
+}
+
+.animate-fade-up {
+	animation: fade-up 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fade-in {
+	animation: fade-in 1.2s ease both;
+}
+
+.animate-glow-pulse {
+	animation: glow-pulse 4s ease-in-out infinite;
+}
+
+.animate-subtle-float {
+	animation: subtle-float 6s ease-in-out infinite;
 }

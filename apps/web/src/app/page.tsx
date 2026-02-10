@@ -2,51 +2,83 @@ import Image from "next/image";
 
 export default function Home() {
 	return (
-		<div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-			<main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-				<Image className="dark:invert" src="/next.svg" alt="Next.js logo" width={180} height={38} priority />
-				<ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-					<li className="mb-2 tracking-[-.01em]">
-						Get started by editing{" "}
-						<code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-							src/app/page.tsx
-						</code>
-						.
-					</li>
-					<li className="tracking-[-.01em]">Save and see your changes instantly.</li>
-				</ol>
+		<div className="relative min-h-screen flex flex-col items-center justify-center px-6">
+			{/* Background radial glow */}
+			<div
+				className="animate-glow-pulse pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] sm:w-[800px] sm:h-[800px] rounded-full"
+				style={{
+					background:
+						"radial-gradient(circle, rgba(180, 180, 200, 0.06) 0%, rgba(180, 180, 200, 0.02) 40%, transparent 70%)",
+				}}
+			/>
 
-				<div className="flex gap-4 items-center flex-col sm:flex-row">
+			{/* Subtle top line accent */}
+			<div className="animate-fade-in absolute top-0 left-1/2 -translate-x-1/2 w-px h-24 bg-gradient-to-b from-transparent via-zinc-700/40 to-transparent" />
+
+			<main className="relative z-10 flex flex-col items-center gap-10 sm:gap-12 max-w-lg">
+				{/* Logo */}
+				<div
+					className="animate-fade-up animate-subtle-float"
+					style={{ animationDelay: "0.1s" }}
+				>
+					<Image
+						src="/openskills-darkmode.png"
+						alt="OpenSkills"
+						width={340}
+						height={80}
+						priority
+						className="w-[260px] sm:w-[340px] h-auto select-none"
+						draggable={false}
+					/>
+				</div>
+
+				{/* Tagline */}
+				<p
+					className="animate-fade-up text-center text-[15px] sm:text-[17px] tracking-wide text-zinc-500 font-light leading-relaxed"
+					style={{ animationDelay: "0.35s" }}
+				>
+					AI Skills Hub
+				</p>
+
+				{/* CTA Button */}
+				<div
+					className="animate-fade-up"
+					style={{ animationDelay: "0.6s" }}
+				>
 					<a
-						className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-						href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+						href="https://forms.gle/5i8NP8ZAc52Hfhr17"
 						target="_blank"
 						rel="noopener noreferrer"
+						className="group relative inline-flex items-center justify-center px-8 py-3.5 text-sm font-medium tracking-wide text-zinc-200 transition-all duration-300 hover:text-white"
 					>
-						Read our docs
+						{/* Button border with glow */}
+						<span className="absolute inset-0 rounded-full border border-zinc-700/60 transition-all duration-300 group-hover:border-zinc-500/80 group-hover:shadow-[0_0_20px_rgba(161,161,170,0.08)]" />
+
+						{/* Subtle background on hover */}
+						<span className="absolute inset-0 rounded-full bg-white/0 transition-all duration-300 group-hover:bg-white/[0.03]" />
+
+						<span className="relative">Join Waitlist</span>
+
+						{/* Arrow */}
+						<svg
+							className="relative ml-2.5 w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							strokeWidth={1.5}
+						>
+							<path
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
+							/>
+						</svg>
 					</a>
 				</div>
 			</main>
-			<footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-				<a
-					className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-					href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-					target="_blank"
-					rel="noopener noreferrer"
-				>
-					<Image aria-hidden src="/file.svg" alt="File icon" width={16} height={16} />
-					Learn
-				</a>
-				<a
-					className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-					href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-					target="_blank"
-					rel="noopener noreferrer"
-				>
-					<Image aria-hidden src="/globe.svg" alt="Globe icon" width={16} height={16} />
-					Go to nextjs.org →
-				</a>
-			</footer>
+
+			{/* Bottom accent */}
+			<div className="animate-fade-in absolute bottom-0 left-1/2 -translate-x-1/2 w-px h-16 bg-gradient-to-t from-transparent via-zinc-800/30 to-transparent" />
 		</div>
 	);
 }

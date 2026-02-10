@@ -77,3 +77,4 @@ apps/web/*.tsbuildinfo
 # ==========================================
 /plans/
 .agents/
+/scripts/

@@ -76,5 +76,9 @@ apps/web/*.tsbuildinfo
 # Other apps (add as needed)
 # ==========================================
 /plans/
-.agents/
 /scripts/
+.agents/
+
+.tmp/
+.claude/
+.venv/

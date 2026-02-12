@@ -13,11 +13,18 @@ model Skill {
   slug        String   @unique
   name        String
   description String
+  summary     String?  @db.Text
+  categories  Json?
+  capabilities Json?
+  keywords    Json?
+  contentHash String?  @map("content_hash")
 
   // Source
   sourceType String  @default("direct") @map("source_type")
   githubRepo String? @map("github_repo")
   githubPath String? @map("github_path")
+  hasScripts Boolean  @default(false) @map("has_scripts")
+  hasReferences Boolean @default(false) @map("has_references")
 
   // Stats
   downloads Int @default(0)

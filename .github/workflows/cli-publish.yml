@@ -28,7 +28,7 @@ jobs:
       - name: Typecheck
         run: npm run typecheck -w skillsgate
 
-      - name: Publish to npm
+      - name: Publish to npm with provenance
         run: npm publish -w skillsgate --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

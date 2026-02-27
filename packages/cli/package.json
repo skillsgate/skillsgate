@@ -1,0 +1,54 @@
+{
+  "name": "skillsgate",
+  "version": "0.1.0",
+  "description": "Install and manage AI agent skills from GitHub",
+  "type": "module",
+  "bin": {
+    "skillsgate": "./bin/cli.mjs"
+  },
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/cli.d.ts",
+      "import": "./dist/cli.js"
+    }
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "skills",
+    "claude",
+    "cursor",
+    "copilot",
+    "cli"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/skillsgate/skillsgate",
+    "directory": "packages/cli"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.10.0",
+    "gray-matter": "^4.0.3",
+    "picocolors": "^1.1.1",
+    "simple-git": "^3.27.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.4",
+    "@types/node": "^22.7.4"
+  }
+}

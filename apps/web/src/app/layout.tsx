@@ -13,19 +13,19 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-	title: "OpenSkills — The open marketplace for AI agent skills",
+	title: "SkillsGate — The open marketplace for AI agent skills",
 	description:
 		"Discover, publish, and install skills that extend AI coding assistants like Claude Code, Cursor, and Windsurf. The npm for AI skills.",
 	openGraph: {
-		title: "OpenSkills",
+		title: "SkillsGate",
 		description: "The open marketplace for AI agent skills",
-		url: "https://openskills.dev",
-		siteName: "OpenSkills",
+		url: "https://skillsgate.ai",
+		siteName: "SkillsGate",
 		type: "website",
 	},
 	twitter: {
 		card: "summary_large_image",
-		title: "OpenSkills",
+		title: "SkillsGate",
 		description: "The open marketplace for AI agent skills",
 	},
 };

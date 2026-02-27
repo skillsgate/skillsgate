@@ -22,8 +22,8 @@ export default function Home() {
 					style={{ animationDelay: "0.1s" }}
 				>
 					<Image
-						src="/openskills-darkmode.png"
-						alt="OpenSkills"
+						src="/skillsgate-darkmode.png"
+						alt="SkillsGate"
 						width={340}
 						height={80}
 						priority

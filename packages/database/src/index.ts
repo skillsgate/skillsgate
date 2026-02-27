@@ -1,7 +1,7 @@
 export { createDatabaseClient, type DatabaseClient } from "./client.js";
 
 // Re-export all generated types so consumers can do:
-//   import { type User, type Skill, Prisma } from "@openskills/database"
+//   import { type User, type Skill, Prisma } from "@skillsgate/database"
 export * from "./generated/prisma/client.js";
 
 /**
@@ -18,7 +18,7 @@ export interface CloudflareHyperdriveEnv {
  * Use this in any app that has a HYPERDRIVE binding.
  *
  * Usage:
- *   import { getDb } from "@openskills/database";
+ *   import { getDb } from "@skillsgate/database";
  *   const db = getDb(env);
  */
 export function getDb(env: CloudflareHyperdriveEnv): import("./client.js").DatabaseClient {

@@ -73,11 +73,27 @@ apps/web/next-env.d.ts
 apps/web/*.tsbuildinfo
 
 # ==========================================
+# Packages/cli specific
+# ==========================================
+
+# Lock file written by skillsgate CLI
+.skill-lock.json
+
+# Agent skill directories (installed by skillsgate CLI)
+.agents/
+.claude/skills/
+.cursor/skills/
+.windsurf/skills/
+.cline/skills/
+.continue/skills/
+.codex/skills/
+.github/skills/
+
+# ==========================================
 # Other apps (add as needed)
 # ==========================================
 /plans/
 /scripts/
-.agents/
 
 .tmp/
 .claude/

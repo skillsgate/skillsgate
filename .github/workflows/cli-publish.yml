@@ -19,8 +19,8 @@ jobs:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install CLI dependencies only
+        run: npm install --workspace=skillsgate --ignore-scripts
 
       - name: Build CLI
         run: npm run build -w skillsgate

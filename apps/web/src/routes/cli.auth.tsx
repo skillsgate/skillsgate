@@ -1,61 +1,53 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router";
 import { authClient } from "~/lib/auth-client";
 
 type State =
 	| { step: "loading" }
 	| { step: "unauthenticated" }
-	| { step: "authenticated"; user: { name: string; email: string } }
-	| { step: "confirming"; user: { name: string; email: string } }
+	| { step: "no-code" }
+	| { step: "ready"; user: { name: string; email: string }; code: string }
+	| { step: "confirming" }
 	| { step: "success" }
-	| { step: "error"; message: string; user: { name: string; email: string } };
+	| { step: "error"; message: string };
 
 export default function CliAuthPage() {
+	const [searchParams] = useSearchParams();
+	const code = searchParams.get("code");
 	const [state, setState] = useState<State>({ step: "loading" });
-	const [code, setCode] = useState("");
-	const inputRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
+		if (!code) {
+			setState({ step: "no-code" });
+			return;
+		}
+
 		authClient.getSession().then((res) => {
 			if (res.data?.user) {
 				setState({
-					step: "authenticated",
+					step: "ready",
 					user: {
 						name: res.data.user.name,
 						email: res.data.user.email,
 					},
+					code,
 				});
 			} else {
 				setState({ step: "unauthenticated" });
 			}
 		});
-	}, []);
-
-	useEffect(() => {
-		if (state.step === "authenticated" && inputRef.current) {
-			inputRef.current.focus();
-		}
-	}, [state.step]);
-
-	function handleCodeChange(raw: string) {
-		const clean = raw.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 8);
-		if (clean.length > 4) {
-			setCode(clean.slice(0, 4) + "-" + clean.slice(4));
-		} else {
-			setCode(clean);
-		}
-	}
+	}, [code]);
 
 	async function handleConfirm() {
-		if (state.step !== "authenticated" && state.step !== "error") return;
-		const user = state.user;
+		if (state.step !== "ready") return;
 
-		setState({ step: "confirming", user });
+		setState({ step: "confirming" });
 
 		try {
 			const res = await fetch("/api/auth/device/confirm", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ user_code: code }),
+				body: JSON.stringify({ user_code: state.code }),
 			});
 
 			if (res.ok) {
@@ -64,20 +56,16 @@ export default function CliAuthPage() {
 				const data = (await res.json().catch(() => ({}))) as { error?: string };
 				const msg =
 					data?.error === "invalid_code"
-						? "That code is invalid or has expired. Check your terminal and try again."
+						? "That code is invalid or has expired. Run `skillsgate login` again."
 						: data?.error === "already_used"
 							? "That code has already been used."
 							: data?.error === "expired"
 								? "That code has expired. Run `skillsgate login` again."
 								: "Something went wrong. Please try again.";
-				setState({ step: "error", message: msg, user });
+				setState({ step: "error", message: msg });
 			}
 		} catch {
-			setState({
-				step: "error",
-				message: "Network error. Please try again.",
-				user,
-			});
+			setState({ step: "error", message: "Network error. Please try again." });
 		}
 	}
 
@@ -99,18 +87,29 @@ export default function CliAuthPage() {
 						</div>
 					)}
 
+					{state.step === "no-code" && (
+						<>
+							<h1 className="text-lg font-medium text-zinc-200 text-center mb-2">
+								Missing code
+							</h1>
+							<p className="text-sm text-zinc-500 text-center">
+								Run <code className="text-zinc-300">skillsgate login</code> in your terminal to start the login flow.
+							</p>
+						</>
+					)}
+
 					{state.step === "unauthenticated" && (
 						<>
 							<h1 className="text-lg font-medium text-zinc-200 text-center mb-2">
 								Connect your CLI
 							</h1>
 							<p className="text-sm text-zinc-500 text-center">
-								Sign in using the button in the top right to link your terminal session.
+								Sign in using the button in the top right, then come back to this page.
 							</p>
 						</>
 					)}
 
-					{(state.step === "authenticated" || state.step === "error") && (
+					{state.step === "ready" && (
 						<>
 							<h1 className="text-lg font-medium text-zinc-200 text-center mb-2">
 								Authorize CLI
@@ -119,32 +118,14 @@ export default function CliAuthPage() {
 								Signed in as{" "}
 								<span className="text-zinc-300">{state.user.name}</span>
 							</p>
-							<label className="block text-sm text-zinc-400 mb-2">
-								Enter the code from your terminal
-							</label>
-							<input
-								ref={inputRef}
-								type="text"
-								value={code}
-								onChange={(e) => handleCodeChange(e.target.value)}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" && code.length === 9) handleConfirm();
-								}}
-								placeholder="XXXX-XXXX"
-								className="w-full rounded-lg border border-zinc-700/60 bg-zinc-800/50 px-4 py-3 text-center font-mono text-lg tracking-[0.25em] text-zinc-200 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none transition-colors"
-								maxLength={9}
-								autoComplete="off"
-								spellCheck={false}
-							/>
-							{state.step === "error" && (
-								<p className="mt-3 text-sm text-red-400">{state.message}</p>
-							)}
+							<div className="mb-6 rounded-lg border border-zinc-700/60 bg-zinc-800/50 px-4 py-3 text-center font-mono text-lg tracking-[0.25em] text-zinc-200">
+								{state.code}
+							</div>
 							<button
 								onClick={handleConfirm}
-								disabled={code.length !== 9}
-								className="mt-4 w-full rounded-lg border border-zinc-700/60 bg-white/[0.05] px-4 py-3 text-sm font-medium text-zinc-200 transition-all hover:border-zinc-600 hover:bg-white/[0.08] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+								className="w-full rounded-lg border border-zinc-700/60 bg-white/[0.05] px-4 py-3 text-sm font-medium text-zinc-200 transition-all hover:border-zinc-600 hover:bg-white/[0.08] hover:text-white"
 							>
-								Confirm
+								Authorize
 							</button>
 						</>
 					)}
@@ -152,8 +133,17 @@ export default function CliAuthPage() {
 					{state.step === "confirming" && (
 						<div className="flex flex-col items-center py-4">
 							<div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-600 border-t-zinc-300 mb-4" />
-							<p className="text-sm text-zinc-400">Confirming...</p>
+							<p className="text-sm text-zinc-400">Authorizing...</p>
 						</div>
+					)}
+
+					{state.step === "error" && (
+						<>
+							<h1 className="text-lg font-medium text-zinc-200 text-center mb-2">
+								Something went wrong
+							</h1>
+							<p className="text-sm text-red-400 text-center">{state.message}</p>
+						</>
 					)}
 
 					{state.step === "success" && (

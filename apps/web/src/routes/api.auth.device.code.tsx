@@ -31,7 +31,7 @@ export async function action({ context }: ActionFunctionArgs) {
 	return Response.json({
 		device_code: deviceCode,
 		user_code: userCode,
-		verification_uri: `${appUrl}/cli/auth`,
+		verification_uri: `${appUrl}/cli/auth?code=${userCode}`,
 		expires_in: 900,
 		interval: 5,
 	});

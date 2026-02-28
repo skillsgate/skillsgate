@@ -1,9 +1,9 @@
-import { createDatabaseClient, type DatabaseClient } from "./client.js";
+import { createDatabaseClient, type DatabaseClient } from "./client";
 export { createDatabaseClient, type DatabaseClient };
 
 // Re-export all generated types so consumers can do:
 //   import { type User, type Skill, Prisma } from "@skillsgate/database"
-export * from "./generated/prisma/client.js";
+export * from "./generated/prisma/client";
 
 /**
  * Standardized Cloudflare env shape for apps using Hyperdrive.

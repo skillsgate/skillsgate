@@ -5,17 +5,18 @@
 	"scripts": {
 		"dev": "next dev",
 		"build": "next build",
-		"build:worker": "opennextjs-cloudflare build",
+		"build:worker": "WRANGLER_BUILD_CONDITIONS=workerd,worker,browser WRANGLER_BUILD_PLATFORM=node opennextjs-cloudflare build",
 		"start": "next start",
 		"lint": "next lint",
-		"deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
-		"upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
-		"preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+		"deploy": "WRANGLER_BUILD_CONDITIONS=workerd,worker,browser WRANGLER_BUILD_PLATFORM=node opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+		"upload": "WRANGLER_BUILD_CONDITIONS=workerd,worker,browser WRANGLER_BUILD_PLATFORM=node opennextjs-cloudflare build && opennextjs-cloudflare upload",
+		"preview": "WRANGLER_BUILD_CONDITIONS=workerd,worker,browser WRANGLER_BUILD_PLATFORM=node opennextjs-cloudflare build && opennextjs-cloudflare preview",
 		"cf-typegen": "wrangler types --env-interface CloudflareEnv ./cloudflare-env.d.ts"
 	},
 	"dependencies": {
 		"@opennextjs/cloudflare": "^1.15.1",
 		"better-auth": "^1.4.19",
+		"pg": "^8.16.3",
 		"next": "16.1.5",
 		"react": "19.1.5",
 		"react-dom": "19.1.5"

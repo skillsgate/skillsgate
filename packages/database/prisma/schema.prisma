@@ -38,6 +38,8 @@ model Skill {
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   publishedAt DateTime? @map("published_at") @db.Timestamptz
 
+  chunks SkillChunk[]
+
   @@index([githubRepo, githubPath], map: "idx_skills_github")
   @@index([downloads(sort: Desc)], map: "idx_skills_downloads")
   @@index([createdAt(sort: Desc)], map: "idx_skills_created")
@@ -58,6 +60,9 @@ model User {
   sessions    Session[]
   accounts    Account[]
   deviceCodes DeviceCode[]
+
+  ownedNamespaces  Namespace[]       @relation("ownedNamespaces")
+  namespaceAccess  NamespaceAccess[]
 
   @@map("users")
 }
@@ -126,4 +131,55 @@ model DeviceCode {
 
   @@index([expiresAt], map: "idx_device_codes_expires")
   @@map("device_codes")
+}
+
+// ─── Vector search ────────────────────────────────────────────────
+
+model SkillChunk {
+  id         String   @id              // "{skillId}::{chunkIndex}"
+  skillId    String   @map("skill_id")
+  chunkId    String   @map("chunk_id")
+  title      String
+  text       String   @db.Text
+  chunkIndex Int      @map("chunk_index")
+  namespace  String   @default("public") @map("namespace")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  // embedding vector(1536) — added via raw SQL in migration
+
+  skill        Skill     @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  namespaceRef Namespace @relation(fields: [namespace], references: [id])
+
+  @@index([skillId], map: "idx_skill_chunks_skill_id")
+  @@index([namespace], map: "idx_skill_chunks_namespace")
+  @@map("skill_chunks")
+}
+
+model Namespace {
+  id        String   @id              // "public", "pub_tailwind", "org_acme", "usr_abc"
+  name      String                    // Display name
+  type      String                    // "system" | "personal" | "org" | "publisher" | "collection"
+  ownerId   String   @map("owner_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  owner   User              @relation("ownedNamespaces", fields: [ownerId], references: [id])
+  members NamespaceAccess[]
+  chunks  SkillChunk[]
+
+  @@map("namespaces")
+}
+
+model NamespaceAccess {
+  id          String   @id @default(cuid())
+  namespaceId String   @map("namespace_id")
+  userId      String   @map("user_id")
+  role        String   @default("reader") // "reader" | "publisher"
+  grantedAt   DateTime @default(now()) @map("granted_at") @db.Timestamptz
+
+  namespace Namespace @relation(fields: [namespaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([namespaceId, userId], map: "uq_namespace_access")
+  @@index([userId], map: "idx_namespace_access_user")
+  @@map("namespace_access")
 }

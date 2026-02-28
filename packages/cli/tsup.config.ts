@@ -11,6 +11,7 @@ export default defineConfig({
   dts: true,
   clean: true,
   banner: {},
+  external: ["@napi-rs/keyring"],
   noExternal: [],
   shims: true,
 });

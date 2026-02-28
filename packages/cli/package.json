@@ -42,6 +42,7 @@
   },
   "dependencies": {
     "@clack/prompts": "^0.10.0",
+    "@napi-rs/keyring": "^1.2.0",
     "gray-matter": "^4.0.3",
     "open": "^11.0.0",
     "picocolors": "^1.1.1",

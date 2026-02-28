@@ -77,7 +77,9 @@ export async function runLogin(): Promise<void> {
     const data = (await res.json().catch(() => ({}))) as { error?: string };
     spinner.stop("Failed.");
 
-    if (data?.error === "invalid_code") {
+    if (data?.error === "rate_limited") {
+      p.log.error("Too many attempts. Please wait a minute and try again.");
+    } else if (data?.error === "invalid_code") {
       p.log.error("Invalid code. Please check and try again.");
     } else if (data?.error === "expired") {
       p.log.error("Code has expired. Get a new one from the browser.");

@@ -26,5 +26,12 @@
 	},
 	"define": {
 		"import.meta.url": "\"file:///worker.js\""
-	}
+	},
+	"rate_limits": [
+		{
+			"binding": "DEVICE_EXCHANGE_LIMITER",
+			"namespace_id": "1001",
+			"simple": { "limit": 10, "period": 60 }
+		}
+	]
 }

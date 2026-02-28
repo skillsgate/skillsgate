@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { bearer } from "better-auth/plugins";
 import { createDatabaseClient } from "@skillsgate/database";
 
 export function createAuth(connectionString: string) {
@@ -30,6 +31,7 @@ export function createAuth(connectionString: string) {
 				maxAge: 60 * 5, // 5 min cache
 			},
 		},
+		plugins: [bearer()],
 		basePath: "/api/auth",
 		secret: process.env.BETTER_AUTH_SECRET,
 		trustedOrigins: [

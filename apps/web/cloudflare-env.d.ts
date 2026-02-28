@@ -11,6 +11,7 @@ declare namespace Cloudflare {
 		ASSETS: Fetcher;
 		NEXTJS_ENV: string;
 		WORKER_SELF_REFERENCE: Service<typeof import("./.open-next/worker").default>;
+		DEVICE_EXCHANGE_LIMITER: RateLimit;
 	}
 }
 interface CloudflareEnv extends Cloudflare.Env {}

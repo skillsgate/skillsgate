@@ -2,6 +2,12 @@ import type { ActionFunctionArgs } from "react-router";
 import { getDb } from "@skillsgate/database";
 
 export async function action({ request, context }: ActionFunctionArgs) {
+	const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
+	const { success } = await context.cloudflare.env.DEVICE_EXCHANGE_LIMITER.limit({ key: ip });
+	if (!success) {
+		return Response.json({ error: "rate_limited" }, { status: 429, headers: { "Retry-After": "60" } });
+	}
+
 	const body = (await request.json()) as { code?: string };
 	const rawCode = body?.code;
 

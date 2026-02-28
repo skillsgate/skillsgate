@@ -1,7 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "skillsgate",
-	"main": "build/server/index.js",
+	"main": "worker.ts",
 	"compatibility_date": "2025-12-01",
 	"compatibility_flags": [
 		"nodejs_compat",

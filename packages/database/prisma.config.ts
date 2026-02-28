@@ -6,6 +6,6 @@ export default defineConfig({
   earlyAccess: true,
   schema: path.join(__dirname, "prisma", "schema.prisma"),
   datasource: {
-    url: env("DATABASE_URL"),
+    url: process.env.DATABASE_URL ?? "postgresql://localhost:5432/placeholder",
   },
 });

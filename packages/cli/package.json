@@ -1,6 +1,6 @@
 {
   "name": "skillsgate",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Install and manage AI agent skills from GitHub",
   "type": "module",
   "bin": {

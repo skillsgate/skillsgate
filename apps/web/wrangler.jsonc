@@ -36,7 +36,7 @@
 		{
 			"binding": "HYPERDRIVE",
 			"id": "a7e64ebf303b48599a157bc62b37e67f",
-			"localConnectionString": "postgresql://localhost:5432/skillsgate"
+			"localConnectionString": "postgresql://user:password@localhost:5432/skillsgate"
 		}
 	],
 	"observability": {

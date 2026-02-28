@@ -23,5 +23,8 @@
 	},
 	"vars": {
 		"APP_URL": "https://skillsgate.ai"
+	},
+	"define": {
+		"import.meta.url": "\"file:///worker.js\""
 	}
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Sora, Geist_Mono } from "next/font/google";
+import { AuthButton } from "@/components/auth-button";
 import "./globals.css";
 
 const sora = Sora({
@@ -43,6 +44,9 @@ export default function RootLayout({
 			<body
 				className={`${sora.variable} ${geistMono.variable} antialiased`}
 			>
+				<header className="fixed top-0 right-0 z-50 p-4">
+					<AuthButton />
+				</header>
 				{children}
 			</body>
 		</html>

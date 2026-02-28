@@ -20,7 +20,7 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Install CLI dependencies only
-        run: npm install --workspace=skillsgate --ignore-scripts
+        run: npm install --workspace=skillsgate
 
       - name: Build CLI
         run: npm run build -w skillsgate

@@ -21,6 +21,9 @@
     "find-skill:build": "npx esbuild ../scripts/find-skill.ts --bundle --platform=node --format=cjs --tsconfig=../scripts/tsconfig.json --outdir=.tmp/find-skill --packages=external \"--define:import.meta.url=__import_meta_url\" \"--banner:js=var __import_meta_url = require('url').pathToFileURL(__filename).href;\"",
     "find-skill": "npm run find-skill:build && node .tmp/find-skill/find-skill.js"
   },
+  "optionalDependencies": {
+    "@ast-grep/napi-linux-x64-gnu": "0.40.5"
+  },
   "devDependencies": {
     "@pinecone-database/pinecone": "^7.0.0",
     "@types/node": "^22.7.4",

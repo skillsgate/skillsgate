@@ -4,7 +4,7 @@ import { createRequestHandler } from "@react-router/cloudflare";
 // @ts-ignore - build output exists after `react-router build`
 import * as build from "./build/server/index.js";
 
-const requestHandler = createRequestHandler(build);
+const requestHandler = createRequestHandler({ build });
 
 export default {
 	async fetch(request: Request, env: CloudflareEnv, ctx: ExecutionContext) {

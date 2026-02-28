@@ -23,6 +23,7 @@
   },
   "optionalDependencies": {
     "@ast-grep/napi-linux-x64-gnu": "0.40.5",
+    "@rollup/rollup-linux-x64-gnu": "4.59.0",
     "@tailwindcss/oxide-linux-x64-gnu": "4.1.18",
     "lightningcss-linux-x64-gnu": "1.30.2"
   },

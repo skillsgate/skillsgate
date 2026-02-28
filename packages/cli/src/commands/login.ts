@@ -1,18 +1,10 @@
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import open from "open";
-import { API_BASE_URL, DEVICE_CODE_POLL_INTERVAL } from "../constants.js";
+import { API_BASE_URL } from "../constants.js";
 import { loadAuth, saveAuth } from "../utils/auth-store.js";
 
-interface DeviceCodeResponse {
-  device_code: string;
-  user_code: string;
-  verification_uri: string;
-  expires_in: number;
-  interval: number;
-}
-
-interface PollSuccessResponse {
+interface ExchangeResponse {
   access_token: string;
   user: { id: string; name: string; email: string; image?: string };
 }
@@ -31,21 +23,8 @@ export async function runLogin(): Promise<void> {
     }
   }
 
-  // Request device code
-  const res = await fetch(`${API_BASE_URL}/api/auth/device/code`, {
-    method: "POST",
-  });
-
-  if (!res.ok) {
-    p.log.error("Failed to start login flow. Please try again later.");
-    process.exit(1);
-  }
-
-  const data = (await res.json()) as DeviceCodeResponse;
-
-  p.log.info(`Your code: ${pc.bold(pc.cyan(data.user_code))}`);
   p.log.info(
-    `Visit ${pc.underline(data.verification_uri)} to complete authentication.`,
+    `Open ${pc.underline(`${API_BASE_URL}/cli/auth`)} to get your login code.`,
   );
 
   const shouldOpen = await p.confirm({
@@ -54,61 +33,61 @@ export async function runLogin(): Promise<void> {
   });
 
   if (!p.isCancel(shouldOpen) && shouldOpen) {
-    await open(data.verification_uri).catch(() => {
+    await open(`${API_BASE_URL}/cli/auth`).catch(() => {
       // Best-effort, user can open manually
     });
   }
 
-  const spinner = p.spinner();
-  spinner.start("Waiting for authentication...");
+  const code = await p.text({
+    message: "Paste the code from the browser:",
+    placeholder: "XXXX-XXXX",
+    validate(value) {
+      const clean = value.replace(/[\s-]/g, "");
+      if (clean.length !== 8) return "Code must be 8 characters (XXXX-XXXX)";
+    },
+  });
 
-  const interval = (data.interval ?? 5) * 1000;
-  const maxTime = data.expires_in * 1000;
-  const startTime = Date.now();
-  let pollInterval = interval;
-
-  while (Date.now() - startTime < maxTime) {
-    await sleep(pollInterval);
-
-    try {
-      const pollRes = await fetch(
-        `${API_BASE_URL}/api/auth/device/poll?device_code=${data.device_code}`,
-      );
-
-      if (pollRes.status === 200) {
-        const result = (await pollRes.json()) as PollSuccessResponse;
-        await saveAuth({
-          token: result.access_token,
-          user: result.user,
-        });
-        spinner.stop(
-          `Logged in as ${pc.bold(result.user.name)} (${result.user.email})`,
-        );
-        return;
-      }
-
-      if (pollRes.status === 410) {
-        spinner.stop("Code expired.");
-        p.log.error("The code has expired. Run `skillsgate login` to try again.");
-        process.exit(1);
-      }
-
-      if (pollRes.status === 429) {
-        // Slow down
-        pollInterval = Math.min(pollInterval + 1000, 15000);
-      }
-
-      // 202 or other: keep polling
-    } catch {
-      // Network error, keep polling
-    }
+  if (p.isCancel(code)) {
+    p.log.info("Login cancelled.");
+    return;
   }
 
-  spinner.stop("Timed out.");
-  p.log.error("Authentication timed out. Run `skillsgate login` to try again.");
-  process.exit(1);
-}
+  const spinner = p.spinner();
+  spinner.start("Verifying code...");
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth/device/exchange`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+
+    if (res.ok) {
+      const result = (await res.json()) as ExchangeResponse;
+      await saveAuth({
+        token: result.access_token,
+        user: result.user,
+      });
+      spinner.stop(
+        `Logged in as ${pc.bold(result.user.name)} (${result.user.email})`,
+      );
+      return;
+    }
+
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    spinner.stop("Failed.");
+
+    if (data?.error === "invalid_code") {
+      p.log.error("Invalid code. Please check and try again.");
+    } else if (data?.error === "expired") {
+      p.log.error("Code has expired. Get a new one from the browser.");
+    } else {
+      p.log.error("Something went wrong. Please try again.");
+    }
+    process.exit(1);
+  } catch {
+    spinner.stop("Failed.");
+    p.log.error("Network error. Please try again.");
+    process.exit(1);
+  }
 }

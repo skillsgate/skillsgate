@@ -6,14 +6,21 @@ import { runRemove } from "./commands/remove.js";
 import { runList } from "./commands/list.js";
 import { runUpdate } from "./commands/update.js";
 import { runSync } from "./commands/sync.js";
+import { runLogin } from "./commands/login.js";
+import { runLogout } from "./commands/logout.js";
+import { runWhoami } from "./commands/whoami.js";
+
+// "SKILLS" in dark silver (dim), "GATE" in bright white (bold)
+const s = (t: string) => pc.dim(t);       // dark silver
+const g = (t: string) => pc.bold(pc.white(t)); // glowy white
 
 const LOGO = `
-${pc.cyan("███████╗██╗  ██╗██╗██╗     ██╗     ███████╗ ██████╗  █████╗ ████████╗███████╗")}
-${pc.cyan("██╔════╝██║ ██╔╝██║██║     ██║     ██╔════╝██╔════╝ ██╔══██╗╚══██╔══╝██╔════╝")}
-${pc.cyan("███████╗█████╔╝ ██║██║     ██║     ███████╗██║  ███╗███████║   ██║   █████╗")}
-${pc.cyan("╚════██║██╔═██╗ ██║██║     ██║     ╚════██║██║   ██║██╔══██║   ██║   ██╔══╝")}
-${pc.cyan("███████║██║  ██╗██║███████╗███████╗███████║╚██████╔╝██║  ██║   ██║   ███████╗")}
-${pc.cyan("╚══════╝╚═╝  ╚═╝╚═╝╚══════╝╚══════╝╚══════╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝")}
+${s("███████╗██╗  ██╗██╗██╗     ██╗     ███████╗")} ${g("██████╗  █████╗ ████████╗███████╗")}
+${s("██╔════╝██║ ██╔╝██║██║     ██║     ██╔════╝")}${g("██╔════╝ ██╔══██╗╚══██╔══╝██╔════╝")}
+${s("███████╗█████╔╝ ██║██║     ██║     ███████╗")}${g("██║  ███╗███████║   ██║   █████╗")}
+${s("╚════██║██╔═██╗ ██║██║     ██║     ╚════██║")}${g("██║   ██║██╔══██║   ██║   ██╔══╝")}
+${s("███████║██║  ██╗██║███████╗███████╗███████║")}${g("╚██████╔╝██║  ██║   ██║   ███████╗")}
+${s("╚══════╝╚═╝  ╚═╝╚═╝╚══════╝╚══════╝╚══════╝")} ${g("╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝")}
 `;
 
 function printLogo(): void {
@@ -59,6 +66,18 @@ async function main(): Promise<void> {
       await runSync(restArgs);
       break;
 
+    case "login":
+      await runLogin();
+      break;
+
+    case "logout":
+      await runLogout();
+      break;
+
+    case "whoami":
+      await runWhoami();
+      break;
+
     case "--version":
     case "-v":
       console.log(`skillsgate v${VERSION}`);
@@ -97,6 +116,9 @@ function printHelp(): void {
   console.log(`    list               Show installed skills`);
   console.log(`    update ${DIM("[name]")}    Check and apply updates`);
   console.log(`    sync               Sync skills from node_modules`);
+  console.log(`    login              Authenticate with SkillsGate`);
+  console.log(`    logout             Sign out`);
+  console.log(`    whoami             Show current user`);
   console.log();
   console.log(`  ${BOLD("Examples:")}`);
   console.log(`    skillsgate add vercel-labs/agent-skills`);

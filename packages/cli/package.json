@@ -43,12 +43,13 @@
   "dependencies": {
     "@clack/prompts": "^0.10.0",
     "gray-matter": "^4.0.3",
+    "open": "^11.0.0",
     "picocolors": "^1.1.1",
     "simple-git": "^3.27.0"
   },
   "devDependencies": {
+    "@types/node": "^22.7.4",
     "tsup": "^8.4.0",
-    "typescript": "^5.7.4",
-    "@types/node": "^22.7.4"
+    "typescript": "^5.7.4"
   }
 }

@@ -40,5 +40,9 @@
 	],
 	"observability": {
 		"enabled": true
+	},
+	"vars": {
+		"APP_URL": "https://skillsgate.ai",
+		"NEXT_PUBLIC_APP_URL": "https://skillsgate.ai"
 	}
 }

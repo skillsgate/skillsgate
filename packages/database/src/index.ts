@@ -1,4 +1,5 @@
-export { createDatabaseClient, type DatabaseClient } from "./client.js";
+import { createDatabaseClient, type DatabaseClient } from "./client.js";
+export { createDatabaseClient, type DatabaseClient };
 
 // Re-export all generated types so consumers can do:
 //   import { type User, type Skill, Prisma } from "@skillsgate/database"
@@ -21,6 +22,6 @@ export interface CloudflareHyperdriveEnv {
  *   import { getDb } from "@skillsgate/database";
  *   const db = getDb(env);
  */
-export function getDb(env: CloudflareHyperdriveEnv): import("./client.js").DatabaseClient {
+export function getDb(env: CloudflareHyperdriveEnv): DatabaseClient {
   return createDatabaseClient(env.HYPERDRIVE.connectionString);
 }

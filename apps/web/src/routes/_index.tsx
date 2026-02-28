@@ -1,5 +1,3 @@
-import Image from "next/image";
-
 export default function Home() {
 	return (
 		<div className="relative min-h-screen flex flex-col items-center justify-center px-6">
@@ -21,12 +19,11 @@ export default function Home() {
 					className="animate-fade-up animate-subtle-float"
 					style={{ animationDelay: "0.1s" }}
 				>
-					<Image
+					<img
 						src="/skillsgate-darkmode.png"
 						alt="SkillsGate"
 						width={340}
 						height={80}
-						priority
 						className="w-[260px] sm:w-[340px] h-auto select-none"
 						draggable={false}
 					/>

@@ -1,10 +1,10 @@
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import type { ActionFunctionArgs } from "react-router";
 import { getDb } from "@skillsgate/database";
-import { getAuth } from "@/lib/auth-helper";
+import { createAuth } from "~/lib/auth";
 
-export async function POST(request: Request) {
+export async function action({ request, context }: ActionFunctionArgs) {
 	// Verify the user is authenticated via Better Auth session cookie
-	const auth = await getAuth();
+	const auth = createAuth(context.cloudflare.env.HYPERDRIVE.connectionString);
 	const session = await auth.api.getSession({ headers: request.headers });
 
 	if (!session) {
@@ -23,8 +23,7 @@ export async function POST(request: Request) {
 	// Re-format as XXXX-XXXX for DB lookup
 	const userCode = normalized.slice(0, 4) + "-" + normalized.slice(4, 8);
 
-	const { env } = await getCloudflareContext();
-	const db = getDb(env);
+	const db = getDb(context.cloudflare.env);
 
 	const record = await db.deviceCode.findUnique({
 		where: { userCode },

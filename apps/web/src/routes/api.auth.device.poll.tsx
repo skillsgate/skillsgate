@@ -1,7 +1,7 @@
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import type { LoaderFunctionArgs } from "react-router";
 import { getDb } from "@skillsgate/database";
 
-export async function GET(request: Request) {
+export async function loader({ request, context }: LoaderFunctionArgs) {
 	const url = new URL(request.url);
 	const deviceCode = url.searchParams.get("device_code");
 
@@ -9,8 +9,7 @@ export async function GET(request: Request) {
 		return Response.json({ error: "missing_device_code" }, { status: 400 });
 	}
 
-	const { env } = await getCloudflareContext();
-	const db = getDb(env);
+	const db = getDb(context.cloudflare.env);
 
 	const record = await db.deviceCode.findUnique({
 		where: { deviceCode },

@@ -1,15 +1,7 @@
-/**
- * For more details on how to configure Wrangler, refer to:
- * https://developers.cloudflare.com/workers/wrangler/configuration/
- */
-/**
- * For more details on how to configure Wrangler, refer to:
- * https://developers.cloudflare.com/workers/wrangler/configuration/
- */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "skillsgate",
-	"main": ".open-next/worker.js",
+	"main": "build/server/index.js",
 	"compatibility_date": "2025-12-01",
 	"compatibility_flags": [
 		"nodejs_compat",
@@ -17,21 +9,8 @@
 	],
 	"assets": {
 		"binding": "ASSETS",
-		"directory": ".open-next/assets"
+		"directory": "build/client"
 	},
-	"images": {
-		// Enable image optimization
-		// see https://opennext.js.org/cloudflare/howtos/image
-		"binding": "IMAGES"
-	},
-	"services": [
-		{
-			// Self-reference service binding, the service name must match the worker name
-			// see https://opennext.js.org/cloudflare/caching
-			"binding": "WORKER_SELF_REFERENCE",
-			"service": "skillsgate"
-		}
-	],
 	"hyperdrive": [
 		{
 			"binding": "HYPERDRIVE",
@@ -43,7 +22,6 @@
 		"enabled": true
 	},
 	"vars": {
-		"APP_URL": "https://skillsgate.ai",
-		"NEXT_PUBLIC_APP_URL": "https://skillsgate.ai"
+		"APP_URL": "https://skillsgate.ai"
 	}
 }

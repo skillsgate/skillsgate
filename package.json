@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "dev": "npm run dev -w apps/web",
-    "build": "npm run generate -w @skillsgate/database && npm run build:worker -w apps/web",
+    "build": "npm run generate -w @skillsgate/database && npm run build -w apps/web",
     "deploy": "npm run deploy -w apps/web",
     "preview": "npm run preview -w apps/web",
     "db:generate": "npm run generate -w @skillsgate/database",
@@ -23,7 +23,6 @@
   },
   "optionalDependencies": {
     "@ast-grep/napi-linux-x64-gnu": "0.40.5",
-    "@next/swc-linux-x64-gnu": "16.1.5",
     "@tailwindcss/oxide-linux-x64-gnu": "4.1.18",
     "lightningcss-linux-x64-gnu": "1.30.2"
   },

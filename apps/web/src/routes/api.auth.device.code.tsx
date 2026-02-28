@@ -1,4 +1,4 @@
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import type { ActionFunctionArgs } from "react-router";
 import { getDb } from "@skillsgate/database";
 
 // Characters excluding ambiguous ones: O, 0, I, 1, L
@@ -10,9 +10,8 @@ function generateUserCode(): string {
 	return chars.slice(0, 4).join("") + "-" + chars.slice(4).join("");
 }
 
-export async function POST() {
-	const { env } = await getCloudflareContext();
-	const db = getDb(env);
+export async function action({ context }: ActionFunctionArgs) {
+	const db = getDb(context.cloudflare.env);
 
 	const deviceCode = crypto.randomUUID();
 	const userCode = generateUserCode();
@@ -27,7 +26,7 @@ export async function POST() {
 		},
 	});
 
-	const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+	const appUrl = context.cloudflare.env.APP_URL ?? "http://localhost:5173";
 
 	return Response.json({
 		device_code: deviceCode,

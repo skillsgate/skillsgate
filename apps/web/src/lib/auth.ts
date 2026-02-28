@@ -1,9 +1,11 @@
 import { betterAuth } from "better-auth";
-import { Pool } from "pg";
+import { prismaAdapter } from "better-auth/adapters/prisma";
+import { createDatabaseClient } from "@skillsgate/database";
 
 export function createAuth(connectionString: string) {
+	const prisma = createDatabaseClient(connectionString);
 	return betterAuth({
-		database: new Pool({ connectionString }),
+		database: prismaAdapter(prisma, { provider: "postgresql" }),
 		emailAndPassword: { enabled: false },
 		socialProviders: {
 			github: {

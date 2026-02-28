@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "dev": "npm run dev -w apps/web",
-    "build": "npm run build:worker -w apps/web",
+    "build": "npm run generate -w @skillsgate/database && npm run build:worker -w apps/web",
     "deploy": "npm run deploy -w apps/web",
     "preview": "npm run preview -w apps/web",
     "db:generate": "npm run generate -w @skillsgate/database",
@@ -23,7 +23,8 @@
   },
   "optionalDependencies": {
     "@ast-grep/napi-linux-x64-gnu": "0.40.5",
-    "@next/swc-linux-x64-gnu": "16.1.5"
+    "@next/swc-linux-x64-gnu": "16.1.5",
+    "lightningcss-linux-x64-gnu": "1.30.2"
   },
   "devDependencies": {
     "@pinecone-database/pinecone": "^7.0.0",

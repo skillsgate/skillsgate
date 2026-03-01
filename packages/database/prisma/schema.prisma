@@ -155,6 +155,18 @@ model SearchUsage {
   @@map("search_usage")
 }
 
+// ─── Pending skills (from CLI telemetry) ─────────────────────────
+
+model PendingSkill {
+  id          String   @id @default(cuid())
+  githubUrl   String   @unique @map("github_url")
+  source      String   // "cli_add", "cli_search"
+  submittedAt DateTime @default(now()) @map("submitted_at") @db.Timestamptz
+  status      String   @default("pending") // pending, processing, indexed, rejected
+
+  @@map("pending_skills")
+}
+
 // ─── Vector search ────────────────────────────────────────────────
 
 model SkillChunk {

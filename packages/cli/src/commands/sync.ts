@@ -7,6 +7,7 @@ import { discoverSkills } from "../core/skill-discovery.js";
 import { installSkillForAgent, sanitizeName } from "../core/installer.js";
 import { fmt } from "../ui/format.js";
 import { Skill, AgentConfig } from "../types.js";
+import { trackSync } from "../telemetry.js";
 
 interface SyncOptions {
   yes: boolean;
@@ -111,6 +112,12 @@ export async function runSync(args: string[]): Promise<void> {
       `Synced ${fmt.skillName(skill.name)}${skill.plugin ? fmt.dim(` (${skill.plugin})`) : ""}`,
     );
   }
+
+  trackSync({
+    skillCount: allSkills.length,
+    installedCount,
+    agents: targetAgents.map((a) => a.name),
+  });
 
   p.outro(
     fmt.success(

@@ -36,6 +36,7 @@ import {
   InstallResult,
   AgentConfig,
 } from "../types.js";
+import { trackAdd } from "../telemetry.js";
 
 interface AddOptions {
   global: boolean;
@@ -219,6 +220,14 @@ export async function runAdd(args: string[]): Promise<void> {
         p.log.error(`Failed: ${f.skillName} -> ${f.agent}: ${f.error}`);
       }
     }
+
+    trackAdd({
+      source: getOwnerRepo(parsed),
+      skills: selectedSkills.map((s) => sanitizeName(s.name)),
+      agents: selectedAgents.map((a) => a.name),
+      scope,
+      sourceType: parsed.type,
+    });
 
     p.outro(
       fmt.success(

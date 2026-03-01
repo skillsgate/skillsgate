@@ -3,6 +3,7 @@ import pc from "picocolors";
 import { SEARCH_API_URL } from "../constants.js";
 import { getToken } from "../utils/auth-store.js";
 import { fmt } from "../ui/format.js";
+import { trackSearch } from "../telemetry.js";
 
 interface SearchResult {
   skillId: string;
@@ -92,6 +93,8 @@ export async function runSearch(args: string[]): Promise<void> {
 
     const data = (await response.json()) as SearchResponse;
     spin.stop(`Found ${data.results.length} skill${data.results.length !== 1 ? "s" : ""}`);
+
+    trackSearch({ query, resultCount: data.results.length });
 
     if (data.results.length === 0) {
       p.log.info("No skills found matching your query.");

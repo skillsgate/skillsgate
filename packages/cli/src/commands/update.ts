@@ -6,6 +6,7 @@ import { discoverSkills } from "../core/skill-discovery.js";
 import { installSkillForAgent, sanitizeName } from "../core/installer.js";
 import { detectInstalledAgents } from "../core/agents.js";
 import { fmt } from "../ui/format.js";
+import { trackUpdate } from "../telemetry.js";
 
 export async function runUpdate(args: string[]): Promise<void> {
   const { skillName } = parseUpdateOptions(args);
@@ -104,6 +105,12 @@ export async function runUpdate(args: string[]): Promise<void> {
   }
 
   spinner.stop("Update check complete.");
+
+  trackUpdate({
+    skillCount: toCheck.length,
+    updatedCount,
+    upToDateCount,
+  });
 
   if (updatedCount > 0) {
     p.log.success(`Updated ${updatedCount} skill(s).`);

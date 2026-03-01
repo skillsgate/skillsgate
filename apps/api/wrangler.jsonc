@@ -10,6 +10,9 @@
       "localConnectionString": "postgresql://user:password@localhost:5432/skillsgate"
     }
   ],
+  "analytics_engine_datasets": [
+    { "binding": "TELEMETRY", "dataset": "skillsgate_cli" }
+  ],
   "observability": { "enabled": true },
   "define": {
     "import.meta.url": "\"file:///worker.js\""

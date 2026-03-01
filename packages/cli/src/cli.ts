@@ -10,6 +10,7 @@ import { runLogin } from "./commands/login.js";
 import { runLogout } from "./commands/logout.js";
 import { runWhoami } from "./commands/whoami.js";
 import { runSearch } from "./commands/search.js";
+import { flushTelemetry } from "./telemetry.js";
 
 // "SKILLS" in dark silver (dim), "GATE" in bright white (bold)
 const s = (t: string) => pc.dim(t);       // dark silver
@@ -154,7 +155,9 @@ function printHelp(): void {
   console.log();
 }
 
-main().catch((err) => {
-  console.error(pc.red(err.message || String(err)));
-  process.exit(1);
-});
+main()
+  .then(() => flushTelemetry())
+  .catch((err) => {
+    console.error(pc.red(err.message || String(err)));
+    process.exit(1);
+  });

@@ -23,6 +23,8 @@ function isCI(): boolean {
   return CI_ENV_VARS.some((v) => !!process.env[v]);
 }
 
+let pending: Promise<unknown> | null = null;
+
 function trackEvent(params: Record<string, string | number | undefined>): void {
   try {
     if (isDisabled()) return;
@@ -39,9 +41,22 @@ function trackEvent(params: Record<string, string | number | undefined>): void {
     }
 
     const url = `${TELEMETRY_URL}?${searchParams.toString()}`;
-    fetch(url).catch(() => {});
+    pending = fetch(url).catch(() => {});
   } catch {
     // telemetry must never crash the CLI
+  }
+}
+
+/**
+ * Wait for any in-flight telemetry request to complete.
+ * Call before process.exit() to prevent Node from killing the
+ * TCP connection before the request leaves the machine.
+ */
+export async function flushTelemetry(): Promise<void> {
+  try {
+    if (pending) await pending;
+  } catch {
+    // never crash
   }
 }
 

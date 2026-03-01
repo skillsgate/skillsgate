@@ -39,8 +39,8 @@ telemetryRoute.get("/t", async (c) => {
         blobs: [v, os, ci, source, sourceType, skills, agents, scope, query],
         doubles: [resultCount, skillCount, updatedCount, upToDateCount],
       });
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error(JSON.stringify({ message: "telemetry_ae_write_failed", event: e, error: err instanceof Error ? err.message : String(err) }));
     }
 
     // DB side-effects for add events
@@ -49,7 +49,8 @@ telemetryRoute.get("/t", async (c) => {
     }
 
     return c.body(null, 204);
-  } catch {
+  } catch (err) {
+    console.error(JSON.stringify({ message: "telemetry_handler_failed", error: err instanceof Error ? err.message : String(err) }));
     return c.body(null, 204);
   }
 });
@@ -89,7 +90,7 @@ async function handleAddEvent(
         update: {},
       });
     }
-  } catch {
-    // silently fail — telemetry should never break
+  } catch (err) {
+    console.error(JSON.stringify({ message: "telemetry_db_write_failed", source, error: err instanceof Error ? err.message : String(err) }));
   }
 }

@@ -83,12 +83,11 @@ async function handleAddEvent(
         ? `https://github.com/${source}`
         : source;
 
-      await db.$executeRawUnsafe(
-        `INSERT INTO pending_skills (id, github_url, source, submitted_at, status)
-         VALUES (gen_random_uuid()::text, $1, 'cli_add', now(), 'pending')
-         ON CONFLICT (github_url) DO NOTHING`,
-        githubUrl,
-      );
+      await db.pendingSkill.upsert({
+        where: { githubUrl },
+        create: { githubUrl, source: "cli_add" },
+        update: {},
+      });
     }
   } catch {
     // silently fail — telemetry should never break

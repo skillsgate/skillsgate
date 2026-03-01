@@ -84,7 +84,7 @@ function deriveInstallCommand(
 
   const isSingleSkill = githubPath === "SKILL.md" || !githubPath;
   if (isSingleSkill) {
-    return `npx skills add ${githubRepo} -y`;
+    return `skillsgate add ${githubRepo} -y`;
   }
 
   const parts = githubPath.split("/");
@@ -95,8 +95,8 @@ function deriveInstallCommand(
       : undefined;
 
   if (skillName) {
-    return `npx skills add ${githubRepo} --skill ${skillName} -y`;
+    return `skillsgate add ${githubRepo} --skill ${skillName} -y`;
   }
 
-  return `npx skills add ${githubRepo} -y`;
+  return `skillsgate add ${githubRepo} -y`;
 }

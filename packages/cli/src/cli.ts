@@ -9,6 +9,7 @@ import { runSync } from "./commands/sync.js";
 import { runLogin } from "./commands/login.js";
 import { runLogout } from "./commands/logout.js";
 import { runWhoami } from "./commands/whoami.js";
+import { runSearch } from "./commands/search.js";
 
 // "SKILLS" in dark silver (dim), "GATE" in bright white (bold)
 const s = (t: string) => pc.dim(t);       // dark silver
@@ -78,6 +79,12 @@ async function main(): Promise<void> {
       await runWhoami();
       break;
 
+    case "search":
+    case "find":
+    case "s":
+      await runSearch(restArgs);
+      break;
+
     case "--version":
     case "-v":
       console.log(`skillsgate v${VERSION}`);
@@ -116,6 +123,9 @@ function printHelp(): void {
   console.log(`    list               Show installed skills`);
   console.log(`    update ${DIM("[name]")}    Check and apply updates`);
   console.log(`    sync               Sync skills from node_modules`);
+  console.log(
+    `    search ${DIM("<query>")}   Search for skills`,
+  );
   console.log(`    login              Authenticate with SkillsGate`);
   console.log(`    logout             Sign out`);
   console.log(`    whoami             Show current user`);
@@ -125,6 +135,7 @@ function printHelp(): void {
   console.log(`    skillsgate add vercel-labs/agent-skills@my-skill`);
   console.log(`    skillsgate add https://github.com/owner/repo`);
   console.log(`    skillsgate add ./local/skills`);
+  console.log(`    skillsgate search "tailwind CSS"`);
   console.log(`    skillsgate remove my-skill`);
   console.log(`    skillsgate list -g`);
   console.log(`    skillsgate update`);

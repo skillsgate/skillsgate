@@ -1,7 +1,7 @@
 import path from "node:path";
 import os from "node:os";
 
-export const VERSION = "0.0.5";
+export const VERSION = "0.0.6";
 export const AGENTS_DIR = ".agents";
 export const SKILLS_SUBDIR = "skills";
 export const UNIVERSAL_SKILLS_DIR = ".agents/skills";
@@ -33,6 +33,8 @@ export const MAX_SKILL_DEPTH = 5;
 // Auth
 export const API_BASE_URL =
   process.env.SKILLSGATE_API_URL ?? "https://skillsgate.ai";
+export const SEARCH_API_URL =
+  process.env.SKILLSGATE_SEARCH_API_URL ?? "https://api.skillsgate.ai";
 export const AUTH_DIR = path.join(os.homedir(), ".skillsgate");
 export const AUTH_FILE = path.join(os.homedir(), ".skillsgate", "auth.json");
 export const DEVICE_CODE_POLL_INTERVAL = 5000; // ms

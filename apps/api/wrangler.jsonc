@@ -1,0 +1,23 @@
+{
+  "name": "skillsgate-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-12-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "a7e64ebf303b48599a157bc62b37e67f",
+      "localConnectionString": "postgresql://user:password@localhost:5432/skillsgate"
+    }
+  ],
+  "observability": { "enabled": true },
+  "define": {
+    "import.meta.url": "\"file:///worker.js\""
+  },
+  "routes": [
+    {
+      "pattern": "api.skillsgate.ai/*",
+      "zone_name": "skillsgate.ai"
+    }
+  ]
+}

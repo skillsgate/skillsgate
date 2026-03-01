@@ -5,6 +5,13 @@ generator client {
   runtime    = "cloudflare"
 }
 
+generator clientNode {
+  provider   = "prisma-client"
+  output     = "../src/generated/prisma-node"
+  engineType = "client"
+  runtime    = "nodejs"
+}
+
 datasource db {
   provider = "postgresql"
 }
@@ -60,6 +67,7 @@ model User {
   sessions    Session[]
   accounts    Account[]
   deviceCodes DeviceCode[]
+  searchUsage SearchUsage[]
 
   ownedNamespaces  Namespace[]       @relation("ownedNamespaces")
   namespaceAccess  NamespaceAccess[]
@@ -131,6 +139,20 @@ model DeviceCode {
 
   @@index([expiresAt], map: "idx_device_codes_expires")
   @@map("device_codes")
+}
+
+// ─── Search usage ─────────────────────────────────────────────────
+
+model SearchUsage {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  query      String
+  searchedAt DateTime @default(now()) @map("searched_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, searchedAt], map: "idx_search_usage_user_time")
+  @@map("search_usage")
 }
 
 // ─── Vector search ────────────────────────────────────────────────

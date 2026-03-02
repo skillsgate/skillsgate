@@ -40,6 +40,22 @@ searchRoute.post("/search", async (c) => {
     data: { userId, query },
   });
 
+  // Write per-result analytics (non-blocking)
+  c.executionCtx.waitUntil((async () => {
+    try {
+      for (let i = 0; i < results.length; i++) {
+        const r = results[i];
+        c.env.TELEMETRY.writeDataPoint({
+          indexes: ["search_result"],
+          blobs: [query, r.skillId, r.slug, r.name, r.githubUrl],
+          doubles: [r.score, i + 1, results.length],
+        });
+      }
+    } catch (err) {
+      console.error(JSON.stringify({ message: "search_result_telemetry_failed", error: err instanceof Error ? err.message : String(err) }));
+    }
+  })());
+
   return c.json({
     results,
     meta: {

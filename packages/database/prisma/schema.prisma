@@ -34,6 +34,13 @@ model Skill {
   hasScripts Boolean  @default(false) @map("has_scripts")
   hasReferences Boolean @default(false) @map("has_references")
 
+  // Access & pricing
+  visibility      String  @default("public") // "public" | "private" | "premium"
+  publisherId     String? @map("publisher_id")
+  orgId           String? @map("org_id")
+  connectedRepoId String? @map("connected_repo_id")
+  priceCents      Int?    @map("price_cents")
+
   // Stats
   downloads Int @default(0)
 
@@ -45,11 +52,16 @@ model Skill {
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   publishedAt DateTime? @map("published_at") @db.Timestamptz
 
-  chunks SkillChunk[]
+  chunks        SkillChunk[]
+  publisher     User?           @relation("publishedSkills", fields: [publisherId], references: [id])
+  org           Organization?   @relation(fields: [orgId], references: [id])
+  connectedRepo ConnectedRepo? @relation(fields: [connectedRepoId], references: [id])
 
   @@index([githubRepo, githubPath], map: "idx_skills_github")
   @@index([downloads(sort: Desc)], map: "idx_skills_downloads")
   @@index([createdAt(sort: Desc)], map: "idx_skills_created")
+  @@index([publisherId], map: "idx_skills_publisher")
+  @@index([orgId], map: "idx_skills_org")
   @@map("skills")
 }
 
@@ -69,8 +81,13 @@ model User {
   deviceCodes DeviceCode[]
   searchUsage SearchUsage[]
 
-  ownedNamespaces  Namespace[]       @relation("ownedNamespaces")
-  namespaceAccess  NamespaceAccess[]
+  ownedNamespaces         Namespace[]            @relation("ownedNamespaces")
+  namespaceAccess         NamespaceAccess[]
+  organizationMemberships OrganizationMember[]
+  connectedRepos          ConnectedRepo[]
+  purchases               Purchase[]
+  grantedAccess           NamespaceAccess[]      @relation("grantedAccess")
+  publishedSkills         Skill[]                @relation("publishedSkills")
 
   @@map("users")
 }
@@ -196,9 +213,10 @@ model Namespace {
   ownerId   String   @map("owner_id")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  owner   User              @relation("ownedNamespaces", fields: [ownerId], references: [id])
-  members NamespaceAccess[]
-  chunks  SkillChunk[]
+  owner     User              @relation("ownedNamespaces", fields: [ownerId], references: [id])
+  members   NamespaceAccess[]
+  chunks    SkillChunk[]
+  purchases Purchase[]
 
   @@map("namespaces")
 }
@@ -208,12 +226,88 @@ model NamespaceAccess {
   namespaceId String   @map("namespace_id")
   userId      String   @map("user_id")
   role        String   @default("reader") // "reader" | "publisher"
+  grantedBy   String?  @map("granted_by")
   grantedAt   DateTime @default(now()) @map("granted_at") @db.Timestamptz
 
   namespace Namespace @relation(fields: [namespaceId], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  granter   User?     @relation("grantedAccess", fields: [grantedBy], references: [id])
 
   @@unique([namespaceId, userId], map: "uq_namespace_access")
   @@index([userId], map: "idx_namespace_access_user")
   @@map("namespace_access")
+}
+
+// ─── Organizations ───────────────────────────────────────────────
+
+model Organization {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  name             String
+  avatarUrl        String?  @map("avatar_url")
+  billingEmail     String?  @map("billing_email")
+  plan             String   @default("free") // "free" | "team" | "enterprise"
+  privateSkillLimit Int     @default(5) @map("private_skill_limit")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  members        OrganizationMember[]
+  connectedRepos ConnectedRepo[]
+  skills         Skill[]
+
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  orgId    String   @map("org_id")
+  userId   String   @map("user_id")
+  role     String   @default("member") // "owner" | "admin" | "member"
+  joinedAt DateTime @default(now()) @map("joined_at") @db.Timestamptz
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([orgId, userId])
+  @@map("organization_members")
+}
+
+// ─── Connected Repos (GitHub sync) ──────────────────────────────
+
+model ConnectedRepo {
+  id                   String    @id @default(cuid())
+  orgId                String?   @map("org_id")
+  userId               String?   @map("user_id")
+  githubOwner          String    @map("github_owner")
+  githubRepo           String    @map("github_repo")
+  githubBranch         String    @default("main") @map("github_branch")
+  githubInstallationId String?   @map("github_installation_id")
+  skillCount           Int       @default(0) @map("skill_count")
+  lastSyncedAt         DateTime? @map("last_synced_at") @db.Timestamptz
+  syncStatus           String    @default("pending") @map("sync_status") // "pending" | "syncing" | "synced" | "error"
+  syncError            String?   @map("sync_error")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  org    Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user   User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skills Skill[]
+
+  @@unique([githubOwner, githubRepo])
+  @@map("connected_repos")
+}
+
+// ─── Purchases (premium catalogs) ───────────────────────────────
+
+model Purchase {
+  id              String   @id @default(cuid())
+  namespaceId     String   @map("namespace_id")
+  userId          String   @map("user_id")
+  priceCents      Int      @map("price_cents")
+  stripePaymentId String?  @map("stripe_payment_id")
+  purchasedAt     DateTime @default(now()) @map("purchased_at") @db.Timestamptz
+
+  namespace Namespace @relation(fields: [namespaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([namespaceId, userId])
+  @@map("purchases")
 }

@@ -1,13 +1,39 @@
 @import "tailwindcss";
 
+/* ─── Light mode (default) ─── */
 :root {
-	--background: #08080a;
-	--foreground: #e4e4e7;
-	--muted: #71717a;
-	--accent: #a1a1aa;
-	--glow: rgba(200, 200, 220, 0.06);
+	--background: #fafaf9;
+	--foreground: #1c1917;
+	--muted: #78716c;
+	--accent: #a8a29e;
+	--border: #e7e5e4;
+	--surface: #ffffff;
+	--surface-hover: #f5f5f4;
+	--glow: rgba(28, 25, 23, 0.03);
+	--code-bg: #f5f5f4;
+	--card-bg: #ffffff;
+	--card-border: #e7e5e4;
+	--nav-bg: rgba(250, 250, 249, 0.85);
+	--nav-border: rgba(231, 229, 228, 0.6);
 	--font-sora: "Sora", system-ui, sans-serif;
 	--font-geist-mono: "Geist Mono", ui-monospace, monospace;
+}
+
+/* ─── Dark mode ─── */
+.dark {
+	--background: #0a0a0b;
+	--foreground: #e7e5e4;
+	--muted: #78716c;
+	--accent: #a8a29e;
+	--border: #292524;
+	--surface: #141413;
+	--surface-hover: #1c1b1a;
+	--glow: rgba(231, 229, 228, 0.04);
+	--code-bg: #141413;
+	--card-bg: #141413;
+	--card-border: #292524;
+	--nav-bg: rgba(10, 10, 11, 0.85);
+	--nav-border: rgba(41, 37, 36, 0.6);
 }
 
 @theme inline {
@@ -15,8 +41,20 @@
 	--color-foreground: var(--foreground);
 	--color-muted: var(--muted);
 	--color-accent: var(--accent);
+	--color-border: var(--border);
+	--color-surface: var(--surface);
+	--color-surface-hover: var(--surface-hover);
+	--color-code-bg: var(--code-bg);
+	--color-card-bg: var(--card-bg);
+	--color-card-border: var(--card-border);
+	--color-nav-bg: var(--nav-bg);
+	--color-nav-border: var(--nav-border);
 	--font-sans: var(--font-sora);
 	--font-mono: var(--font-geist-mono);
+}
+
+html {
+	scroll-behavior: smooth;
 }
 
 body {
@@ -31,19 +69,19 @@ body::before {
 	content: "";
 	position: fixed;
 	inset: 0;
-	z-index: 50;
+	z-index: 9999;
 	pointer-events: none;
-	opacity: 0.03;
+	opacity: 0.025;
 	background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
 	background-repeat: repeat;
 	background-size: 256px 256px;
 }
 
-/* Entrance animations */
+/* ─── Animations ─── */
 @keyframes fade-up {
 	from {
 		opacity: 0;
-		transform: translateY(20px);
+		transform: translateY(24px);
 	}
 	to {
 		opacity: 1;
@@ -63,15 +101,31 @@ body::before {
 
 @keyframes subtle-float {
 	0%, 100% { transform: translateY(0px); }
-	50% { transform: translateY(-6px); }
+	50% { transform: translateY(-4px); }
+}
+
+@keyframes slide-down {
+	from {
+		opacity: 0;
+		transform: translateY(-8px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes typing-cursor {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0; }
 }
 
 .animate-fade-up {
-	animation: fade-up 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+	animation: fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .animate-fade-in {
-	animation: fade-in 1.2s ease both;
+	animation: fade-in 1s ease both;
 }
 
 .animate-glow-pulse {
@@ -80,4 +134,50 @@ body::before {
 
 .animate-subtle-float {
 	animation: subtle-float 6s ease-in-out infinite;
+}
+
+.animate-slide-down {
+	animation: slide-down 0.3s ease both;
+}
+
+/* ─── Scroll-triggered reveal ─── */
+.reveal {
+	opacity: 0;
+	transform: translateY(20px);
+	transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+	            transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal.visible {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+/* ─── FAQ accordion ─── */
+details summary {
+	cursor: pointer;
+	list-style: none;
+}
+
+details summary::-webkit-details-marker {
+	display: none;
+}
+
+details[open] .faq-icon {
+	transform: rotate(45deg);
+}
+
+.faq-icon {
+	transition: transform 0.2s ease;
+}
+
+/* ─── Smooth theme transition ─── */
+html.transitioning,
+html.transitioning *,
+html.transitioning *::before,
+html.transitioning *::after {
+	transition: background-color 0.3s ease,
+	            color 0.3s ease,
+	            border-color 0.3s ease,
+	            box-shadow 0.3s ease !important;
 }

@@ -6,7 +6,6 @@ import {
 	Scripts,
 	ScrollRestoration,
 } from "react-router";
-import { AuthButton } from "~/components/auth-button";
 import "./globals.css";
 
 export const links: LinksFunction = () => [
@@ -48,17 +47,20 @@ export const meta: MetaFunction = () => [
 
 export default function Root() {
 	return (
-		<html lang="en" className="dark">
+		<html lang="en" className="dark" suppressHydrationWarning>
 			<head>
 				<meta charSet="utf-8" />
 				<meta name="viewport" content="width=device-width, initial-scale=1" />
 				<Meta />
 				<Links />
+				{/* Inline script to prevent flash of wrong theme */}
+				<script
+					dangerouslySetInnerHTML={{
+						__html: `(function(){try{var t=localStorage.getItem('theme');if(t==='light'){document.documentElement.classList.remove('dark')}else{document.documentElement.classList.add('dark')}}catch(e){}})();`,
+					}}
+				/>
 			</head>
-			<body className="font-sora antialiased">
-				<header className="fixed top-0 right-0 z-50 p-4">
-					<AuthButton />
-				</header>
+			<body className="font-sans antialiased bg-background text-foreground">
 				<Outlet />
 				<ScrollRestoration />
 				<Scripts />

@@ -26,6 +26,7 @@ telemetryRoute.get("/t", async (c) => {
     const agents = c.req.query("agents") ?? "";
     const scope = c.req.query("scope") ?? "";
     const query = c.req.query("query") ?? "";
+    const scores = c.req.query("scores") ?? "";
 
     const resultCount = parseFloat(c.req.query("resultCount") ?? "") || 0;
     const skillCount = parseFloat(c.req.query("skillCount") ?? "") || 0;
@@ -36,7 +37,7 @@ telemetryRoute.get("/t", async (c) => {
     try {
       c.env.TELEMETRY.writeDataPoint({
         indexes: [e],
-        blobs: [v, os, ci, source, sourceType, skills, agents, scope, query],
+        blobs: [v, os, ci, source, sourceType, skills, agents, scope, query, scores],
         doubles: [resultCount, skillCount, updatedCount, upToDateCount],
       });
     } catch (err) {

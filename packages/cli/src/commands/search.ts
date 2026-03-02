@@ -15,6 +15,7 @@ interface SearchResult {
   keywords: string[];
   githubUrl: string;
   installCommand: string | null;
+  score?: number;
 }
 
 interface SearchResponse {
@@ -94,7 +95,11 @@ export async function runSearch(args: string[]): Promise<void> {
     const data = (await response.json()) as SearchResponse;
     spin.stop(`Found ${data.results.length} skill${data.results.length !== 1 ? "s" : ""}`);
 
-    trackSearch({ query, resultCount: data.results.length });
+    trackSearch({
+      query,
+      resultCount: data.results.length,
+      scores: data.results.map((r) => r.score).filter((s): s is number => s !== undefined),
+    });
 
     if (data.results.length === 0) {
       p.log.info("No skills found matching your query.");

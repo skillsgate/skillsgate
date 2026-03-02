@@ -12,6 +12,7 @@ export interface SearchResult {
   keywords: string[];
   githubUrl: string;
   installCommand: string | null;
+  score: number;
 }
 
 export async function searchSkills(
@@ -54,7 +55,7 @@ export async function searchSkills(
   const skillMap = new Map(skills.map((s) => [s.id, s]));
 
   // 6. Build response
-  return ranked.map(({ skillId }) => {
+  return ranked.map(({ skillId, bestScore }) => {
     const skill = skillMap.get(skillId);
     const githubRepo = skill?.githubRepo ?? "";
     const githubPath = skill?.githubPath ?? "";
@@ -72,6 +73,7 @@ export async function searchSkills(
       keywords: (skill?.keywords as string[]) ?? [],
       githubUrl,
       installCommand: deriveInstallCommand(githubRepo, githubPath),
+      score: Math.round(bestScore * 1000) / 1000,
     };
   });
 }

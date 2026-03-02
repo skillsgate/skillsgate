@@ -103,12 +103,14 @@ export function trackRemove(data: {
 export function trackSearch(data: {
   query?: string;
   resultCount?: number;
+  scores?: number[];
 }): void {
   try {
     trackEvent({
       e: "search",
       query: data.query,
       resultCount: data.resultCount,
+      scores: data.scores?.join(","),
     });
   } catch {
     // never crash

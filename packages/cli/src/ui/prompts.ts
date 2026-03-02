@@ -1,6 +1,11 @@
 import * as p from "@clack/prompts";
 import { AgentConfig, Skill, InstallScope, InstallMethod } from "../types.js";
 
+function truncate(text: string, max: number): string {
+  const line = text.replace(/\n/g, " ").trim();
+  return line.length > max ? line.slice(0, max - 1) + "…" : line;
+}
+
 export async function selectSkills(skills: Skill[]): Promise<Skill[]> {
   if (skills.length === 1) {
     p.log.info(`Found 1 skill: ${skills[0].name}`);
@@ -12,7 +17,7 @@ export async function selectSkills(skills: Skill[]): Promise<Skill[]> {
     options: skills.map((s) => ({
       value: s.name,
       label: s.name,
-      hint: s.description,
+      hint: truncate(s.description, 80),
     })),
     required: true,
   });

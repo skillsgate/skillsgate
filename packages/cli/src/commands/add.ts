@@ -89,11 +89,12 @@ export async function runAdd(args: string[]): Promise<void> {
       throw new NoSkillsInRepoError(sourceLabel);
     }
 
-    // Apply @skill filter
-    if (parsed.skillFilter) {
-      skills = filterSkills(skills, parsed.skillFilter);
+    // Apply skill filter (from @skill syntax or --skill flag)
+    const skillFilter = parsed.skillFilter || options.skill;
+    if (skillFilter) {
+      skills = filterSkills(skills, skillFilter);
       if (skills.length === 0) {
-        throw new SkillNotFoundError(parsed.skillFilter);
+        throw new SkillNotFoundError(skillFilter);
       }
     }
 

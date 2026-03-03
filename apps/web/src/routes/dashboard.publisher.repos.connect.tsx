@@ -6,14 +6,14 @@ import { api } from "~/lib/api";
 
 type GitHubRepo = {
 	id: number;
-	full_name: string;
+	fullName: string;
 	name: string;
-	owner: { login: string };
-	default_branch: string;
+	owner: string;
+	defaultBranch: string;
 	private: boolean;
 	description: string | null;
-	html_url: string;
-	updated_at: string;
+	htmlUrl: string;
+	updatedAt: string;
 };
 
 /* ─── Component ─── */
@@ -61,7 +61,7 @@ export default function ConnectRepoPage() {
 		const query = search.toLowerCase();
 		return repos.filter(
 			(r) =>
-				r.full_name.toLowerCase().includes(query) ||
+				r.fullName.toLowerCase().includes(query) ||
 				r.name.toLowerCase().includes(query) ||
 				(r.description?.toLowerCase().includes(query) ?? false),
 		);
@@ -72,9 +72,9 @@ export default function ConnectRepoPage() {
 		setConnectError(null);
 
 		const res = await api.post("/api/connected-repos", {
-			githubOwner: repo.owner.login,
+			githubOwner: repo.owner,
 			githubRepo: repo.name,
-			githubBranch: repo.default_branch,
+			githubBranch: repo.defaultBranch,
 		});
 
 		if (res.ok) {
@@ -183,7 +183,7 @@ export default function ConnectRepoPage() {
 								<div className="min-w-0 flex-1">
 									<div className="flex items-center gap-2 mb-1">
 										<p className="text-[14px] font-medium text-foreground font-mono truncate">
-											{repo.full_name}
+											{repo.fullName}
 										</p>
 										{repo.private ? (
 											<span className="inline-flex items-center px-2 py-0.5 text-[10px] font-mono tracking-wider uppercase rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
@@ -203,7 +203,7 @@ export default function ConnectRepoPage() {
 									<span className="text-[12px] text-muted/50">
 										default branch:{" "}
 										<span className="font-mono text-muted">
-											{repo.default_branch}
+											{repo.defaultBranch}
 										</span>
 									</span>
 									{connectError?.id === repo.id && (

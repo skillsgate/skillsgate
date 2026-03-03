@@ -1,3 +1,4 @@
+// Portions adapted from vercel-labs/skills (https://github.com/vercel-labs/skills)
 import os from "node:os";
 import path from "node:path";
 import fs from "node:fs/promises";

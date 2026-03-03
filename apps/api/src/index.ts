@@ -9,6 +9,7 @@ import { sharesRoute } from "./routes/shares";
 import { dashboardRoute } from "./routes/dashboard";
 import { publisherRoute } from "./routes/publisher";
 import { orgsRoute } from "./routes/orgs";
+import { skillsRoute } from "./routes/skills";
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -22,5 +23,6 @@ app.route("/api", sharesRoute);
 app.route("/api", dashboardRoute);
 app.route("/api", publisherRoute);
 app.route("/api", orgsRoute);
+app.route("/api", skillsRoute);
 
 export default app;

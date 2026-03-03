@@ -122,6 +122,12 @@ export function AuthButton() {
 			</button>
 			{open && (
 				<div className="absolute right-0 mt-2 w-44 rounded-xl border border-zinc-800/60 bg-zinc-900/40 p-2 backdrop-blur-sm">
+					<a
+						href="/dashboard/skills"
+						className="flex w-full items-center rounded-lg px-3 py-2.5 text-sm text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+					>
+						Dashboard
+					</a>
 					<button
 						onClick={handleSignOut}
 						className="flex w-full items-center rounded-lg px-3 py-2.5 text-sm text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"

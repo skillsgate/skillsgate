@@ -432,15 +432,6 @@ export default function OrgManagementPage() {
 				</div>
 			</section>
 
-			{/* Plan info */}
-			<div className="px-1">
-				<p className="text-[12px] text-muted">
-					Plan:{" "}
-					<span className="font-mono text-foreground">Team</span>
-					{" "} 50 private skills
-				</p>
-			</div>
-
 			{/* Remove member confirmation */}
 			{removeTarget && (
 				<ConfirmationDialog

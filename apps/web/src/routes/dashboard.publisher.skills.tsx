@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router";
+import { api } from "~/lib/api";
 
 /* ─── Types matching API contract ─── */
 
@@ -19,63 +20,6 @@ type PublisherSkill = {
 type PublisherSkillsData = {
 	skills: PublisherSkill[];
 };
-
-/* ─── Mock data (swap for real API calls) ─── */
-
-function getMockData(): PublisherSkillsData {
-	return {
-		skills: [
-			{
-				id: "sk_1",
-				slug: "audit-website",
-				name: "audit-website",
-				description: "Run comprehensive Lighthouse audits on any URL",
-				visibility: "public",
-				shareCount: null,
-				buyerCount: null,
-				downloads: 1204,
-				createdAt: "2026-01-15T00:00:00Z",
-				updatedAt: "2026-02-28T00:00:00Z",
-			},
-			{
-				id: "sk_2",
-				slug: "seo-checker",
-				name: "seo-checker",
-				description: "Check SEO best practices and get actionable recommendations",
-				visibility: "public",
-				shareCount: null,
-				buyerCount: null,
-				downloads: 847,
-				createdAt: "2026-01-20T00:00:00Z",
-				updatedAt: "2026-02-25T00:00:00Z",
-			},
-			{
-				id: "sk_3",
-				slug: "deploy-helper",
-				name: "deploy-helper",
-				description: "Automated deployment helper for CI/CD pipelines",
-				visibility: "private",
-				shareCount: 3,
-				buyerCount: null,
-				downloads: 0,
-				createdAt: "2026-02-15T00:00:00Z",
-				updatedAt: "2026-03-01T00:00:00Z",
-			},
-			{
-				id: "sk_4",
-				slug: "my-scratchpad",
-				name: "my-scratchpad",
-				description: "Personal development scratchpad",
-				visibility: "private",
-				shareCount: 0,
-				buyerCount: null,
-				downloads: 0,
-				createdAt: "2026-02-20T00:00:00Z",
-				updatedAt: "2026-02-28T00:00:00Z",
-			},
-		],
-	};
-}
 
 /* ─── Helpers ─── */
 
@@ -124,17 +68,57 @@ function getShareInfo(skill: PublisherSkill): string {
 /* ─── Component ─── */
 
 export default function PublisherSkillsPage() {
-	const [data] = useState<PublisherSkillsData>(getMockData);
+	const [data, setData] = useState<PublisherSkillsData>({ skills: [] });
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
 
-	const privateSkillCount = data.skills.filter(
-		(s) => s.visibility === "private",
-	).length;
-	const privateSkillLimit = 5;
+	useEffect(() => {
+		let cancelled = false;
+
+		async function fetchSkills() {
+			const res = await api.get<PublisherSkillsData>(
+				"/api/dashboard/publisher/skills",
+			);
+
+			if (cancelled) return;
+
+			if (res.ok) {
+				setData(res.data);
+			} else {
+				setError(res.error);
+			}
+			setLoading(false);
+		}
+
+		fetchSkills();
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	if (loading) {
+		return (
+			<div className="flex items-center justify-center py-20">
+				<div className="h-6 w-6 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+			</div>
+		);
+	}
+
+	if (error) {
+		return (
+			<div className="rounded-xl border border-border bg-card-bg p-12 text-center">
+				<p className="text-[15px] text-red-400 mb-2">
+					Failed to load skills.
+				</p>
+				<p className="text-[13px] text-muted/70">{error}</p>
+			</div>
+		);
+	}
 
 	return (
 		<div>
 			{/* Header */}
-			<div className="flex items-center justify-between mb-8">
+			<div className="flex items-start justify-between mb-8">
 				<div>
 					<h1 className="text-2xl font-semibold tracking-tight text-foreground">
 						Publisher Dashboard
@@ -143,22 +127,12 @@ export default function PublisherSkillsPage() {
 						Manage your published skills.
 					</p>
 				</div>
-				<button className="inline-flex items-center gap-1.5 px-4 py-2 text-[13px] font-medium text-foreground bg-surface-hover border border-border rounded-lg hover:border-accent/30 transition-colors">
-					<svg
-						width="14"
-						height="14"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						strokeWidth="2"
-						strokeLinecap="round"
-						strokeLinejoin="round"
-					>
-						<line x1="12" y1="5" x2="12" y2="19" />
-						<line x1="5" y1="12" x2="19" y2="12" />
-					</svg>
+				<Link
+					to="/dashboard/publisher/skills/new"
+					className="px-4 py-2 text-[13px] font-medium text-white bg-accent rounded-lg hover:bg-accent/90 transition-colors"
+				>
 					New Skill
-				</button>
+				</Link>
 			</div>
 
 			{/* Skills table */}
@@ -222,9 +196,15 @@ export default function PublisherSkillsPage() {
 					<p className="text-[15px] text-muted mb-2">
 						No published skills yet.
 					</p>
-					<p className="text-[13px] text-muted/70">
+					<p className="text-[13px] text-muted/70 mb-4">
 						Upload your first skill to get started.
 					</p>
+					<Link
+						to="/dashboard/publisher/skills/new"
+						className="inline-flex px-4 py-2 text-[13px] font-medium text-white bg-accent rounded-lg hover:bg-accent/90 transition-colors"
+					>
+						New Skill
+					</Link>
 				</div>
 			)}
 
@@ -243,23 +223,6 @@ export default function PublisherSkillsPage() {
 				</div>
 			</section>
 
-			{/* Free tier usage */}
-			<div className="mt-8 flex items-center justify-between px-1">
-				<p className="text-[12px] text-muted">
-					Private Skills:{" "}
-					<span className="font-mono text-foreground">
-						{privateSkillCount}
-					</span>{" "}
-					/{" "}
-					<span className="font-mono">
-						{privateSkillLimit}
-					</span>{" "}
-					free tier
-				</p>
-				<span className="text-[12px] text-accent hover:text-foreground transition-colors cursor-pointer">
-					Upgrade for unlimited
-				</span>
-			</div>
 		</div>
 	);
 }

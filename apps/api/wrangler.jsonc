@@ -10,6 +10,12 @@
       "localConnectionString": "postgresql://user:password@localhost:5432/skillsgate"
     }
   ],
+  "r2_buckets": [
+    {
+      "binding": "R2_SKILLS",
+      "bucket_name": "skillsgate-skills"
+    }
+  ],
   "analytics_engine_datasets": [
     { "binding": "TELEMETRY", "dataset": "skillsgate_cli" }
   ],

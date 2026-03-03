@@ -103,20 +103,6 @@ packages/
 | Auth | Better Auth (GitHub + Google OAuth, device code flow for CLI) |
 | CLI | TypeScript, Commander, published on npm |
 
-### How Search Works
-
-Skills are vectorized into a `skill_chunks` table with a `namespace` column for access scoping. A single pgvector query resolves both relevance and access control:
-
-```sql
-SELECT ..., 1 - (embedding <=> query_vector) AS score
-FROM skill_chunks
-WHERE namespace = 'public' OR namespace = ANY(user_namespaces)
-ORDER BY embedding <=> query_vector
-LIMIT 20;
-```
-
-No external vector database. No post-filtering. One query, scoped results.
-
 ### How Access Control Works
 
 Four namespace types handle every access pattern:

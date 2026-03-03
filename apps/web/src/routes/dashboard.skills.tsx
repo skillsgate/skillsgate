@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "~/lib/api";
 import { ConfirmationDialog } from "~/components/confirmation-dialog";
 
@@ -27,52 +27,18 @@ type DashboardSkillsData = {
 	catalogs: CatalogAccess[];
 };
 
-/* ─── Mock data (swap for real API calls) ─── */
+/* ─── Data fetching ─── */
 
-function getMockData(): DashboardSkillsData {
-	return {
-		shared: [
-			{
-				skill: {
-					id: "sk_1",
-					slug: "deploy-helper",
-					name: "deploy-helper",
-					description: "Automated deployment helper for CI/CD pipelines",
-				},
-				sharedBy: { id: "u_1", name: "Bob Smith", githubUsername: "bob" },
-				grantedAt: new Date(Date.now() - 3 * 86400000).toISOString(),
-				namespaceId: "skill_sk_1",
-			},
-			{
-				skill: {
-					id: "sk_2",
-					slug: "db-migration",
-					name: "db-migration",
-					description: "Database migration helper with rollback support",
-				},
-				sharedBy: { id: "u_2", name: "Alice Chen", githubUsername: "alice" },
-				grantedAt: new Date(Date.now() - 7 * 86400000).toISOString(),
-				namespaceId: "skill_sk_2",
-			},
-		],
-		orgs: [
-			{
-				org: {
-					id: "org_1",
-					slug: "acme",
-					name: "Acme Corp",
-					avatarUrl: null,
-				},
-				skillCount: 12,
-			},
-		],
-		catalogs: [
-			{
-				namespace: { id: "pub_tailwind", name: "Tailwind Pro" },
-				skillCount: 8,
-			},
-		],
-	};
+const EMPTY_DATA: DashboardSkillsData = { shared: [], orgs: [], catalogs: [] };
+
+async function fetchDashboardSkills(): Promise<DashboardSkillsData> {
+	try {
+		const res = await api.get("/api/dashboard/skills");
+		if (!res.ok) return EMPTY_DATA;
+		return await res.json();
+	} catch {
+		return EMPTY_DATA;
+	}
 }
 
 /* ─── Helper ─── */
@@ -94,9 +60,17 @@ function formatRelativeDate(isoDate: string): string {
 /* ─── Component ─── */
 
 export default function DashboardSkillsPage() {
-	const [data, setData] = useState<DashboardSkillsData>(getMockData);
+	const [data, setData] = useState<DashboardSkillsData>(EMPTY_DATA);
+	const [loading, setLoading] = useState(true);
 	const [leaveTarget, setLeaveTarget] = useState<SharedSkill | null>(null);
 	const [isLeaving, setIsLeaving] = useState(false);
+
+	useEffect(() => {
+		fetchDashboardSkills().then((d) => {
+			setData(d);
+			setLoading(false);
+		});
+	}, []);
 
 	async function handleLeave() {
 		if (!leaveTarget) return;
@@ -123,6 +97,14 @@ export default function DashboardSkillsPage() {
 		data.shared.length === 0 &&
 		data.orgs.length === 0 &&
 		data.catalogs.length === 0;
+
+	if (loading) {
+		return (
+			<div className="flex items-center justify-center py-20">
+				<div className="h-6 w-6 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+			</div>
+		);
+	}
 
 	return (
 		<div>

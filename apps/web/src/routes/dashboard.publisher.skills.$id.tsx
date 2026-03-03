@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useParams } from "react-router";
+import { useState, useEffect } from "react";
+import { Link, useParams, useNavigate } from "react-router";
 import { api } from "~/lib/api";
 import { UserSearch } from "~/components/user-search";
 import { ConfirmationDialog } from "~/components/confirmation-dialog";
@@ -29,68 +29,13 @@ type SkillDetail = {
 	createdAt: string;
 	updatedAt: string;
 	downloads: number;
-	priceCents: number | null;
 };
 
 type SkillDetailData = {
 	skill: SkillDetail;
 	shares: Share[];
 	shareCount: number;
-	shareLimit: number;
 };
-
-/* ─── Mock data (swap for real API calls) ─── */
-
-function getMockData(id: string): SkillDetailData {
-	return {
-		skill: {
-			id,
-			slug: "deploy-helper",
-			name: "deploy-helper",
-			description: "Automated deployment helper for CI/CD pipelines",
-			visibility: "private",
-			sourceType: "direct",
-			createdAt: "2026-02-15T00:00:00Z",
-			updatedAt: "2026-03-01T00:00:00Z",
-			downloads: 0,
-			priceCents: null,
-		},
-		shares: [
-			{
-				user: {
-					id: "u_owner",
-					name: "You",
-					image: null,
-					githubUsername: "you",
-				},
-				role: "publisher",
-				grantedAt: "2026-02-15T00:00:00Z",
-			},
-			{
-				user: {
-					id: "u_1",
-					name: "Alice Chen",
-					image: null,
-					githubUsername: "alice",
-				},
-				role: "reader",
-				grantedAt: "2026-02-20T00:00:00Z",
-			},
-			{
-				user: {
-					id: "u_2",
-					name: "Charlie Brown",
-					image: null,
-					githubUsername: "charlie",
-				},
-				role: "reader",
-				grantedAt: "2026-02-22T00:00:00Z",
-			},
-		],
-		shareCount: 3,
-		shareLimit: 10,
-	};
-}
 
 /* ─── Helpers ─── */
 
@@ -131,13 +76,43 @@ function getVisibilityBadge(visibility: string) {
 
 export default function SkillDetailPage() {
 	const { id } = useParams();
-	const [data, setData] = useState<SkillDetailData>(() =>
-		getMockData(id ?? ""),
-	);
+	const navigate = useNavigate();
+
+	const [data, setData] = useState<SkillDetailData | null>(null);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
+
 	const [revokeTarget, setRevokeTarget] = useState<Share | null>(null);
 	const [isRevoking, setIsRevoking] = useState(false);
 	const [isSharing, setIsSharing] = useState(false);
 	const [shareError, setShareError] = useState<string | null>(null);
+
+	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+	const [isDeleting, setIsDeleting] = useState(false);
+
+	useEffect(() => {
+		let cancelled = false;
+
+		async function fetchSkill() {
+			const res = await api.get<SkillDetailData>(
+				`/api/dashboard/publisher/skills/${id}`,
+			);
+
+			if (cancelled) return;
+
+			if (res.ok) {
+				setData(res.data);
+			} else {
+				setError(res.error);
+			}
+			setLoading(false);
+		}
+
+		fetchSkill();
+		return () => {
+			cancelled = true;
+		};
+	}, [id]);
 
 	async function handleShare(user: {
 		id: string;
@@ -157,11 +132,15 @@ export default function SkillDetailPage() {
 		setIsSharing(false);
 
 		if (res.ok) {
-			setData((prev) => ({
-				...prev,
-				shares: [...prev.shares, res.data.share],
-				shareCount: prev.shareCount + 1,
-			}));
+			setData((prev) =>
+				prev
+					? {
+							...prev,
+							shares: [...prev.shares, res.data.share],
+							shareCount: prev.shareCount + 1,
+						}
+					: prev,
+			);
 		} else if (!res.ok && res.status === 404) {
 			setShareError(
 				`@${user.githubUsername} isn't on SkillsGate yet.`,
@@ -184,17 +163,76 @@ export default function SkillDetailPage() {
 		);
 
 		if (res.ok) {
-			setData((prev) => ({
-				...prev,
-				shares: prev.shares.filter(
-					(s) => s.user.id !== revokeTarget.user.id,
-				),
-				shareCount: prev.shareCount - 1,
-			}));
+			setData((prev) =>
+				prev
+					? {
+							...prev,
+							shares: prev.shares.filter(
+								(s) => s.user.id !== revokeTarget.user.id,
+							),
+							shareCount: prev.shareCount - 1,
+						}
+					: prev,
+			);
 		}
 
 		setIsRevoking(false);
 		setRevokeTarget(null);
+	}
+
+	async function handleDelete() {
+		setIsDeleting(true);
+
+		const res = await api.delete(`/api/skills/${id}`);
+
+		if (res.ok) {
+			navigate("/dashboard/publisher/skills", { replace: true });
+		} else {
+			setIsDeleting(false);
+			setShowDeleteDialog(false);
+		}
+	}
+
+	if (loading) {
+		return (
+			<div className="flex items-center justify-center py-20">
+				<div className="h-6 w-6 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+			</div>
+		);
+	}
+
+	if (error || !data) {
+		return (
+			<div>
+				<Link
+					to="/dashboard/publisher/skills"
+					className="inline-flex items-center gap-1.5 text-[13px] text-muted hover:text-foreground transition-colors mb-6"
+				>
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="1.5"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+					>
+						<line x1="19" y1="12" x2="5" y2="12" />
+						<polyline points="12 19 5 12 12 5" />
+					</svg>
+					Back to skills
+				</Link>
+				<div className="rounded-xl border border-border bg-card-bg p-12 text-center">
+					<p className="text-[15px] text-red-400 mb-2">
+						Skill not found.
+					</p>
+					<p className="text-[13px] text-muted/70">
+						{error ?? "This skill may have been deleted."}
+					</p>
+				</div>
+			</div>
+		);
 	}
 
 	const isPrivate = data.skill.visibility === "private";
@@ -242,6 +280,12 @@ export default function SkillDetailPage() {
 						</span>
 					</p>
 				</div>
+				<button
+					onClick={() => setShowDeleteDialog(true)}
+					className="px-4 py-2 text-[13px] font-medium text-muted border border-border rounded-lg hover:text-red-400 hover:border-red-400/30 transition-colors"
+				>
+					Delete
+				</button>
 			</div>
 
 			{/* Sharing section (only for private skills) */}
@@ -331,18 +375,6 @@ export default function SkillDetailPage() {
 							)}
 						</div>
 
-						{/* Usage */}
-						<div className="px-5 py-3 border-t border-border bg-surface-hover/50">
-							<p className="text-[12px] text-muted">
-								<span className="font-mono text-foreground">
-									{data.shareCount}
-								</span>{" "}
-								/{" "}
-								<span className="font-mono">{data.shareLimit}</span> share
-								slots used{" "}
-								<span className="text-muted/50">(free tier)</span>
-							</p>
-						</div>
 					</div>
 				</section>
 			)}
@@ -378,18 +410,6 @@ export default function SkillDetailPage() {
 								{data.skill.downloads}
 							</span>
 						</div>
-						<div className="flex items-center justify-between">
-							<span className="text-[13px] text-muted">Files</span>
-							<span className="text-[13px] font-mono text-muted">
-								SKILL.md, scripts/deploy.sh
-							</span>
-						</div>
-						<div className="flex items-center justify-between">
-							<span className="text-[13px] text-muted">Security</span>
-							<span className="text-[13px] text-emerald-400">
-								Clean (scanned {formatDate(data.skill.updatedAt)})
-							</span>
-						</div>
 					</div>
 				</div>
 			</section>
@@ -403,6 +423,18 @@ export default function SkillDetailPage() {
 					onConfirm={handleRevoke}
 					onCancel={() => setRevokeTarget(null)}
 					isLoading={isRevoking}
+				/>
+			)}
+
+			{/* Delete confirmation */}
+			{showDeleteDialog && (
+				<ConfirmationDialog
+					title="Delete skill?"
+					message={`Permanently delete "${data.skill.name}"? This action cannot be undone. All shared access will be revoked.`}
+					confirmLabel="Delete"
+					onConfirm={handleDelete}
+					onCancel={() => setShowDeleteDialog(false)}
+					isLoading={isDeleting}
 				/>
 			)}
 		</div>

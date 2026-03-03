@@ -40,5 +40,8 @@
     "ts-node": "^10.9.2",
     "tsx": "^4.19.1",
     "wrangler": "^4.63.0"
+  },
+  "dependencies": {
+    "skillsgate": "^0.0.6"
   }
 }

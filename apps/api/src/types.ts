@@ -4,6 +4,7 @@ export interface Bindings {
   HYPERDRIVE: { connectionString: string };
   OPENAI_API_KEY: string;
   TELEMETRY: AnalyticsEngineDataset;
+  R2_SKILLS: R2Bucket;
 }
 
 export interface Variables {

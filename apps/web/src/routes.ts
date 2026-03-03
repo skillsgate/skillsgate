@@ -12,6 +12,7 @@ export default [
 		route("dashboard/skills", "routes/dashboard.skills.tsx"),
 		layout("routes/dashboard.publisher.tsx", [
 			route("dashboard/publisher/skills", "routes/dashboard.publisher.skills.tsx"),
+			route("dashboard/publisher/skills/new", "routes/dashboard.publisher.skills.new.tsx"),
 			route("dashboard/publisher/skills/:id", "routes/dashboard.publisher.skills.$id.tsx"),
 			route("dashboard/publisher/orgs/:orgId", "routes/dashboard.publisher.orgs.$orgId.tsx"),
 		]),

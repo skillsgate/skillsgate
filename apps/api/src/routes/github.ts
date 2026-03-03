@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Bindings, Variables } from "../types";
 import { authMiddleware } from "../middleware/auth";
+import { validateGitHubToken } from "../lib/github-token";
 
 export const githubRoute = new Hono<{
   Bindings: Bindings;
@@ -22,12 +23,29 @@ githubRoute.get("/github/repos", async (c) => {
 
   if (!account || !account.accessToken) {
     return c.json(
-      { error: "GitHub account not linked or access token missing" },
+      {
+        error: "github_not_linked",
+        message:
+          "No GitHub account is linked. Please link your GitHub account to connect repos.",
+      },
       400,
     );
   }
 
   const githubToken = account.accessToken;
+
+  // Validate token before making the repos call
+  const tokenValid = await validateGitHubToken(githubToken);
+  if (!tokenValid) {
+    return c.json(
+      {
+        error: "github_reauth_required",
+        message:
+          "Your GitHub authorization has expired or lacks required permissions. Please re-authorize.",
+      },
+      403,
+    );
+  }
 
   // Fetch repos from GitHub API
   const githubRes = await fetch(
@@ -41,11 +59,23 @@ githubRoute.get("/github/repos", async (c) => {
     },
   );
 
+  if (githubRes.status === 401 || githubRes.status === 403) {
+    return c.json(
+      {
+        error: "github_reauth_required",
+        message:
+          "Your GitHub authorization has expired or lacks required permissions. Please re-authorize.",
+      },
+      403,
+    );
+  }
+
   if (!githubRes.ok) {
     const errorText = await githubRes.text();
     return c.json(
       {
-        error: "Failed to fetch repos from GitHub",
+        error: "github_api_error",
+        message: "Failed to fetch repos from GitHub",
         details: errorText,
       },
       502,

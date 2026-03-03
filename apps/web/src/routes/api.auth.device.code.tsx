@@ -11,7 +11,7 @@ function generateCode(): string {
 }
 
 export async function action({ request, context }: ActionFunctionArgs) {
-	const auth = createAuth(context.cloudflare.env.HYPERDRIVE.connectionString);
+	const auth = createAuth(context.cloudflare.env.HYPERDRIVE.connectionString, context.cloudflare.env as any);
 	const session = await auth.api.getSession({ headers: request.headers });
 
 	if (!session) {

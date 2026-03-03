@@ -3,19 +3,30 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { bearer } from "better-auth/plugins";
 import { createDatabaseClient } from "@skillsgate/database";
 
-export function createAuth(connectionString: string) {
+type AuthEnv = {
+	GITHUB_CLIENT_ID: string;
+	GITHUB_CLIENT_SECRET: string;
+	GOOGLE_CLIENT_ID: string;
+	GOOGLE_CLIENT_SECRET: string;
+	BETTER_AUTH_SECRET: string;
+	APP_URL?: string;
+};
+
+export function createAuth(connectionString: string, env: AuthEnv) {
 	const prisma = createDatabaseClient(connectionString);
+	const appUrl = env.APP_URL ?? "https://skillsgate.ai";
 	return betterAuth({
+		baseURL: appUrl,
 		database: prismaAdapter(prisma, { provider: "postgresql" }),
 		emailAndPassword: { enabled: false },
 		socialProviders: {
 			github: {
-				clientId: process.env.GITHUB_CLIENT_ID!,
-				clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+				clientId: env.GITHUB_CLIENT_ID,
+				clientSecret: env.GITHUB_CLIENT_SECRET,
 			},
 			google: {
-				clientId: process.env.GOOGLE_CLIENT_ID!,
-				clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+				clientId: env.GOOGLE_CLIENT_ID,
+				clientSecret: env.GOOGLE_CLIENT_SECRET,
 			},
 		},
 		account: {
@@ -33,10 +44,8 @@ export function createAuth(connectionString: string) {
 		},
 		plugins: [bearer()],
 		basePath: "/api/auth",
-		secret: process.env.BETTER_AUTH_SECRET,
-		trustedOrigins: [
-			process.env.APP_URL ?? "http://localhost:3000",
-		],
+		secret: env.BETTER_AUTH_SECRET,
+		trustedOrigins: [appUrl],
 	});
 }
 

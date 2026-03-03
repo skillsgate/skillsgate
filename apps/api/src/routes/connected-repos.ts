@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Bindings, Variables } from "../types";
 import { authMiddleware } from "../middleware/auth";
 import { syncRepo, disconnectRepo } from "../lib/github-sync";
+import { validateGitHubToken } from "../lib/github-token";
 
 export const connectedReposRoute = new Hono<{
   Bindings: Bindings;
@@ -18,6 +19,16 @@ const connectRepoSchema = z.object({
   githubRepo: z.string().min(1),
   githubBranch: z.string().min(1).optional(),
 });
+
+// ─── Reauth error response helper ────────────────────────────────
+
+function reauthError() {
+  return {
+    error: "github_reauth_required",
+    message:
+      "Your GitHub authorization has expired or lacks required permissions. Please re-authorize.",
+  } as const;
+}
 
 // ─── GET /connected-repos — List user's connected repos ──────────
 
@@ -78,10 +89,13 @@ connectedReposRoute.post("/connected-repos", async (c) => {
   });
 
   if (!account || !account.accessToken) {
-    return c.json(
-      { error: "GitHub account not linked or access token missing" },
-      400,
-    );
+    return c.json(reauthError(), 403);
+  }
+
+  // Validate the token before proceeding
+  const tokenValid = await validateGitHubToken(account.accessToken);
+  if (!tokenValid) {
+    return c.json(reauthError(), 403);
   }
 
   const repoId = crypto.randomUUID();
@@ -188,10 +202,13 @@ connectedReposRoute.post("/connected-repos/:id/sync", async (c) => {
   });
 
   if (!account || !account.accessToken) {
-    return c.json(
-      { error: "GitHub account not linked or access token missing" },
-      400,
-    );
+    return c.json(reauthError(), 403);
+  }
+
+  // Validate the token before proceeding
+  const tokenValid = await validateGitHubToken(account.accessToken);
+  if (!tokenValid) {
+    return c.json(reauthError(), 403);
   }
 
   // Mark as syncing

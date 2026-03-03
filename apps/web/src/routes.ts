@@ -14,6 +14,8 @@ export default [
 			route("dashboard/publisher/skills", "routes/dashboard.publisher.skills.tsx"),
 			route("dashboard/publisher/skills/new", "routes/dashboard.publisher.skills.new.tsx"),
 			route("dashboard/publisher/skills/:id", "routes/dashboard.publisher.skills.$id.tsx"),
+			route("dashboard/publisher/repos", "routes/dashboard.publisher.repos.tsx"),
+			route("dashboard/publisher/repos/connect", "routes/dashboard.publisher.repos.connect.tsx"),
 			route("dashboard/publisher/orgs/:orgId", "routes/dashboard.publisher.orgs.$orgId.tsx"),
 		]),
 	]),

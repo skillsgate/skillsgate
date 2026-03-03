@@ -10,6 +10,8 @@ import { dashboardRoute } from "./routes/dashboard";
 import { publisherRoute } from "./routes/publisher";
 import { orgsRoute } from "./routes/orgs";
 import { skillsRoute } from "./routes/skills";
+import { githubRoute } from "./routes/github";
+import { connectedReposRoute } from "./routes/connected-repos";
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -24,5 +26,7 @@ app.route("/api", dashboardRoute);
 app.route("/api", publisherRoute);
 app.route("/api", orgsRoute);
 app.route("/api", skillsRoute);
+app.route("/api", githubRoute);
+app.route("/api", connectedReposRoute);
 
 export default app;

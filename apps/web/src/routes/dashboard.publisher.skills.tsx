@@ -208,18 +208,18 @@ export default function PublisherSkillsPage() {
 				</div>
 			)}
 
-			{/* Connected Repos placeholder */}
+			{/* Connected Repos */}
 			<section className="mt-8">
-				<h2 className="text-[13px] font-mono tracking-[0.1em] uppercase text-muted mb-4">
-					Connected Repos
-				</h2>
-				<div className="rounded-xl border border-border border-dashed bg-card-bg p-8 text-center">
-					<p className="text-[13px] text-muted">
-						GitHub repo syncing coming soon.
-					</p>
-					<p className="text-[12px] text-muted/50 mt-1">
-						Connect a GitHub repo to automatically publish skills from your codebase.
-					</p>
+				<div className="flex items-center justify-between mb-4">
+					<h2 className="text-[13px] font-mono tracking-[0.1em] uppercase text-muted">
+						Connected Repos
+					</h2>
+					<Link
+						to="/dashboard/publisher/repos"
+						className="text-[13px] text-accent hover:text-accent/80 transition-colors"
+					>
+						Manage connected repos &rarr;
+					</Link>
 				</div>
 			</section>
 

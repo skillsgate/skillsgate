@@ -88,6 +88,7 @@ model User {
   purchases               Purchase[]
   grantedAccess           NamespaceAccess[]      @relation("grantedAccess")
   publishedSkills         Skill[]                @relation("publishedSkills")
+  githubInstallations      GitHubInstallation[]
 
   @@map("users")
 }
@@ -182,6 +183,23 @@ model PendingSkill {
   status      String   @default("pending") // pending, processing, indexed, rejected
 
   @@map("pending_skills")
+}
+
+// ─── GitHub App Installations ───────────────────────────────────
+
+model GitHubInstallation {
+  id             String   @id @default(cuid())
+  userId         String   @map("user_id")
+  installationId String   @map("installation_id")
+  accountLogin   String?  @map("account_login")
+  accountType    String?  @map("account_type")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, installationId], map: "uq_github_installations_user_installation")
+  @@index([userId], map: "idx_github_installations_user")
+  @@map("github_installations")
 }
 
 // ─── Vector search ────────────────────────────────────────────────

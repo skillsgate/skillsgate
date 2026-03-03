@@ -23,6 +23,7 @@ export function createAuth(connectionString: string, env: AuthEnv) {
 			github: {
 				clientId: env.GITHUB_CLIENT_ID,
 				clientSecret: env.GITHUB_CLIENT_SECRET,
+				scope: "read:user user:email read:org",
 			},
 			google: {
 				clientId: env.GOOGLE_CLIENT_ID,

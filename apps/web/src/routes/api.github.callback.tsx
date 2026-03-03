@@ -6,14 +6,14 @@ import { getDb } from "@skillsgate/database";
 /**
  * GET /api/github/callback
  *
- * Handles the GitHub OAuth callback after the user grants repo access.
- * Exchanges the code for a token and stores it in the account table.
+ * Handles the GitHub App installation callback.
+ * Stores the installation id for the current user.
  */
 export async function loader({ request, context }: LoaderFunctionArgs) {
 	const env = context.cloudflare.env as any;
 	const url = new URL(request.url);
 
-	const code = url.searchParams.get("code");
+	const installationId = url.searchParams.get("installation_id");
 	const state = url.searchParams.get("state");
 	const error = url.searchParams.get("error");
 
@@ -22,7 +22,7 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
 		return redirect("/dashboard/publisher/repos/connect?error=denied");
 	}
 
-	if (!code || !state) {
+	if (!installationId || !state) {
 		return redirect("/dashboard/publisher/repos/connect?error=invalid");
 	}
 
@@ -43,75 +43,22 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
 		return redirect("/");
 	}
 
-	// Exchange code for access token
-	const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			Accept: "application/json",
-		},
-		body: JSON.stringify({
-			client_id: env.GITHUB_CLIENT_ID,
-			client_secret: env.GITHUB_CLIENT_SECRET,
-			code,
-			redirect_uri: `${env.APP_URL ?? "https://skillsgate.ai"}/api/github/callback`,
-		}),
-	});
-
-	if (!tokenRes.ok) {
-		return redirect("/dashboard/publisher/repos/connect?error=token_exchange");
-	}
-
-	const tokenData = (await tokenRes.json()) as {
-		access_token?: string;
-		error?: string;
-		scope?: string;
-	};
-
-	if (!tokenData.access_token || tokenData.error) {
-		return redirect("/dashboard/publisher/repos/connect?error=token_exchange");
-	}
-
-	// Store the new token in the account table
+	// Store the installation for this user
 	const db = getDb(env);
 
-	const account = await db.account.findFirst({
-		where: { userId: session.user.id, providerId: "github" },
-	});
-
-	if (account) {
-		// Update existing GitHub account with the new token (which has repo scope)
-		await db.account.update({
-			where: { id: account.id },
-			data: { accessToken: tokenData.access_token },
-		});
-	} else {
-		// Fetch GitHub user info to create the account record
-		const ghUserRes = await fetch("https://api.github.com/user", {
-			headers: {
-				Authorization: `Bearer ${tokenData.access_token}`,
-				"User-Agent": "SkillsGate",
-				Accept: "application/vnd.github+json",
+	await db.gitHubInstallation.upsert({
+		where: {
+			userId_installationId: {
+				userId: session.user.id,
+				installationId,
 			},
-		});
-
-		if (ghUserRes.ok) {
-			const ghUser = (await ghUserRes.json()) as {
-				id: number;
-				login: string;
-			};
-
-			await db.account.create({
-				data: {
-					id: crypto.randomUUID(),
-					userId: session.user.id,
-					providerId: "github",
-					accountId: String(ghUser.id),
-					accessToken: tokenData.access_token,
-				},
-			});
-		}
-	}
+		},
+		update: {},
+		create: {
+			userId: session.user.id,
+			installationId,
+		},
+	});
 
 	// Clear the state cookie and redirect to connect page
 	return new Response(null, {

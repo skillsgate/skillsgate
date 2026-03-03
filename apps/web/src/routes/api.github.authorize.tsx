@@ -5,9 +5,8 @@ import { createAuth } from "~/lib/auth";
 /**
  * GET /api/github/authorize
  *
- * Redirects the user to GitHub OAuth with `repo` scope.
- * This is a separate flow from sign-in — used when the user
- * explicitly wants to grant repo access for connecting repos.
+ * Redirects the user to GitHub App installation flow.
+ * Users explicitly choose which repos to grant access to.
  */
 export async function loader({ request, context }: LoaderFunctionArgs) {
 	const env = context.cloudflare.env as any;
@@ -20,19 +19,21 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
 		return redirect("/");
 	}
 
-	const clientId = env.GITHUB_CLIENT_ID;
+	const appSlug = env.GITHUB_APP_SLUG;
 	const appUrl = env.APP_URL ?? "https://skillsgate.ai";
 	const callbackUrl = `${appUrl}/api/github/callback`;
+
+	if (!appSlug) {
+		return redirect("/dashboard/publisher/repos/connect?error=app_not_configured");
+	}
 
 	// Generate a state token to prevent CSRF
 	const state = crypto.randomUUID();
 
 	// Store state in a cookie so we can verify it on callback
-	const url = new URL("https://github.com/login/oauth/authorize");
-	url.searchParams.set("client_id", clientId);
-	url.searchParams.set("redirect_uri", callbackUrl);
-	url.searchParams.set("scope", "read:user user:email repo");
+	const url = new URL(`https://github.com/apps/${appSlug}/installations/new`);
 	url.searchParams.set("state", state);
+	url.searchParams.set("redirect_url", callbackUrl);
 
 	return new Response(null, {
 		status: 302,

@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Bindings, Variables } from "../types";
 import { authMiddleware } from "../middleware/auth";
 import { syncRepo, disconnectRepo } from "../lib/github-sync";
-import { validateGitHubToken } from "../lib/github-token";
+import { createGitHubAppJwt, getInstallationToken } from "../lib/github-app";
 
 export const connectedReposRoute = new Hono<{
   Bindings: Bindings;
@@ -18,15 +18,16 @@ const connectRepoSchema = z.object({
   githubOwner: z.string().min(1),
   githubRepo: z.string().min(1),
   githubBranch: z.string().min(1).optional(),
+  githubInstallationId: z.string().min(1),
 });
 
 // ─── Reauth error response helper ────────────────────────────────
 
-function reauthError() {
+function installRequiredError() {
   return {
-    error: "github_reauth_required",
+    error: "github_install_required",
     message:
-      "Your GitHub authorization has expired or lacks required permissions. Please re-authorize.",
+      "GitHub App installation is missing or no longer valid. Please reinstall.",
   } as const;
 }
 
@@ -72,7 +73,7 @@ connectedReposRoute.post("/connected-repos", async (c) => {
     );
   }
 
-  const { githubOwner, githubRepo, githubBranch } = parsed.data;
+  const { githubOwner, githubRepo, githubBranch, githubInstallationId } = parsed.data;
 
   // Check if this repo is already connected by this user
   const existing = await db.connectedRepo.findFirst({
@@ -83,19 +84,27 @@ connectedReposRoute.post("/connected-repos", async (c) => {
     return c.json({ error: "Repository is already connected" }, 409);
   }
 
-  // Get the user's GitHub token for syncing
-  const account = await db.account.findFirst({
-    where: { userId, providerId: "github" },
+  const installation = await db.gitHubInstallation.findFirst({
+    where: { userId, installationId: githubInstallationId },
   });
 
-  if (!account || !account.accessToken) {
-    return c.json(reauthError(), 403);
+  if (!installation) {
+    return c.json(installRequiredError(), 403);
   }
 
-  // Validate the token before proceeding
-  const tokenValid = await validateGitHubToken(account.accessToken);
-  if (!tokenValid) {
-    return c.json(reauthError(), 403);
+  if (!c.env.GITHUB_APP_ID || !c.env.GITHUB_APP_PRIVATE_KEY) {
+    return c.json({ error: "github_app_not_configured" }, 500);
+  }
+
+  let installationToken: string;
+  try {
+    const appJwt = await createGitHubAppJwt(
+      c.env.GITHUB_APP_ID,
+      c.env.GITHUB_APP_PRIVATE_KEY,
+    );
+    installationToken = await getInstallationToken(appJwt, githubInstallationId);
+  } catch {
+    return c.json(installRequiredError(), 403);
   }
 
   const repoId = crypto.randomUUID();
@@ -108,6 +117,7 @@ connectedReposRoute.post("/connected-repos", async (c) => {
       githubOwner,
       githubRepo,
       githubBranch: branch,
+      githubInstallationId,
       syncStatus: "syncing",
     },
   });
@@ -119,7 +129,7 @@ connectedReposRoute.post("/connected-repos", async (c) => {
       githubOwner,
       githubRepo,
       githubBranch: branch,
-      githubToken: account.accessToken,
+      githubToken: installationToken,
       publisherId: userId,
       db,
       r2: c.env.R2_SKILLS,
@@ -134,6 +144,7 @@ connectedReposRoute.post("/connected-repos", async (c) => {
         githubOwner: repo.githubOwner,
         githubRepo: repo.githubRepo,
         githubBranch: repo.githubBranch,
+        githubInstallationId: repo.githubInstallationId,
         skillCount: repo.skillCount,
         lastSyncedAt: repo.lastSyncedAt?.toISOString() ?? null,
         syncStatus: repo.syncStatus,
@@ -196,19 +207,26 @@ connectedReposRoute.post("/connected-repos/:id/sync", async (c) => {
     return c.json({ error: "Forbidden" }, 403);
   }
 
-  // Get the user's GitHub token
-  const account = await db.account.findFirst({
-    where: { userId, providerId: "github" },
-  });
-
-  if (!account || !account.accessToken) {
-    return c.json(reauthError(), 403);
+  if (!repo.githubInstallationId) {
+    return c.json(installRequiredError(), 403);
   }
 
-  // Validate the token before proceeding
-  const tokenValid = await validateGitHubToken(account.accessToken);
-  if (!tokenValid) {
-    return c.json(reauthError(), 403);
+  if (!c.env.GITHUB_APP_ID || !c.env.GITHUB_APP_PRIVATE_KEY) {
+    return c.json({ error: "github_app_not_configured" }, 500);
+  }
+
+  let installationToken: string;
+  try {
+    const appJwt = await createGitHubAppJwt(
+      c.env.GITHUB_APP_ID,
+      c.env.GITHUB_APP_PRIVATE_KEY,
+    );
+    installationToken = await getInstallationToken(
+      appJwt,
+      repo.githubInstallationId,
+    );
+  } catch {
+    return c.json(installRequiredError(), 403);
   }
 
   // Mark as syncing
@@ -224,7 +242,7 @@ connectedReposRoute.post("/connected-repos/:id/sync", async (c) => {
       githubOwner: repo.githubOwner,
       githubRepo: repo.githubRepo,
       githubBranch: repo.githubBranch,
-      githubToken: account.accessToken,
+      githubToken: installationToken,
       publisherId: userId,
       db,
       r2: c.env.R2_SKILLS,

@@ -74,7 +74,7 @@ export default function PublisherReposPage() {
 	const [error, setError] = useState<string | null>(null);
 
 	const [syncingId, setSyncingId] = useState<string | null>(null);
-	const [needsReauth, setNeedsReauth] = useState(false);
+	const [needsInstall, setNeedsInstall] = useState(false);
 	const [disconnectTarget, setDisconnectTarget] =
 		useState<ConnectedRepo | null>(null);
 	const [isDisconnecting, setIsDisconnecting] = useState(false);
@@ -116,8 +116,8 @@ export default function PublisherReposPage() {
 			if (refreshRes.ok) {
 				setRepos(refreshRes.data.repos);
 			}
-		} else if (!res.ok && res.error === "github_reauth_required") {
-			setNeedsReauth(true);
+		} else if (!res.ok && res.error === "github_install_required") {
+			setNeedsInstall(true);
 		}
 
 		setSyncingId(null);
@@ -205,16 +205,16 @@ export default function PublisherReposPage() {
 			</Link>
 
 			{/* Reauth banner */}
-			{needsReauth && (
+			{needsInstall && (
 				<div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 mb-4 flex items-center justify-between">
 					<p className="text-[13px] text-amber-400">
-						GitHub authorization expired. Re-authorize to sync repos.
+						GitHub App access is missing. Reinstall to sync repos.
 					</p>
 					<a
 						href="/api/github/authorize"
 						className="px-3 py-1.5 text-[12px] font-medium text-white bg-accent rounded-lg hover:bg-accent/90 transition-colors flex-shrink-0 ml-4"
 					>
-						Re-authorize
+						Install App
 					</a>
 				</div>
 			)}

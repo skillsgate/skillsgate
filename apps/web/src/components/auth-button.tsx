@@ -51,6 +51,7 @@ export function AuthButton() {
 		authClient.signOut().then(() => {
 			setUser(null);
 			setOpen(false);
+			window.location.replace("/");
 		});
 	}
 

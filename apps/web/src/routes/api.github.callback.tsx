@@ -12,6 +12,7 @@ import { getDb } from "@skillsgate/database";
 export async function loader({ request, context }: LoaderFunctionArgs) {
 	const env = context.cloudflare.env as any;
 	const url = new URL(request.url);
+	const secureCookie = url.protocol === "https:";
 
 	const installationId = url.searchParams.get("installation_id");
 	const state = url.searchParams.get("state");
@@ -61,11 +62,20 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
 	});
 
 	// Clear the state cookie and redirect to connect page
+	const clearCookieParts = [
+		"gh_oauth_state=",
+		"Path=/",
+		"HttpOnly",
+		"SameSite=Lax",
+		"Max-Age=0",
+	];
+	if (secureCookie) clearCookieParts.push("Secure");
+
 	return new Response(null, {
 		status: 302,
 		headers: {
 			Location: "/dashboard/publisher/repos/connect",
-			"Set-Cookie": "gh_oauth_state=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0",
+			"Set-Cookie": clearCookieParts.join("; "),
 		},
 	});
 }

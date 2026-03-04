@@ -27,6 +27,21 @@ function classifyError(errorMsg: string): ErrorKind {
 	return "generic";
 }
 
+function getOauthErrorMessage(error: string | null): string | null {
+	if (!error) return null;
+	if (error === "denied") return "GitHub access was denied.";
+	if (error === "invalid_state") {
+		return "Reconnect session expired or was blocked. Please try again.";
+	}
+	if (error === "invalid") {
+		return "GitHub callback was missing required parameters. Please try again.";
+	}
+	if (error === "app_not_configured") {
+		return "GitHub App is not configured in this environment.";
+	}
+	return `GitHub connection failed (${error}).`;
+}
+
 /* ─── Component ─── */
 
 export default function ConnectRepoPage() {
@@ -50,6 +65,7 @@ export default function ConnectRepoPage() {
 	const [orgsError, setOrgsError] = useState<string | null>(null);
 	const [searchParams] = useSearchParams();
 	const oauthError = searchParams.get("error");
+	const oauthErrorMessage = getOauthErrorMessage(oauthError);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -196,10 +212,10 @@ export default function ConnectRepoPage() {
 		return (
 			<div>
 				{backLink}
-				{oauthError === "denied" && (
+				{oauthErrorMessage && (
 					<div className="rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 mb-4">
 						<p className="text-[13px] text-red-400">
-							GitHub access was denied. You need to install the app to connect repos.
+							{oauthErrorMessage}
 						</p>
 					</div>
 				)}

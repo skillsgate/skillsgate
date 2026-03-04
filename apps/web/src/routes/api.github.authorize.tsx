@@ -10,6 +10,7 @@ import { createAuth } from "~/lib/auth";
  */
 export async function loader({ request, context }: LoaderFunctionArgs) {
 	const env = context.cloudflare.env as any;
+	const requestUrl = new URL(request.url);
 
 	// Verify user is authenticated
 	const auth = createAuth(env.HYPERDRIVE.connectionString, env);
@@ -29,6 +30,15 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
 
 	// Generate a state token to prevent CSRF
 	const state = crypto.randomUUID();
+	const secureCookie = requestUrl.protocol === "https:";
+	const cookieParts = [
+		`gh_oauth_state=${state}`,
+		"Path=/",
+		"HttpOnly",
+		"SameSite=Lax",
+		"Max-Age=600",
+	];
+	if (secureCookie) cookieParts.push("Secure");
 
 	// Store state in a cookie so we can verify it on callback
 	const url = new URL(`https://github.com/apps/${appSlug}/installations/new`);
@@ -39,7 +49,7 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
 		status: 302,
 		headers: {
 			Location: url.toString(),
-			"Set-Cookie": `gh_oauth_state=${state}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`,
+			"Set-Cookie": cookieParts.join("; "),
 		},
 	});
 }

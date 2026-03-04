@@ -10,6 +10,74 @@ export const githubRoute = new Hono<{
 
 githubRoute.use("*", authMiddleware);
 
+async function syncUserInstallationsFromGitHub(
+  userId: string,
+  token: string,
+  db: Variables["db"],
+) {
+  type GitHubInstallation = {
+    id: number;
+    account: {
+      login?: string;
+      type?: string;
+    } | null;
+  };
+
+  const installations: GitHubInstallation[] = [];
+  let nextUrl: string | null =
+    "https://api.github.com/user/installations?per_page=100";
+
+  while (nextUrl) {
+    const res = await fetch(nextUrl, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "User-Agent": "SkillsGate",
+        Accept: "application/vnd.github+json",
+      },
+    });
+
+    if (!res.ok) {
+      break;
+    }
+
+    const page = (await res.json()) as {
+      installations?: GitHubInstallation[];
+    };
+
+    if (Array.isArray(page.installations)) {
+      installations.push(...page.installations);
+    }
+
+    const link = res.headers.get("link");
+    nextUrl = null;
+    if (link) {
+      const match = link.match(/<([^>]+)>;\s*rel="next"/);
+      if (match) nextUrl = match[1];
+    }
+  }
+
+  for (const installation of installations) {
+    await db.gitHubInstallation.upsert({
+      where: {
+        userId_installationId: {
+          userId,
+          installationId: String(installation.id),
+        },
+      },
+      update: {
+        accountLogin: installation.account?.login ?? null,
+        accountType: installation.account?.type ?? null,
+      },
+      create: {
+        userId,
+        installationId: String(installation.id),
+        accountLogin: installation.account?.login ?? null,
+        accountType: installation.account?.type ?? null,
+      },
+    });
+  }
+}
+
 // ─── GET /github/orgs — List orgs the user can install to ────────
 
 githubRoute.get("/github/orgs", async (c) => {
@@ -93,6 +161,22 @@ githubRoute.get("/github/orgs", async (c) => {
 githubRoute.get("/github/repos", async (c) => {
   const db = c.var.db;
   const userId = c.var.userId;
+
+  const account = await db.account.findFirst({
+    where: { userId, providerId: "github" },
+  });
+
+  if (!account || !account.accessToken) {
+    return c.json(
+      {
+        error: "github_oauth_required",
+        message: "GitHub sign-in is required to list repos.",
+      },
+      400,
+    );
+  }
+
+  await syncUserInstallationsFromGitHub(userId, account.accessToken, db);
 
   const installations = await db.gitHubInstallation.findMany({
     where: { userId },

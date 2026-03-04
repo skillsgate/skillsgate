@@ -14,7 +14,7 @@ async function syncUserInstallationsFromGitHub(
   userId: string,
   token: string,
   db: Variables["db"],
-) {
+): Promise<{ ok: true } | { ok: false; reason: "oauth_forbidden" | "github_unavailable" }> {
   type GitHubInstallation = {
     id: number;
     account: {
@@ -37,7 +37,10 @@ async function syncUserInstallationsFromGitHub(
     });
 
     if (!res.ok) {
-      break;
+      if (res.status === 401 || res.status === 403) {
+        return { ok: false, reason: "oauth_forbidden" };
+      }
+      return { ok: false, reason: "github_unavailable" };
     }
 
     const page = (await res.json()) as {
@@ -76,6 +79,8 @@ async function syncUserInstallationsFromGitHub(
       },
     });
   }
+
+  return { ok: true };
 }
 
 // ─── GET /github/orgs — List orgs the user can install to ────────
@@ -176,7 +181,22 @@ githubRoute.get("/github/repos", async (c) => {
     );
   }
 
-  await syncUserInstallationsFromGitHub(userId, account.accessToken, db);
+  const syncResult = await syncUserInstallationsFromGitHub(
+    userId,
+    account.accessToken,
+    db,
+  );
+
+  if (!syncResult.ok && syncResult.reason === "oauth_forbidden") {
+    return c.json(
+      {
+        error: "github_oauth_required",
+        message:
+          "GitHub permissions need to be re-authorized. Sign in with GitHub again and grant org access.",
+      },
+      400,
+    );
+  }
 
   const installations = await db.gitHubInstallation.findMany({
     where: { userId },
@@ -220,6 +240,7 @@ githubRoute.get("/github/repos", async (c) => {
     updatedAt: string;
     installationId: string;
   }> = [];
+  let hasValidInstallation = false;
 
   for (const installation of installations) {
     let installationRepos;
@@ -228,15 +249,15 @@ githubRoute.get("/github/repos", async (c) => {
         appJwt,
         installation.installationId,
       );
-    } catch (error) {
-      return c.json(
-        {
-          error: "github_install_required",
-          message:
-            "GitHub App installation is missing or no longer valid. Please reinstall.",
+      hasValidInstallation = true;
+    } catch {
+      await db.gitHubInstallation.deleteMany({
+        where: {
+          userId,
+          installationId: installation.installationId,
         },
-        403,
-      );
+      });
+      continue;
     }
 
     for (const repo of installationRepos) {
@@ -253,6 +274,17 @@ githubRoute.get("/github/repos", async (c) => {
         installationId: installation.installationId,
       });
     }
+  }
+
+  if (!hasValidInstallation) {
+    return c.json(
+      {
+        error: "github_install_required",
+        message:
+          "GitHub App installation is missing or no longer valid. Please reinstall.",
+      },
+      403,
+    );
   }
 
   // Get already-connected repos for this user

@@ -10,6 +10,14 @@ type InstallationRepo = {
   updated_at: string;
 };
 
+type GitHubInstallationRef = {
+  id: number;
+  account?: {
+    login?: string;
+    type?: string;
+  } | null;
+};
+
 const GITHUB_API = "https://api.github.com";
 
 function base64UrlEncode(input: ArrayBuffer | string): string {
@@ -143,4 +151,28 @@ export async function getInstallationToken(
   installationId: string,
 ): Promise<string> {
   return fetchInstallationToken(appJwt, installationId);
+}
+
+export async function findUserInstallation(
+  appJwt: string,
+  githubUsername: string,
+): Promise<GitHubInstallationRef | null> {
+  const res = await fetch(
+    `${GITHUB_API}/users/${encodeURIComponent(githubUsername)}/installation`,
+    {
+      headers: {
+        Authorization: `Bearer ${appJwt}`,
+        "User-Agent": "SkillsGate",
+        Accept: "application/vnd.github+json",
+      },
+    },
+  );
+
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`GitHub user installation error ${res.status}: ${text}`);
+  }
+
+  return (await res.json()) as GitHubInstallationRef;
 }

@@ -1,7 +1,11 @@
 import { Hono } from "hono";
 import type { Bindings, Variables } from "../types";
 import { authMiddleware } from "../middleware/auth";
-import { createGitHubAppJwt, listInstallationRepos } from "../lib/github-app";
+import {
+  createGitHubAppJwt,
+  listInstallationRepos,
+  findUserInstallation,
+} from "../lib/github-app";
 
 export const githubRoute = new Hono<{
   Bindings: Bindings;
@@ -197,7 +201,50 @@ githubRoute.get("/github/repos", async (c) => {
     where: { userId },
   });
 
-  if (installations.length === 0) {
+  // Fallback: discover an existing GitHub App installation directly by username
+  // when callback/OAuth sync did not create local installation rows.
+  if (
+    installations.length === 0 &&
+    account?.accountId &&
+    c.env.GITHUB_APP_ID &&
+    c.env.GITHUB_APP_PRIVATE_KEY
+  ) {
+    try {
+      const appJwt = await createGitHubAppJwt(
+        c.env.GITHUB_APP_ID,
+        c.env.GITHUB_APP_PRIVATE_KEY,
+      );
+      const installation = await findUserInstallation(appJwt, account.accountId);
+      if (installation) {
+        await db.gitHubInstallation.upsert({
+          where: {
+            userId_installationId: {
+              userId,
+              installationId: String(installation.id),
+            },
+          },
+          update: {
+            accountLogin: installation.account?.login ?? null,
+            accountType: installation.account?.type ?? null,
+          },
+          create: {
+            userId,
+            installationId: String(installation.id),
+            accountLogin: installation.account?.login ?? null,
+            accountType: installation.account?.type ?? null,
+          },
+        });
+      }
+    } catch {
+      // Best effort fallback; keep existing error behavior if discovery fails.
+    }
+  }
+
+  const effectiveInstallations = await db.gitHubInstallation.findMany({
+    where: { userId },
+  });
+
+  if (effectiveInstallations.length === 0) {
     if (oauthInstallSyncForbidden && installationsBeforeSync.length === 0) {
       return c.json(
         {
@@ -248,7 +295,7 @@ githubRoute.get("/github/repos", async (c) => {
   }> = [];
   let hasValidInstallation = false;
 
-  for (const installation of installations) {
+  for (const installation of effectiveInstallations) {
     let installationRepos;
     try {
       installationRepos = await listInstallationRepos(

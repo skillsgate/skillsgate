@@ -43,7 +43,7 @@ export function AuthButton() {
 	function handleSignIn(provider: "github" | "google") {
 		authClient.signIn.social({
 			provider,
-			callbackURL: window.location.pathname,
+			callbackURL: "/dashboard/skills",
 		});
 	}
 

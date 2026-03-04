@@ -100,7 +100,7 @@ async function listReposForToken(token: string, url: string): Promise<Installati
   let nextUrl: string | null = url;
 
   while (nextUrl) {
-    const res = await fetch(nextUrl, {
+    const res: Response = await fetch(nextUrl, {
       headers: {
         Authorization: `Bearer ${token}`,
         "User-Agent": "SkillsGate",
@@ -116,10 +116,12 @@ async function listReposForToken(token: string, url: string): Promise<Installati
     const body = (await res.json()) as { repositories: InstallationRepo[] };
     repos.push(...body.repositories);
 
-    const link = res.headers.get("link");
+    const link: string | null = res.headers.get("link");
     nextUrl = null;
     if (link) {
-      const match = link.match(/<([^>]+)>;\s*rel="next"/);
+      const match: RegExpMatchArray | null = link.match(
+        /<([^>]+)>;\s*rel="next"/,
+      );
       if (match) nextUrl = match[1];
     }
   }

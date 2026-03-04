@@ -28,7 +28,7 @@ async function syncUserInstallationsFromGitHub(
     "https://api.github.com/user/installations?per_page=100";
 
   while (nextUrl) {
-    const res = await fetch(nextUrl, {
+    const res: Response = await fetch(nextUrl, {
       headers: {
         Authorization: `Bearer ${token}`,
         "User-Agent": "SkillsGate",
@@ -51,10 +51,12 @@ async function syncUserInstallationsFromGitHub(
       installations.push(...page.installations);
     }
 
-    const link = res.headers.get("link");
+    const link: string | null = res.headers.get("link");
     nextUrl = null;
     if (link) {
-      const match = link.match(/<([^>]+)>;\s*rel="next"/);
+      const match: RegExpMatchArray | null = link.match(
+        /<([^>]+)>;\s*rel="next"/,
+      );
       if (match) nextUrl = match[1];
     }
   }
@@ -115,7 +117,7 @@ githubRoute.get("/github/orgs", async (c) => {
     "https://api.github.com/user/memberships/orgs?per_page=100&state=active";
 
   while (nextUrl) {
-    const res = await fetch(nextUrl, {
+    const res: Response = await fetch(nextUrl, {
       headers: {
         Authorization: `Bearer ${token}`,
         "User-Agent": "SkillsGate",
@@ -150,10 +152,12 @@ githubRoute.get("/github/orgs", async (c) => {
       });
     }
 
-    const link = res.headers.get("link");
+    const link: string | null = res.headers.get("link");
     nextUrl = null;
     if (link) {
-      const match = link.match(/<([^>]+)>;\s*rel="next"/);
+      const match: RegExpMatchArray | null = link.match(
+        /<([^>]+)>;\s*rel="next"/,
+      );
       if (match) nextUrl = match[1];
     }
   }

@@ -171,31 +171,31 @@ githubRoute.get("/github/repos", async (c) => {
     where: { userId, providerId: "github" },
   });
 
-  if (!account || !account.accessToken) {
-    return c.json(
-      {
-        error: "github_oauth_required",
-        message: "GitHub sign-in is required to list repos.",
-      },
-      400,
-    );
-  }
+  const installationsBeforeSync = await db.gitHubInstallation.findMany({
+    where: { userId },
+  });
 
-  const syncResult = await syncUserInstallationsFromGitHub(
-    userId,
-    account.accessToken,
-    db,
-  );
-
-  if (!syncResult.ok && syncResult.reason === "oauth_forbidden") {
-    return c.json(
-      {
-        error: "github_oauth_required",
-        message:
-          "GitHub permissions need to be re-authorized. Sign in with GitHub again and grant org access.",
-      },
-      400,
+  if (account?.accessToken) {
+    const syncResult = await syncUserInstallationsFromGitHub(
+      userId,
+      account.accessToken,
+      db,
     );
+
+    if (
+      !syncResult.ok &&
+      syncResult.reason === "oauth_forbidden" &&
+      installationsBeforeSync.length === 0
+    ) {
+      return c.json(
+        {
+          error: "github_oauth_required",
+          message:
+            "GitHub permissions need to be re-authorized. Sign in with GitHub again and grant org access.",
+        },
+        400,
+      );
+    }
   }
 
   const installations = await db.gitHubInstallation.findMany({

@@ -141,11 +141,18 @@ export default function ConnectRepoPage() {
 		window.location.href = "/api/github/authorize";
 	}
 
-	function handleReconnectGitHub() {
-		authClient.signIn.social({
+	async function handleReconnectGitHub() {
+		const result = await authClient.signIn.social({
 			provider: "github",
 			callbackURL: "/dashboard/publisher/repos/connect",
+			errorCallbackURL: "/dashboard/publisher/repos/connect?error=denied",
+			scopes: ["read:user", "user:email", "read:org"],
+			disableRedirect: true,
 		});
+
+		if (result?.data?.url) {
+			window.location.href = result.data.url;
+		}
 	}
 
 	/* ─── Back link (shared) ─── */

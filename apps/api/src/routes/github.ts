@@ -179,6 +179,8 @@ githubRoute.get("/github/repos", async (c) => {
     where: { userId },
   });
 
+  let oauthInstallSyncForbidden = false;
+
   if (account?.accessToken) {
     const syncResult = await syncUserInstallationsFromGitHub(
       userId,
@@ -186,19 +188,8 @@ githubRoute.get("/github/repos", async (c) => {
       db,
     );
 
-    if (
-      !syncResult.ok &&
-      syncResult.reason === "oauth_forbidden" &&
-      installationsBeforeSync.length === 0
-    ) {
-      return c.json(
-        {
-          error: "github_oauth_required",
-          message:
-            "GitHub permissions need to be re-authorized. Sign in with GitHub again and grant org access.",
-        },
-        400,
-      );
+    if (!syncResult.ok && syncResult.reason === "oauth_forbidden") {
+      oauthInstallSyncForbidden = true;
     }
   }
 
@@ -207,6 +198,17 @@ githubRoute.get("/github/repos", async (c) => {
   });
 
   if (installations.length === 0) {
+    if (oauthInstallSyncForbidden && installationsBeforeSync.length === 0) {
+      return c.json(
+        {
+          error: "github_install_required",
+          message:
+            "No GitHub App installation found. Install the SkillsGate GitHub App to continue.",
+        },
+        400,
+      );
+    }
+
     return c.json(
       {
         error: "github_install_required",

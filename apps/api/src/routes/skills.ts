@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Bindings, Variables } from "../types";
 import { authMiddleware } from "../middleware/auth";
 import { parseSkillMd } from "../lib/skill-parser.js";
-import { vectorizeSkill } from "../lib/vectorize.js";
+import { enqueueSkillVectorization } from "../lib/vectorize.js";
 
 export const skillsRoute = new Hono<{
   Bindings: Bindings;
@@ -154,25 +154,39 @@ skillsRoute.post("/skills/:id/files", async (c) => {
   }
 
   // Parse SKILL.md for metadata
-  const metadata = parseSkillMd(skillMdContent);
+  const skillMdMetadata = parseSkillMd(skillMdContent);
 
   // Update skill with extracted metadata and mark as published
   const updatedSkill = await db.skill.update({
     where: { id: skillId },
     data: {
-      ...(metadata.name && { name: metadata.name }),
-      ...(metadata.description && { description: metadata.description }),
-      ...(metadata.summary && { summary: metadata.summary }),
-      ...(metadata.categories && { categories: metadata.categories }),
-      ...(metadata.capabilities && { capabilities: metadata.capabilities }),
-      ...(metadata.keywords && { keywords: metadata.keywords }),
+      ...(skillMdMetadata.name && { name: skillMdMetadata.name }),
+      ...(skillMdMetadata.description && { description: skillMdMetadata.description }),
+      ...(skillMdMetadata.summary && { summary: skillMdMetadata.summary }),
+      ...(skillMdMetadata.categories && { categories: skillMdMetadata.categories }),
+      ...(skillMdMetadata.capabilities && { capabilities: skillMdMetadata.capabilities }),
+      ...(skillMdMetadata.keywords && { keywords: skillMdMetadata.keywords }),
       publishedAt: new Date(),
     },
   });
 
-  // Queue vectorization in the background
+  // Queue vectorization via workflow for durable, idempotent processing
+  // This returns immediately - the queue consumer will create a workflow instance
+  const vectorizeMetadata = {
+    slug: updatedSkill.slug,
+    visibility: updatedSkill.visibility as 'public' | 'private' | 'premium',
+    publisherId: userId,
+    sourceType: 'direct' as const,
+  };
+
   c.executionCtx.waitUntil(
-    vectorizeSkill(c.var.db, c.env.OPENAI_API_KEY, c.env.R2_SKILLS, skillId),
+    enqueueSkillVectorization(c.env.VECTORIZE_QUEUE, skillId, vectorizeMetadata)
+      .then(() => {
+        console.log(`[skills] Queued vectorization for skill ${skillId}`);
+      })
+      .catch((error) => {
+        console.error(`[skills] Failed to queue vectorization for skill ${skillId}:`, error);
+      })
   );
 
   return c.json({
@@ -185,6 +199,10 @@ skillsRoute.post("/skills/:id/files", async (c) => {
       publishedAt: updatedSkill.publishedAt?.toISOString() ?? null,
     },
     files,
+    vectorization: {
+      status: 'queued',
+      message: 'Skill content has been queued for vectorization',
+    },
   });
 });
 

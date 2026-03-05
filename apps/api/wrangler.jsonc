@@ -28,5 +28,29 @@
       "pattern": "api.skillsgate.ai/*",
       "zone_name": "skillsgate.ai"
     }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "queue": "skill-vectorize-queue",
+        "binding": "VECTORIZE_QUEUE"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "skill-vectorize-queue",
+        "max_batch_size": 1,
+        "max_batch_timeout": 1,
+        "max_retries": 3,
+        "dead_letter_queue": "skill-vectorize-dlq"
+      }
+    ]
+  },
+  "workflows": [
+    {
+      "name": "skill-vectorization",
+      "binding": "SKILL_VECTORIZATION_WORKFLOW",
+      "class_name": "SkillVectorizationWorkflow"
+    }
   ]
 }

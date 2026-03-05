@@ -2,12 +2,13 @@
 //
 // Orchestrates the full sync cycle: discover SKILL.md files in a
 // connected GitHub repo, upsert skills, upload files to R2,
-// run vectorization, and clean up deleted skills.
+// queue vectorization, and clean up deleted skills.
 
 import { fetchRepoTree, fetchFileContent, fetchFileText } from "./github-api";
 import { parseSkillMd } from "./skill-parser";
-import { vectorizeSkill } from "./vectorize";
+import { enqueueSkillVectorization } from "./vectorize";
 import type { TreeEntry } from "./github-api";
+import type { VectorizeSkillWorkflowInput, SkillMetadata } from "../types";
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -28,6 +29,7 @@ export interface SyncRepoParams {
   db: any; // Prisma DatabaseClient
   r2: R2Bucket;
   openaiApiKey: string;
+  vectorizeQueue: Queue<VectorizeSkillWorkflowInput>;
 }
 
 export interface DisconnectRepoParams {
@@ -135,6 +137,7 @@ export async function syncRepo(params: SyncRepoParams): Promise<SyncResult> {
     db,
     r2,
     openaiApiKey,
+    vectorizeQueue,
   } = params;
 
   const result: SyncResult = {
@@ -174,6 +177,7 @@ export async function syncRepo(params: SyncRepoParams): Promise<SyncResult> {
           db,
           r2,
           openaiApiKey,
+          vectorizeQueue,
           result,
           discoveredSlugs,
         });
@@ -238,6 +242,7 @@ interface ProcessSkillDirParams {
   db: any;
   r2: R2Bucket;
   openaiApiKey: string;
+  vectorizeQueue: Queue<VectorizeSkillWorkflowInput>;
   result: SyncResult;
   discoveredSlugs: Set<string>;
 }
@@ -254,6 +259,7 @@ async function processSkillDirectory(params: ProcessSkillDirParams): Promise<voi
     db,
     r2,
     openaiApiKey,
+    vectorizeQueue,
     result,
     discoveredSlugs,
   } = params;
@@ -382,8 +388,23 @@ async function processSkillDirectory(params: ProcessSkillDirParams): Promise<voi
     }
   }
 
-  // h. Run vectorization
-  await vectorizeSkill(db, openaiApiKey, r2, skillId);
+  // h. Queue vectorization via workflow for durable processing
+  const vectorizeMetadata: SkillMetadata = {
+    slug,
+    visibility: skill?.visibility || 'public',
+    publisherId,
+    sourceType: 'github',
+    orgId: undefined, // GitHub skills don't have orgId in current schema
+  };
+
+  try {
+    await enqueueSkillVectorization(vectorizeQueue, skillId, vectorizeMetadata);
+    console.log(`[github-sync] Queued vectorization for ${slug} (skill: ${skillId})`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    result.errors.push({ path: skillDir.skillMdPath, error: `Failed to queue vectorization: ${message}` });
+    console.error(`[github-sync] Failed to queue vectorization for ${slug}:`, message);
+  }
 }
 
 // ─── Deletion handling ───────────────────────────────────────────

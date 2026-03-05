@@ -1,6 +1,7 @@
 import type { DatabaseClient } from "@skillsgate/database";
 import { OpenAIEmbeddingProvider } from "./embedding";
 import { chunkSkillContent } from "./chunker";
+import type { VectorizeSkillWorkflowInput, SkillMetadata } from "../types";
 
 /**
  * Vectorizes a skill's SKILL.md content: chunks it, embeds via OpenAI, and
@@ -120,4 +121,62 @@ export async function vectorizeSkill(
       error instanceof Error ? error.message : error
     );
   }
+}
+
+/**
+ * Enqueue a skill for vectorization via the workflow queue.
+ *
+ * This is the preferred way to trigger skill vectorization as it provides:
+ * - Durable execution with automatic retries
+ * - Idempotent processing via sourceId
+ * - Better observability and error handling
+ * - Non-blocking API responses
+ *
+ * @param queue - The VECTORIZE_QUEUE binding from context
+ * @param skillId - The unique skill ID
+ * @param metadata - Required skill metadata
+ * @returns The queue send result
+ */
+export async function enqueueSkillVectorization(
+  queue: Queue<VectorizeSkillWorkflowInput>,
+  skillId: string,
+  metadata: SkillMetadata
+): Promise<void> {
+  // Determine source type and construct sourceId
+  const sourceId = metadata.sourceType === 'github' && metadata.orgId
+    ? `github:${metadata.orgId}/${metadata.slug}`
+    : `direct:${skillId}`;
+
+  // Determine namespace based on visibility
+  let namespace: string;
+  if (metadata.visibility === 'public') {
+    namespace = 'public';
+  } else if (metadata.orgId) {
+    namespace = `org_${metadata.orgId}`;
+  } else {
+    namespace = `skill_${skillId}`;
+  }
+
+  // Construct the workflow input
+  const payload: VectorizeSkillWorkflowInput = {
+    sourceId,
+    source: {
+      type: 'direct',
+      skillId
+    },
+    metadata: {
+      ...metadata,
+      // Ensure these required fields are present
+      slug: metadata.slug,
+      visibility: metadata.visibility,
+      publisherId: metadata.publisherId,
+      sourceType: metadata.sourceType
+    },
+    namespace
+  };
+
+  console.log(`[enqueue] Queuing vectorization for ${sourceId} (skill: ${skillId})`);
+
+  // Send to queue - the queue consumer will create a workflow instance
+  await queue.send(payload);
 }

@@ -134,6 +134,7 @@ connectedReposRoute.post("/connected-repos", async (c) => {
       db,
       r2: c.env.R2_SKILLS,
       openaiApiKey: c.env.OPENAI_API_KEY,
+      vectorizeQueue: c.env.VECTORIZE_QUEUE,
     }),
   );
 
@@ -247,6 +248,7 @@ connectedReposRoute.post("/connected-repos/:id/sync", async (c) => {
       db,
       r2: c.env.R2_SKILLS,
       openaiApiKey: c.env.OPENAI_API_KEY,
+      vectorizeQueue: c.env.VECTORIZE_QUEUE,
     }),
   );
 

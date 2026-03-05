@@ -99,3 +99,36 @@ export interface InstallResult {
   symlinkFailed?: boolean;
   error?: string;
 }
+
+// ---------- Publish Types ----------
+
+export interface PublishSkillMetadata {
+  name: string;
+  description: string;
+  license?: string;
+  compatibility?: string;
+  metadata?: Record<string, string>;
+  allowedTools?: string;
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+}
+
+export interface ParsedSkill extends PublishSkillMetadata {
+  content: string;
+}
+
+export interface SizeCheckResult {
+  valid: boolean;
+  totalSize: number;
+  files: Array<{ name: string; size: number }>;
+  errors: string[];
+}
+
+export interface DirectoryValidationResult {
+  valid: boolean;
+  skillName: string | null;
+  errors: string[];
+}

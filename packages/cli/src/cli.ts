@@ -10,6 +10,7 @@ import { runLogin } from "./commands/login.js";
 import { runLogout } from "./commands/logout.js";
 import { runWhoami } from "./commands/whoami.js";
 import { runSearch } from "./commands/search.js";
+import { runPublish } from "./commands/publish.js";
 import { flushTelemetry } from "./telemetry.js";
 
 // "SKILLS" in dark silver (dim), "GATE" in bright white (bold)
@@ -86,6 +87,12 @@ async function main(): Promise<void> {
       await runSearch(restArgs);
       break;
 
+    case "publish":
+    case "p":
+    case "pub":
+      await runPublish(restArgs);
+      break;
+
     case "--version":
     case "-v":
       console.log(`skillsgate v${VERSION}`);
@@ -126,6 +133,9 @@ function printHelp(): void {
   console.log(`    sync               Sync skills from node_modules`);
   console.log(
     `    search ${DIM("<query>")}   Search for skills`,
+  );
+  console.log(
+    `    publish ${DIM("[path]")}   Publish a skill to SkillsGate`,
   );
   console.log(`    login              Authenticate with SkillsGate`);
   console.log(`    logout             Sign out`);

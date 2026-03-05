@@ -19,6 +19,7 @@ datasource db {
 model Skill {
   id          String   @id
   slug        String   @unique
+  sourceId    String?  @unique @map("source_id")
   name        String
   description String
   summary     String?  @db.Text
@@ -214,7 +215,7 @@ model SkillChunk {
   namespace  String   @default("public") @map("namespace")
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-  // embedding vector(1536) — added via raw SQL in migration
+  embedding  Unsupported("vector(1536)")?
 
   skill        Skill     @relation(fields: [skillId], references: [id], onDelete: Cascade)
   namespaceRef Namespace @relation(fields: [namespace], references: [id])

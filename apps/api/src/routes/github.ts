@@ -4,7 +4,7 @@ import { authMiddleware } from "../middleware/auth";
 import {
   createGitHubAppJwt,
   listInstallationRepos,
-  findUserInstallation,
+  listAppInstallations,
 } from "../lib/github-app";
 
 export const githubRoute = new Hono<{
@@ -13,6 +13,22 @@ export const githubRoute = new Hono<{
 }>();
 
 githubRoute.use("*", authMiddleware);
+
+async function getGithubLoginFromToken(
+  token: string,
+): Promise<string | null> {
+  const res = await fetch("https://api.github.com/user", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "User-Agent": "SkillsGate",
+      Accept: "application/vnd.github+json",
+    },
+  });
+
+  if (!res.ok) return null;
+  const body = (await res.json()) as { login?: string };
+  return body.login ?? null;
+}
 
 async function syncUserInstallationsFromGitHub(
   userId: string,
@@ -203,37 +219,52 @@ githubRoute.get("/github/repos", async (c) => {
 
   // Fallback: discover an existing GitHub App installation directly by username
   // when callback/OAuth sync did not create local installation rows.
-  if (
-    installations.length === 0 &&
-    account?.accountId &&
-    c.env.GITHUB_APP_ID &&
-    c.env.GITHUB_APP_PRIVATE_KEY
-  ) {
+  if (installations.length === 0 && c.env.GITHUB_APP_ID && c.env.GITHUB_APP_PRIVATE_KEY) {
     try {
       const appJwt = await createGitHubAppJwt(
         c.env.GITHUB_APP_ID,
         c.env.GITHUB_APP_PRIVATE_KEY,
       );
-      const installation = await findUserInstallation(appJwt, account.accountId);
-      if (installation) {
-        await db.gitHubInstallation.upsert({
-          where: {
-            userId_installationId: {
-              userId,
-              installationId: String(installation.id),
-            },
-          },
-          update: {
-            accountLogin: installation.account?.login ?? null,
-            accountType: installation.account?.type ?? null,
-          },
-          create: {
-            userId,
-            installationId: String(installation.id),
-            accountLogin: installation.account?.login ?? null,
-            accountType: installation.account?.type ?? null,
-          },
+
+      const candidateLogins = new Set<string>();
+
+      if (account?.accessToken) {
+        const login = await getGithubLoginFromToken(account.accessToken);
+        if (login) candidateLogins.add(login);
+      }
+
+      // Fallback for environments where accountId is still the login.
+      if (account?.accountId) candidateLogins.add(account.accountId);
+
+      if (candidateLogins.size > 0) {
+        const appInstallations = await listAppInstallations(appJwt);
+        const loginSet = new Set(
+          [...candidateLogins].map((l) => l.toLowerCase()),
+        );
+        const matched = appInstallations.find((inst) => {
+          const login = inst.account?.login?.toLowerCase();
+          return !!login && loginSet.has(login);
         });
+        if (matched) {
+          await db.gitHubInstallation.upsert({
+            where: {
+              userId_installationId: {
+                userId,
+                installationId: String(matched.id),
+              },
+            },
+            update: {
+              accountLogin: matched.account?.login ?? null,
+              accountType: matched.account?.type ?? null,
+            },
+            create: {
+              userId,
+              installationId: String(matched.id),
+              accountLogin: matched.account?.login ?? null,
+              accountType: matched.account?.type ?? null,
+            },
+          });
+        }
       }
     } catch {
       // Best effort fallback; keep existing error behavior if discovery fails.

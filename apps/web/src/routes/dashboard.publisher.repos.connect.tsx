@@ -66,6 +66,7 @@ export default function ConnectRepoPage() {
 	const [searchParams] = useSearchParams();
 	const oauthError = searchParams.get("error");
 	const oauthErrorMessage = getOauthErrorMessage(oauthError);
+	const notice = searchParams.get("notice");
 
 	useEffect(() => {
 		let cancelled = false;
@@ -212,6 +213,13 @@ export default function ConnectRepoPage() {
 		return (
 			<div>
 				{backLink}
+				{notice === "linked_without_state" && (
+					<div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 mb-4">
+						<p className="text-[13px] text-emerald-400">
+							GitHub App installation was linked successfully.
+						</p>
+					</div>
+				)}
 				{oauthErrorMessage && (
 					<div className="rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 mb-4">
 						<p className="text-[13px] text-red-400">

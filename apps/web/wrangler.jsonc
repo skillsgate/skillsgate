@@ -33,5 +33,17 @@
 			"namespace_id": "12",
 			"simple": { "limit": 10, "period": 60 }
 		}
+	],
+	"routes": [
+		{
+			"pattern": "openskills.sh",
+			"zone_name": "openskills.sh",
+			"custom_domain": true
+		},
+		{
+			"pattern": "skillsgate.ai",
+			"zone_name": "skillsgate.ai",
+			"custom_domain": true
+		}
 	]
 }

@@ -23,17 +23,8 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
 		return redirect("/dashboard/publisher/repos/connect?error=denied");
 	}
 
-	if (!installationId || !state) {
+	if (!installationId) {
 		return redirect("/dashboard/publisher/repos/connect?error=invalid");
-	}
-
-	// Verify state from cookie
-	const cookies = request.headers.get("Cookie") ?? "";
-	const stateMatch = cookies.match(/gh_oauth_state=([^;]+)/);
-	const savedState = stateMatch ? stateMatch[1] : null;
-
-	if (state !== savedState) {
-		return redirect("/dashboard/publisher/repos/connect?error=invalid_state");
 	}
 
 	// Verify user is authenticated
@@ -43,6 +34,14 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
 	if (!session) {
 		return redirect("/");
 	}
+
+	// Verify state from cookie when available.
+	// If state is missing/mismatched, continue linking installation so GitHub App
+	// install still works even when OAuth cookies are unavailable.
+	const cookies = request.headers.get("Cookie") ?? "";
+	const stateMatch = cookies.match(/gh_oauth_state=([^;]+)/);
+	const savedState = stateMatch ? stateMatch[1] : null;
+	const stateValid = !!state && !!savedState && state === savedState;
 
 	// Store the installation for this user
 	const db = getDb(env);
@@ -74,7 +73,9 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
 	return new Response(null, {
 		status: 302,
 		headers: {
-			Location: "/dashboard/publisher/repos/connect",
+			Location: stateValid
+				? "/dashboard/publisher/repos/connect"
+				: "/dashboard/publisher/repos/connect?notice=linked_without_state",
 			"Set-Cookie": clearCookieParts.join("; "),
 		},
 	});

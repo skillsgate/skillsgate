@@ -1,3 +1,5 @@
+import { createPrivateKey, sign as nodeSign } from "node:crypto";
+
 type InstallationRepo = {
   id: number;
   name: string;
@@ -20,39 +22,17 @@ type GitHubInstallationRef = {
 
 const GITHUB_API = "https://api.github.com";
 
-function base64UrlEncode(input: ArrayBuffer | string): string {
-  const bytes =
-    typeof input === "string" ? new TextEncoder().encode(input) : new Uint8Array(input);
+function base64UrlEncode(input: ArrayBuffer | ArrayBufferView | string): string {
+  const bytes = typeof input === "string"
+    ? new TextEncoder().encode(input)
+    : input instanceof ArrayBuffer
+      ? new Uint8Array(input)
+      : new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
   let binary = "";
   for (const byte of bytes) {
     binary += String.fromCharCode(byte);
   }
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-function pemToArrayBuffer(pem: string): ArrayBuffer {
-  const cleaned = pem
-    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
-    .replace(/-----END PRIVATE KEY-----/g, "")
-    .replace(/\n/g, "")
-    .replace(/\r/g, "");
-  const binary = atob(cleaned);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes.buffer;
-}
-
-async function importPrivateKey(pem: string): Promise<CryptoKey> {
-  const keyData = pemToArrayBuffer(pem);
-  return crypto.subtle.importKey(
-    "pkcs8",
-    keyData,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
 }
 
 export async function createGitHubAppJwt(appId: string, privateKey: string): Promise<string> {
@@ -67,15 +47,11 @@ export async function createGitHubAppJwt(appId: string, privateKey: string): Pro
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
   const data = `${encodedHeader}.${encodedPayload}`;
 
-  const normalizedKey = privateKey.includes("\\n")
-    ? privateKey.replace(/\\n/g, "\n")
-    : privateKey;
-  const key = await importPrivateKey(normalizedKey);
-  const signature = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5",
-    key,
-    new TextEncoder().encode(data),
-  );
+  const normalizedKey = privateKey
+    .replace(/^"|"$/g, "")
+    .replace(/\\n/g, "\n");
+  const key = createPrivateKey(normalizedKey);
+  const signature = nodeSign("RSA-SHA256", Buffer.from(data), key);
   const encodedSignature = base64UrlEncode(signature);
 
   return `${data}.${encodedSignature}`;
@@ -153,26 +129,39 @@ export async function getInstallationToken(
   return fetchInstallationToken(appJwt, installationId);
 }
 
-export async function findUserInstallation(
+export async function listAppInstallations(
   appJwt: string,
-  githubUsername: string,
-): Promise<GitHubInstallationRef | null> {
-  const res = await fetch(
-    `${GITHUB_API}/users/${encodeURIComponent(githubUsername)}/installation`,
-    {
+): Promise<GitHubInstallationRef[]> {
+  const installations: GitHubInstallationRef[] = [];
+  let nextUrl: string | null =
+    `${GITHUB_API}/app/installations?per_page=100`;
+
+  while (nextUrl) {
+    const res: Response = await fetch(nextUrl, {
       headers: {
         Authorization: `Bearer ${appJwt}`,
         "User-Agent": "SkillsGate",
         Accept: "application/vnd.github+json",
       },
-    },
-  );
+    });
 
-  if (res.status === 404) return null;
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`GitHub user installation error ${res.status}: ${text}`);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`GitHub app installations error ${res.status}: ${text}`);
+    }
+
+    const page = (await res.json()) as GitHubInstallationRef[];
+    installations.push(...page);
+
+    const link: string | null = res.headers.get("link");
+    nextUrl = null;
+    if (link) {
+      const match: RegExpMatchArray | null = link.match(
+        /<([^>]+)>;\s*rel="next"/,
+      );
+      if (match) nextUrl = match[1];
+    }
   }
 
-  return (await res.json()) as GitHubInstallationRef;
+  return installations;
 }

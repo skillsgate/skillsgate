@@ -220,6 +220,39 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
     }
 
     if (source.type === 'github') {
+      // First, check if the repo is private
+      const [owner, repo] = source.repo.split('/');
+      const repoApiUrl = `https://api.github.com/repos/${owner}/${repo}`;
+      const repoRes = await fetch(repoApiUrl, {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'SkillsGate-Vectorization/1.0'
+        }
+      });
+
+      if (repoRes.status === 404) {
+        // Repo doesn't exist or is private without auth
+        // Try to get more info from the error response
+        try {
+          const errorData = await repoRes.json() as { message?: string };
+          if (errorData.message?.includes('Not Found')) {
+            throw new NonRetryableError(`Repository not found or is private (private repos not supported): ${source.repo}`);
+          }
+        } catch {
+          // If we can't parse the error, assume it's private/not found
+          throw new NonRetryableError(`Repository not found or is private (private repos not supported): ${source.repo}`);
+        }
+        throw new NonRetryableError(`Repository not found or is private (private repos not supported): ${source.repo}`);
+      }
+
+      if (repoRes.ok) {
+        const repoData = await repoRes.json() as { private: boolean };
+        if (repoData.private) {
+          throw new NonRetryableError(`Private GitHub repositories are not supported: ${source.repo}`);
+        }
+      }
+
+      // Repo is public, fetch the file
       const url = `https://raw.githubusercontent.com/${source.repo}/${source.ref || 'main'}/${source.path}`;
       const res = await fetch(url, {
         headers: {

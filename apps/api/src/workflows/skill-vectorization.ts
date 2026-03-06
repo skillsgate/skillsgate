@@ -4,7 +4,7 @@ import type { Bindings, VectorizeSkillWorkflowInput } from "../types";
 import { parseSkillMd, type ParsedSkillMd } from "../lib/skill-parser";
 import { chunkSkillContent, type TextChunk } from "../lib/chunker";
 import { OpenAIEmbeddingProvider } from "../lib/embedding";
-import { insertSkillChunks, deleteSkillChunks } from "../lib/vector-store-workflow";
+import { insertSkillChunks, deleteSkillChunks } from "./vector-store";
 import { createDatabaseClient } from "@skillsgate/database";
 
 /**

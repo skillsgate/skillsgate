@@ -1,8 +1,5 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
 import { Navbar } from "~/components/navbar";
 import { useReveal } from "~/components/use-reveal";
-import { authClient } from "~/lib/auth-client";
 
 /* ─── Mock data ─── */
 const FEATURED_SKILLS = [
@@ -159,25 +156,6 @@ function formatDownloads(n: number): string {
 
 export default function Home() {
 	const containerRef = useReveal();
-	const navigate = useNavigate();
-	const [authChecked, setAuthChecked] = useState(false);
-
-	useEffect(() => {
-		authClient.getSession().then((res) => {
-			if (res.data?.user) {
-				navigate("/dashboard", { replace: true });
-			}
-			setAuthChecked(true);
-		});
-	}, [navigate]);
-
-	if (!authChecked) {
-		return (
-			<div className="min-h-screen flex items-center justify-center">
-				<div className="h-6 w-6 animate-spin rounded-full border-2 border-muted border-t-foreground" />
-			</div>
-		);
-	}
 
 	return (
 		<div ref={containerRef} className="min-h-screen">

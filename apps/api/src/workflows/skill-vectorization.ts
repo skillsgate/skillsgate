@@ -137,8 +137,9 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       });
 
       // Store LLM output to R2 for debugging/auditing
+      const runId = crypto.randomUUID();
       await step.do('store-llm-output', async () => {
-        const key = `workflows/${sourceId}/llm-enrichment.json`;
+        const key = `workflows/${runId}/llm.json`;
         await this.env.R2_WORKFLOW_ARTIFACTS.put(key, JSON.stringify(llm, null, 2), {
           httpMetadata: { contentType: 'application/json' },
         });

@@ -4,7 +4,8 @@ import type { Bindings, VectorizeSkillWorkflowInput } from "../types";
 import { parseSkillMd, type ParsedSkillMd } from "../lib/skill-parser";
 import { chunkSkillContent, type TextChunk } from "../lib/chunker";
 import { OpenAIEmbeddingProvider } from "../lib/embedding";
-import { insertSkillChunks, deleteSkillChunks } from "./vector-store";
+import { enrichSkillWithLlm, type LlmEnrichment } from "../lib/llm-enrichment";
+import { insertSkillChunks, deleteSkillChunks } from "../lib/vector-store";
 import { createDatabaseClient } from "@skillsgate/database";
 
 /**
@@ -45,19 +46,20 @@ export interface VectorizeResult {
 
 /**
  * Durable workflow for vectorizing a single skill.
- * 
+ *
  * This workflow:
  * 1. Reads SKILL.md from the specified source (R2, GitHub, or Direct)
  * 2. Parses frontmatter metadata
  * 3. Computes content hash for idempotency
  * 4. Checks for existing skill and content changes
  * 5. Validates slug uniqueness
- * 6. Chunks content into semantic pieces
- * 7. Generates embeddings via OpenAI
- * 8. Upserts the skill record in the database
- * 9. Inserts vector chunks with embeddings
- * 10. Marks completion
- * 
+ * 6. Enriches with LLM (summary, categories, capabilities, keywords, semantic chunks)
+ * 7. Chunks content into structured pieces using LLM output + section fallback
+ * 8. Generates embeddings via OpenAI
+ * 9. Upserts the skill record in the database
+ * 10. Inserts vector chunks with embeddings
+ * 11. Marks completion
+ *
  * The workflow is idempotent via sourceId - running it multiple times with the same
  * sourceId will either skip (if content unchanged) or update the existing skill.
  */
@@ -121,11 +123,48 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       });
 
       // ─────────────────────────────────────────────────────────────────
-      // Step 6: Chunk Content
+      // Step 6: LLM Enrichment
+      // ─────────────────────────────────────────────────────────────────
+      const llm = await step.do('llm-enrichment', {
+        retries: { limit: 2, delay: '5 seconds', backoff: 'exponential' },
+        timeout: '2 minutes'
+      }, async () => {
+        // Build frontmatter object for the prompt
+        const frontmatter: Record<string, unknown> = {};
+        if (parsed.name) frontmatter.name = parsed.name;
+        if (parsed.description) frontmatter.description = parsed.description;
+        if (parsed.summary) frontmatter.summary = parsed.summary;
+        if (parsed.categories) frontmatter.categories = parsed.categories;
+        if (parsed.capabilities) frontmatter.capabilities = parsed.capabilities;
+        if (parsed.keywords) frontmatter.keywords = parsed.keywords;
+
+        // Strip frontmatter from body for the prompt
+        const body = skillMd.replace(/^---[\s\S]*?---\n?/, '').trim();
+
+        return enrichSkillWithLlm(this.env.OPENROUTER_API_KEY, frontmatter, body);
+      });
+
+      // ─────────────────────────────────────────────────────────────────
+      // Step 7: Chunk Content
       // ─────────────────────────────────────────────────────────────────
       const chunks = await step.do('chunk-content', async () => {
         const skillName = parsed.name || metadata.slug;
-        return chunkSkillContent(skillName, skillMd);
+        const description = parsed.description || '';
+        const body = skillMd.replace(/^---[\s\S]*?---\n?/, '').trim();
+
+        // Build frontmatter object for the chunker
+        const frontmatter: Record<string, unknown> = {};
+        if (parsed.name) frontmatter.name = parsed.name;
+        if (parsed.description) frontmatter.description = parsed.description;
+
+        return chunkSkillContent({
+          slug: metadata.slug,
+          name: skillName,
+          description,
+          frontmatter,
+          body,
+          llm,
+        });
       });
 
       if (chunks.length === 0) {
@@ -133,7 +172,7 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       }
 
       // ─────────────────────────────────────────────────────────────────
-      // Step 7: Generate Embeddings
+      // Step 8: Generate Embeddings
       // ─────────────────────────────────────────────────────────────────
       const embeddings = await step.do('generate-embeddings', {
         retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' },
@@ -150,16 +189,16 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       });
 
       // ─────────────────────────────────────────────────────────────────
-      // Step 8: Upsert Skill Record
+      // Step 9: Upsert Skill Record
       // ─────────────────────────────────────────────────────────────────
       const skill = await step.do('upsert-skill', {
         retries: { limit: 3, delay: '1 second', backoff: 'exponential' }
       }, async () => {
-        return this.upsertSkill(db, sourceId, metadata, parsed, contentHash, existingCheck.existing);
+        return this.upsertSkill(db, sourceId, metadata, parsed, llm, contentHash, existingCheck.existing);
       });
 
       // ─────────────────────────────────────────────────────────────────
-      // Step 9: Insert Vector Chunks
+      // Step 10: Insert Vector Chunks
       // ─────────────────────────────────────────────────────────────────
       await step.do('insert-vectors', {
         retries: { limit: 3, delay: '1 second', backoff: 'exponential' }
@@ -169,7 +208,7 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       });
 
       // ─────────────────────────────────────────────────────────────────
-      // Step 10: Mark Complete
+      // Step 11: Mark Complete
       // ─────────────────────────────────────────────────────────────────
       await step.do('mark-complete', async () => {
         console.log(`[vectorize] Completed: ${sourceId} (${chunks.length} chunks)`);
@@ -231,15 +270,12 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       });
 
       if (repoRes.status === 404) {
-        // Repo doesn't exist or is private without auth
-        // Try to get more info from the error response
         try {
           const errorData = await repoRes.json() as { message?: string };
           if (errorData.message?.includes('Not Found')) {
             throw new NonRetryableError(`Repository not found or is private (private repos not supported): ${source.repo}`);
           }
         } catch {
-          // If we can't parse the error, assume it's private/not found
           throw new NonRetryableError(`Repository not found or is private (private repos not supported): ${source.repo}`);
         }
         throw new NonRetryableError(`Repository not found or is private (private repos not supported): ${source.repo}`);
@@ -331,22 +367,23 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
   }
 
   /**
-   * Upsert the skill record in the database
+   * Upsert the skill record in the database.
+   * LLM-generated fields fill in when frontmatter doesn't provide them.
    */
   private async upsertSkill(
     db: DatabaseClient,
     sourceId: string,
     metadata: VectorizeSkillWorkflowInput['metadata'],
     parsed: ParsedSkillMd,
+    llm: LlmEnrichment,
     contentHash: string,
     existing: { id: string; contentHash: string | null } | null
   ): Promise<{ id: string; slug: string }> {
-    // Build data object, excluding null values for JSON fields to avoid Prisma type issues
     const data: any = {
-      // From SKILL.md (parsed wins)
+      // From SKILL.md (parsed wins), fallback to LLM
       name: parsed.name || metadata.slug,
       description: parsed.description || '',
-      summary: parsed.summary,
+      summary: parsed.summary || llm.summary || undefined,
       // From metadata
       visibility: metadata.visibility,
       publisherId: metadata.publisherId,
@@ -357,20 +394,22 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       vectorizedAt: new Date(),
     };
 
-    // Only include JSON fields if they have values
-    if (parsed.categories) data.categories = parsed.categories;
-    if (parsed.capabilities) data.capabilities = parsed.capabilities;
-    if (parsed.keywords) data.keywords = parsed.keywords;
+    // Prefer frontmatter, fallback to LLM-generated values
+    const categories = parsed.categories?.length ? parsed.categories : llm.categories;
+    const capabilities = parsed.capabilities?.length ? parsed.capabilities : llm.capabilities;
+    const keywords = parsed.keywords?.length ? parsed.keywords : llm.keywords;
+
+    if (categories.length) data.categories = categories;
+    if (capabilities.length) data.capabilities = capabilities;
+    if (keywords.length) data.keywords = keywords;
 
     if (existing) {
-      // Update existing skill using 'as any' for compatibility with generated client
       const updated = await (db.skill.update as any)({
         where: { sourceId },
         data
       });
       return { id: updated.id, slug: updated.slug };
     } else {
-      // Create new skill using 'as any' for compatibility with generated client
       const skillId = crypto.randomUUID();
       const created = await (db.skill.create as any)({
         data: {

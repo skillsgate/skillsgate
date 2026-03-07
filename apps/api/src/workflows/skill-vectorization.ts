@@ -360,17 +360,11 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
     contentHash: string,
     existing: { id: string; contentHash: string | null } | null
   ): Promise<{ id: string; slug: string }> {
-    const data: any = {
-      // From SKILL.md (parsed wins), fallback to LLM
+    // Content-derived fields (safe to update on both create and update)
+    const contentData: any = {
       name: parsed.name || metadata.slug,
       description: parsed.description || '',
       summary: parsed.summary || llm.summary || undefined,
-      // From metadata
-      visibility: metadata.visibility,
-      publisherId: metadata.publisherId,
-      orgId: metadata.orgId,
-      sourceType: metadata.sourceType,
-      priceCents: metadata.priceCents,
       contentHash,
       vectorizedAt: new Date(),
     };
@@ -380,16 +374,16 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
     const capabilities = parsed.capabilities?.length ? parsed.capabilities : llm.capabilities;
     const keywords = parsed.keywords?.length ? parsed.keywords : llm.keywords;
 
-    if (categories.length) data.categories = categories;
-    if (capabilities.length) data.capabilities = capabilities;
-    if (keywords.length) data.keywords = keywords;
+    if (categories.length) contentData.categories = categories;
+    if (capabilities.length) contentData.capabilities = capabilities;
+    if (keywords.length) contentData.keywords = keywords;
 
     if (existing) {
       // Update by id (not sourceId) since pre-migration records may have sourceId: null
-      // Also backfill sourceId on the record
+      // Backfill sourceId but don't overwrite ownership fields (publisherId, orgId, etc.)
       const updated = await (db.skill.update as any)({
         where: { id: existing.id },
-        data: { ...data, sourceId }
+        data: { ...contentData, sourceId }
       });
       return { id: updated.id, slug: updated.slug };
     } else {
@@ -399,7 +393,13 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
           id: skillId,
           sourceId,
           slug: metadata.slug,
-          ...data
+          ...contentData,
+          // Ownership fields only set on creation
+          visibility: metadata.visibility,
+          publisherId: metadata.publisherId,
+          orgId: metadata.orgId,
+          sourceType: metadata.sourceType,
+          priceCents: metadata.priceCents,
         }
       });
       return { id: created.id, slug: created.slug };

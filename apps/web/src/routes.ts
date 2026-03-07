@@ -11,6 +11,7 @@ export default [
 
 	// Dashboard routes
 	layout("routes/dashboard.tsx", [
+		route("dashboard", "routes/dashboard._index.tsx"),
 		route("dashboard/skills", "routes/dashboard.skills.tsx"),
 		layout("routes/dashboard.publisher.tsx", [
 			route("dashboard/publisher/skills", "routes/dashboard.publisher.skills.tsx"),

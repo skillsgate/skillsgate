@@ -52,13 +52,12 @@ export interface VectorizeResult {
  * 2. Parses frontmatter metadata
  * 3. Computes content hash for idempotency
  * 4. Checks for existing skill and content changes
- * 5. Validates slug uniqueness
- * 6. Enriches with LLM (summary, categories, capabilities, keywords, semantic chunks)
- * 7. Chunks content into structured pieces using LLM output + section fallback
- * 8. Generates embeddings via OpenAI
- * 9. Upserts the skill record in the database
- * 10. Inserts vector chunks with embeddings
- * 11. Marks completion
+ * 5. Enriches with LLM (summary, categories, capabilities, keywords, semantic chunks)
+ * 6. Chunks content into structured pieces using LLM output + section fallback
+ * 7. Generates embeddings via OpenAI
+ * 8. Upserts the skill record in the database
+ * 9. Inserts vector chunks with embeddings
+ * 10. Marks completion
  *
  * The workflow is idempotent via sourceId - running it multiple times with the same
  * sourceId will either skip (if content unchanged) or update the existing skill.
@@ -116,14 +115,7 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       }
 
       // ─────────────────────────────────────────────────────────────────
-      // Step 5: Validate Slug Uniqueness
-      // ─────────────────────────────────────────────────────────────────
-      await step.do('validate-slug', async () => {
-        return this.validateSlug(db, metadata.slug, sourceId);
-      });
-
-      // ─────────────────────────────────────────────────────────────────
-      // Step 6: LLM Enrichment
+      // Step 5: LLM Enrichment
       // ─────────────────────────────────────────────────────────────────
       const llm = await step.do('llm-enrichment', {
         retries: { limit: 2, delay: '5 seconds', backoff: 'exponential' },
@@ -145,7 +137,7 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       });
 
       // ─────────────────────────────────────────────────────────────────
-      // Step 7: Chunk Content
+      // Step 6: Chunk Content
       // ─────────────────────────────────────────────────────────────────
       const chunks = await step.do('chunk-content', async () => {
         const skillName = parsed.name || metadata.slug;
@@ -172,7 +164,7 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       }
 
       // ─────────────────────────────────────────────────────────────────
-      // Step 8: Generate Embeddings
+      // Step 7: Generate Embeddings
       // ─────────────────────────────────────────────────────────────────
       const embeddings = await step.do('generate-embeddings', {
         retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' },
@@ -189,7 +181,7 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       });
 
       // ─────────────────────────────────────────────────────────────────
-      // Step 9: Upsert Skill Record
+      // Step 8: Upsert Skill Record
       // ─────────────────────────────────────────────────────────────────
       const skill = await step.do('upsert-skill', {
         retries: { limit: 3, delay: '1 second', backoff: 'exponential' }
@@ -198,7 +190,7 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       });
 
       // ─────────────────────────────────────────────────────────────────
-      // Step 10: Insert Vector Chunks
+      // Step 9: Insert Vector Chunks
       // ─────────────────────────────────────────────────────────────────
       await step.do('insert-vectors', {
         retries: { limit: 3, delay: '1 second', backoff: 'exponential' }
@@ -208,7 +200,7 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       });
 
       // ─────────────────────────────────────────────────────────────────
-      // Step 11: Mark Complete
+      // Step 10: Mark Complete
       // ─────────────────────────────────────────────────────────────────
       await step.do('mark-complete', async () => {
         console.log(`[vectorize] Completed: ${sourceId} (${chunks.length} chunks)`);
@@ -348,22 +340,6 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
     }
 
     return { shouldProceed: true, existing };
-  }
-
-  /**
-   * Validate that the slug doesn't conflict with another skill
-   */
-  private async validateSlug(db: DatabaseClient, slug: string, sourceId: string): Promise<void> {
-    const existing = await (db.skill.findUnique as any)({
-      where: { slug },
-      select: { id: true, sourceId: true }
-    });
-
-    if (existing && existing.sourceId !== sourceId) {
-      throw new NonRetryableError(
-        `Slug '${slug}' already exists (sourceId: ${existing.sourceId})`
-      );
-    }
   }
 
   /**

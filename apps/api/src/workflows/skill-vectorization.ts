@@ -103,7 +103,7 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       const existingCheck = await step.do('check-existing', {
         retries: { limit: 3, delay: '1 second', backoff: 'exponential' }
       }, async () => {
-        return this.checkExistingSkill(db, sourceId, contentHash, options?.force);
+        return this.checkExistingSkill(db, sourceId, metadata.slug, contentHash, options?.force);
       });
 
       if (!existingCheck.shouldProceed) {
@@ -318,21 +318,26 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
   private async checkExistingSkill(
     db: DatabaseClient,
     sourceId: string,
+    slug: string,
     contentHash: string,
     force?: boolean
   ): Promise<{ shouldProceed: boolean; existing: { id: string; contentHash: string | null } | null }> {
-    if (force) {
-      const existing = await (db.skill.findUnique as any)({
-        where: { sourceId },
-        select: { id: true, contentHash: true }
-      });
-      return { shouldProceed: true, existing };
-    }
-
-    const existing = await (db.skill.findUnique as any)({
+    // Look up by sourceId first, fall back to slug (for pre-migration records with null sourceId)
+    let existing = await (db.skill.findUnique as any)({
       where: { sourceId },
       select: { id: true, contentHash: true }
     });
+
+    if (!existing) {
+      existing = await (db.skill.findUnique as any)({
+        where: { slug },
+        select: { id: true, contentHash: true }
+      });
+    }
+
+    if (force) {
+      return { shouldProceed: true, existing };
+    }
 
     if (existing && existing.contentHash === contentHash) {
       console.log(`[vectorize] Skipping ${sourceId} - content unchanged`);
@@ -380,9 +385,11 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
     if (keywords.length) data.keywords = keywords;
 
     if (existing) {
+      // Update by id (not sourceId) since pre-migration records may have sourceId: null
+      // Also backfill sourceId on the record
       const updated = await (db.skill.update as any)({
-        where: { sourceId },
-        data
+        where: { id: existing.id },
+        data: { ...data, sourceId }
       });
       return { id: updated.id, slug: updated.slug };
     } else {

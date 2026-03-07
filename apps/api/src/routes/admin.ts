@@ -180,26 +180,26 @@ adminRoute.post("/admin/discover-repo", async (c) => {
   try {
     const db = createDatabaseClient(c.env.HYPERDRIVE.connectionString);
 
-    // Upsert into discovered_repos
-    const id = crypto.randomUUID();
-    const rows: any[] = await (db as any).$queryRawUnsafe(
-      `INSERT INTO discovered_repos (id, github_owner, github_repo, default_branch, source, discovery_status)
-       VALUES ($1, $2, $3, $4, $5, 'pending')
-       ON CONFLICT (github_owner, github_repo)
-       DO UPDATE SET discovery_status = 'pending', default_branch = EXCLUDED.default_branch, updated_at = NOW()
-       RETURNING id`,
-      id,
-      githubOwner,
-      githubRepo,
-      defaultBranch,
-      source,
-    );
-
-    const discoveredRepoId = rows[0].id as string;
+    // Upsert into discovered_repos — only reset status if not currently in-flight
+    const repo = await (db.discoveredRepo.upsert as any)({
+      where: { githubOwner_githubRepo: { githubOwner, githubRepo } },
+      create: {
+        id: crypto.randomUUID(),
+        githubOwner,
+        githubRepo,
+        defaultBranch,
+        source,
+        discoveryStatus: 'pending',
+      },
+      update: {
+        defaultBranch,
+        discoveryStatus: 'pending',
+      },
+    });
 
     // Enqueue the discovery job
     const message: DiscoverRepoQueueMessage = {
-      discoveredRepoId,
+      discoveredRepoId: repo.id,
       githubOwner,
       githubRepo,
       defaultBranch,

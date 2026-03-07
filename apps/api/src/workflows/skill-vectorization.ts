@@ -1,4 +1,5 @@
-import { WorkflowEntrypoint, WorkflowStep, WorkflowEvent, NonRetryableError } from "cloudflare:workers";
+import { WorkflowEntrypoint, WorkflowStep, WorkflowEvent } from "cloudflare:workers";
+import { NonRetryableError } from "cloudflare:workflows";
 import type { DatabaseClient } from "@skillsgate/database";
 import type { Bindings, VectorizeSkillWorkflowInput } from "../types";
 import { parseSkillMd, type ParsedSkillMd } from "../lib/skill-parser";
@@ -200,15 +201,16 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       // ─────────────────────────────────────────────────────────────────
       // Step 10: Mark Complete
       // ─────────────────────────────────────────────────────────────────
-      await step.do('mark-complete', async () => {
+      await step.do('mark-complete', {
+        retries: { limit: 2, delay: '1 second' },
+      }, async () => {
         console.log(`[vectorize] Completed: ${sourceId} (${chunks.length} chunks)`);
 
         // Mark vectorization_request as completed (if one exists for this sourceId)
-        await db.$executeRaw`
-          UPDATE vectorization_requests
-          SET status = 'completed', updated_at = NOW()
-          WHERE source_id = ${sourceId}
-        `;
+        await (db.vectorizationRequest.updateMany as any)({
+          where: { sourceId },
+          data: { status: 'completed' },
+        });
       });
 
       return {
@@ -226,11 +228,13 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
 
       // Best-effort: mark vectorization_request as failed
       try {
-        await db.$executeRaw`
-          UPDATE vectorization_requests
-          SET status = 'failed', error = ${error instanceof Error ? error.message : String(error)}, updated_at = NOW()
-          WHERE source_id = ${sourceId}
-        `;
+        await (db.vectorizationRequest.updateMany as any)({
+          where: { sourceId },
+          data: {
+            status: 'failed',
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
       } catch (markError) {
         console.error('[vectorize] Failed to mark request as failed:', markError);
       }

@@ -1,4 +1,5 @@
-import { WorkflowEntrypoint, WorkflowStep, WorkflowEvent, NonRetryableError } from "cloudflare:workers";
+import { WorkflowEntrypoint, WorkflowStep, WorkflowEvent } from "cloudflare:workers";
+import { NonRetryableError } from "cloudflare:workflows";
 import { createDatabaseClient } from "@skillsgate/database";
 import type { Bindings, RepoDiscoveryWorkflowInput } from "../types";
 
@@ -45,14 +46,13 @@ export class RepoDiscoveryWorkflow extends WorkflowEntrypoint<Bindings, RepoDisc
       // Step 1: Mark repo as "discovering"
       // ─────────────────────────────────────────────────────────────────
       await step.do('mark-discovering', {
-        retries: { limit: 1 },
+        retries: { limit: 1, delay: '1 second' },
       }, async () => {
         const db = createDatabaseClient(this.env.HYPERDRIVE.connectionString);
-        await (db as any).$executeRawUnsafe(
-          `UPDATE discovered_repos SET discovery_status = $1, updated_at = NOW() WHERE id = $2`,
-          'discovering',
-          discoveredRepoId,
-        );
+        await (db.discoveredRepo.update as any)({
+          where: { id: discoveredRepoId },
+          data: { discoveryStatus: 'discovering' },
+        });
       });
 
       // ─────────────────────────────────────────────────────────────────
@@ -124,54 +124,53 @@ export class RepoDiscoveryWorkflow extends WorkflowEntrypoint<Bindings, RepoDisc
 
         const db = createDatabaseClient(this.env.HYPERDRIVE.connectionString);
 
-        // Build values for batch INSERT
-        const values: string[] = [];
-        const params: (string | null)[] = [];
-        let paramIndex = 1;
-
+        let inserted = 0;
         for (const path of skillPaths) {
-          const id = crypto.randomUUID();
           const sourceId = `github:${githubOwner}/${githubRepo}:${path}`;
-
-          values.push(
-            `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6})`,
-          );
-          params.push(id, sourceId, githubOwner, githubRepo, path, defaultBranch, discoveredRepoId);
-          paramIndex += 7;
+          try {
+            await (db.vectorizationRequest.create as any)({
+              data: {
+                id: crypto.randomUUID(),
+                sourceId,
+                githubOwner,
+                githubRepo,
+                githubPath: path,
+                githubRef: defaultBranch,
+                discoveredRepoId,
+              },
+            });
+            inserted++;
+          } catch (e: any) {
+            // Unique constraint violation on sourceId — skip duplicate
+            if (e?.code === 'P2002') continue;
+            throw e;
+          }
         }
-
-        const sql = `
-          INSERT INTO vectorization_requests (id, source_id, github_owner, github_repo, github_path, github_ref, discovered_repo_id)
-          VALUES ${values.join(', ')}
-          ON CONFLICT (source_id) DO NOTHING
-        `;
-
-        const result = await (db as any).$executeRawUnsafe(sql, ...params);
-        return typeof result === 'number' ? result : skillPaths.length;
+        return inserted;
       });
 
       // ─────────────────────────────────────────────────────────────────
       // Step 5: Mark repo as "discovered" or "not_found"
       // ─────────────────────────────────────────────────────────────────
       await step.do('mark-discovered', {
-        retries: { limit: 1 },
+        retries: { limit: 1, delay: '1 second' },
       }, async () => {
         const db = createDatabaseClient(this.env.HYPERDRIVE.connectionString);
 
         if (skillPaths.length === 0) {
-          await (db as any).$executeRawUnsafe(
-            `UPDATE discovered_repos SET discovery_status = $1, skill_count = $2, updated_at = NOW() WHERE id = $3`,
-            'not_found',
-            0,
-            discoveredRepoId,
-          );
+          await (db.discoveredRepo.update as any)({
+            where: { id: discoveredRepoId },
+            data: { discoveryStatus: 'not_found', skillCount: 0 },
+          });
         } else {
-          await (db as any).$executeRawUnsafe(
-            `UPDATE discovered_repos SET discovery_status = $1, skill_count = $2, last_discovered_at = NOW(), updated_at = NOW() WHERE id = $3`,
-            'discovered',
-            skillPaths.length,
-            discoveredRepoId,
-          );
+          await (db.discoveredRepo.update as any)({
+            where: { id: discoveredRepoId },
+            data: {
+              discoveryStatus: 'discovered',
+              skillCount: skillPaths.length,
+              lastDiscoveredAt: new Date(),
+            },
+          });
         }
       });
 
@@ -185,13 +184,13 @@ export class RepoDiscoveryWorkflow extends WorkflowEntrypoint<Bindings, RepoDisc
       // Best-effort: mark the repo as "failed" with the error message
       try {
         const db = createDatabaseClient(this.env.HYPERDRIVE.connectionString);
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        await (db as any).$executeRawUnsafe(
-          `UPDATE discovered_repos SET discovery_status = $1, discovery_error = $2, updated_at = NOW() WHERE id = $3`,
-          'failed',
-          errorMessage,
-          discoveredRepoId,
-        );
+        await (db.discoveredRepo.update as any)({
+          where: { id: discoveredRepoId },
+          data: {
+            discoveryStatus: 'failed',
+            discoveryError: error instanceof Error ? error.message : String(error),
+          },
+        });
       } catch (markError) {
         console.error(`[repo-discovery] Failed to mark repo ${discoveredRepoId} as failed:`, markError);
       }

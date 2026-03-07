@@ -308,15 +308,6 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       return res.text();
     }
 
-    if (source.type === 'direct') {
-      const r2Key = `skills/${source.skillId}/SKILL.md`;
-      const obj = await this.env.R2_SKILLS.get(r2Key);
-      if (!obj) {
-        throw new NonRetryableError(`SKILL.md not found for direct skill: ${r2Key}`);
-      }
-      return obj.text();
-    }
-
     throw new NonRetryableError(`Invalid source type: ${(source as any).type}`);
   }
 

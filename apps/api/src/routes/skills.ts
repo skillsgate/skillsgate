@@ -62,7 +62,7 @@ skillsRoute.post("/skills", async (c) => {
       description,
       visibility,
       publisherId: userId,
-      sourceType: "direct",
+      sourceType: "r2",
     },
   });
 
@@ -176,7 +176,7 @@ skillsRoute.post("/skills/:id/files", async (c) => {
     slug: updatedSkill.slug,
     visibility: updatedSkill.visibility as 'public' | 'private' | 'premium',
     publisherId: userId,
-    sourceType: 'direct' as const,
+    sourceType: 'r2' as const,
   };
 
   c.executionCtx.waitUntil(

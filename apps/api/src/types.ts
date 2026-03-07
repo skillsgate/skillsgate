@@ -25,8 +25,7 @@ export interface Variables {
  */
 export type SkillSource =
   | { type: 'r2'; r2Key: string }
-  | { type: 'github'; repo: string; path: string; ref?: string }
-  | { type: 'direct'; skillId: string };
+  | { type: 'github'; repo: string; path: string; ref?: string };
 
 /**
  * Required metadata fields for skill vectorization.
@@ -38,7 +37,7 @@ export interface SkillMetadata {
   visibility: 'public' | 'private' | 'premium';
   publisherId: string;
   orgId?: string;
-  sourceType: 'direct' | 'github';
+  sourceType: 'r2' | 'github';
   priceCents?: number;
 }
 
@@ -58,7 +57,6 @@ export interface VectorizeSkillWorkflowInput {
    * Format varies by source type:
    * - GitHub: "github:{owner}/{repo}:{path}"
    * - R2: "r2:{r2Key}"
-   * - Direct: "direct:{skillId}"
    */
   sourceId: string;
 

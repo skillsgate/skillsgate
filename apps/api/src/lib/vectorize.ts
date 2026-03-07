@@ -168,9 +168,10 @@ export async function enqueueSkillVectorization(
   metadata: SkillMetadata
 ): Promise<void> {
   // Determine source type and construct sourceId
+  const r2Key = `skills/${skillId}/SKILL.md`;
   const sourceId = metadata.sourceType === 'github' && metadata.orgId
     ? `github:${metadata.orgId}/${metadata.slug}`
-    : `direct:${skillId}`;
+    : `r2:${r2Key}`;
 
   // Determine namespace based on visibility
   let namespace: string;
@@ -186,8 +187,8 @@ export async function enqueueSkillVectorization(
   const payload: VectorizeSkillWorkflowInput = {
     sourceId,
     source: {
-      type: 'direct',
-      skillId
+      type: 'r2',
+      r2Key
     },
     metadata: {
       ...metadata,

@@ -17,10 +17,6 @@ const vectorizeSkillSchema = z.object({
       repo: z.string().min(1, "repo is required for github source"),
       path: z.string().min(1, "path is required for github source"),
       ref: z.string().optional()
-    }),
-    z.object({
-      type: z.literal("direct"),
-      skillId: z.string().min(1, "skillId is required for direct source")
     })
   ]),
   metadata: z.object({
@@ -28,7 +24,7 @@ const vectorizeSkillSchema = z.object({
     visibility: z.enum(["public", "private", "premium"]),
     publisherId: z.string().min(1, "publisherId is required"),
     orgId: z.string().optional(),
-    sourceType: z.enum(["direct", "github"]),
+    sourceType: z.enum(["r2", "github"]),
     priceCents: z.number().int().nonnegative().optional()
   }),
   namespace: z.string().min(1, "namespace is required"),

@@ -29,7 +29,7 @@ model Skill {
   contentHash String?  @map("content_hash")
 
   // Source
-  sourceType String  @default("direct") @map("source_type")
+  sourceType String  @default("r2") @map("source_type")
   githubRepo String? @map("github_repo")
   githubPath String? @map("github_path")
   hasScripts Boolean  @default(false) @map("has_scripts")

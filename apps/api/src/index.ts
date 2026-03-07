@@ -22,6 +22,7 @@ app.use("*", cors());
 
 app.route("/", healthRoute);
 app.route("/", telemetryRoute);
+app.route("/api", adminRoute);
 app.route("/api/v1", searchRoute);
 app.route("/api", usersRoute);
 app.route("/api", sharesRoute);
@@ -31,7 +32,6 @@ app.route("/api", orgsRoute);
 app.route("/api", skillsRoute);
 app.route("/api", githubRoute);
 app.route("/api", connectedReposRoute);
-app.route("/api", adminRoute);
 
 // Named export required by Cloudflare Workflows
 export { SkillVectorizationWorkflow };

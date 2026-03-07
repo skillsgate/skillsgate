@@ -73,7 +73,7 @@ export async function enrichSkillWithLlm(
         "X-Title": "SkillsGate Vectorization",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.0-flash-001",
+        model: "deepseek/deepseek-chat-v3-0324:free",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userMessage },

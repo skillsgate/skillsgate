@@ -33,6 +33,9 @@ app.route("/api", githubRoute);
 app.route("/api", connectedReposRoute);
 app.route("/api", adminRoute);
 
+// Named export required by Cloudflare Workflows
+export { SkillVectorizationWorkflow };
+
 // Export the Hono app as default export
 export default {
   // Standard fetch handler for HTTP requests
@@ -71,9 +74,4 @@ export default {
       }
     }
   },
-
-  /**
-   * Workflow class - registered for skill-vectorization workflow
-   */
-  SkillVectorizationWorkflow
 };

@@ -14,6 +14,10 @@
     {
       "binding": "R2_SKILLS",
       "bucket_name": "skillsgate-skills"
+    },
+    {
+      "binding": "R2_WORKFLOW_ARTIFACTS",
+      "bucket_name": "skillsgate-workflow-artifacts"
     }
   ],
   "analytics_engine_datasets": [

@@ -136,6 +136,14 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
         return enrichSkillWithLlm(this.env.OPENROUTER_API_KEY, frontmatter, body);
       });
 
+      // Store LLM output to R2 for debugging/auditing
+      await step.do('store-llm-output', async () => {
+        const key = `workflows/${sourceId}/llm-enrichment.json`;
+        await this.env.R2_WORKFLOW_ARTIFACTS.put(key, JSON.stringify(llm, null, 2), {
+          httpMetadata: { contentType: 'application/json' },
+        });
+      });
+
       // ─────────────────────────────────────────────────────────────────
       // Step 6: Chunk Content
       // ─────────────────────────────────────────────────────────────────

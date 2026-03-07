@@ -8,6 +8,7 @@ export interface Bindings {
   GITHUB_APP_PRIVATE_KEY: string;
   TELEMETRY: AnalyticsEngineDataset;
   R2_SKILLS: R2Bucket;
+  R2_WORKFLOW_ARTIFACTS: R2Bucket;
   VECTORIZE_QUEUE: Queue<VectorizeSkillWorkflowInput>;
   SKILL_VECTORIZATION_WORKFLOW: Workflow;
   INTERNAL_API_KEY: string;

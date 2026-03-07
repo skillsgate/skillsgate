@@ -11,7 +11,10 @@ export interface Bindings {
   R2_WORKFLOW_ARTIFACTS: R2Bucket;
   VECTORIZE_QUEUE: Queue<VectorizeSkillWorkflowInput>;
   SKILL_VECTORIZATION_WORKFLOW: Workflow;
+  DISCOVERY_QUEUE: Queue<DiscoverRepoQueueMessage>;
+  REPO_DISCOVERY_WORKFLOW: Workflow;
   INTERNAL_API_KEY: string;
+  GITHUB_TOKEN: string;
 }
 
 export interface Variables {
@@ -81,3 +84,12 @@ export interface VectorizeSkillWorkflowInput {
    */
   options?: VectorizeOptions;
 }
+
+export interface DiscoverRepoQueueMessage {
+  discoveredRepoId: string;
+  githubOwner: string;
+  githubRepo: string;
+  defaultBranch: string;
+}
+
+export type RepoDiscoveryWorkflowInput = DiscoverRepoQueueMessage;

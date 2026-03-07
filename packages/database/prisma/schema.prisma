@@ -314,6 +314,48 @@ model ConnectedRepo {
   @@map("connected_repos")
 }
 
+// ─── Discovery Pipeline ─────────────────────────────────────────
+
+model DiscoveredRepo {
+  id              String    @id
+  githubOwner     String    @map("github_owner")
+  githubRepo      String    @map("github_repo")
+  defaultBranch   String    @default("main") @map("default_branch")
+  source          String    @default("csv_import") // "csv_import" | "pending_skill" | "manual"
+  discoveryStatus String    @default("pending") @map("discovery_status") // "pending" | "discovering" | "discovered" | "failed" | "not_found"
+  skillCount      Int       @default(0) @map("skill_count")
+  lastDiscoveredAt DateTime? @map("last_discovered_at") @db.Timestamptz
+  discoveryError  String?   @map("discovery_error")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  vectorizationRequests VectorizationRequest[]
+
+  @@unique([githubOwner, githubRepo])
+  @@index([discoveryStatus], map: "idx_discovered_repos_status")
+  @@map("discovered_repos")
+}
+
+model VectorizationRequest {
+  id               String    @id
+  sourceId         String    @unique @map("source_id")
+  githubOwner      String    @map("github_owner")
+  githubRepo       String    @map("github_repo")
+  githubPath       String    @map("github_path")
+  githubRef        String?   @map("github_ref")
+  discoveredRepoId String?   @map("discovered_repo_id")
+  priority         Int       @default(0)
+  status           String    @default("pending") // "pending" | "processing" | "completed" | "failed"
+  error            String?
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  discoveredRepo DiscoveredRepo? @relation(fields: [discoveredRepoId], references: [id])
+
+  @@index([status], map: "idx_vectorization_requests_status")
+  @@map("vectorization_requests")
+}
+
 // ─── Purchases (premium catalogs) ───────────────────────────────
 
 model Purchase {

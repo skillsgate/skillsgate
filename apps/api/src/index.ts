@@ -14,7 +14,8 @@ import { githubRoute } from "./routes/github";
 import { connectedReposRoute } from "./routes/connected-repos";
 import { adminRoute } from "./routes/admin";
 import { SkillVectorizationWorkflow } from "./workflows/skill-vectorization";
-import type { VectorizeSkillWorkflowInput } from "./types";
+import { RepoDiscoveryWorkflow } from "./workflows/repo-discovery";
+import type { VectorizeSkillWorkflowInput, DiscoverRepoQueueMessage } from "./types";
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -33,8 +34,9 @@ app.route("/api", skillsRoute);
 app.route("/api", githubRoute);
 app.route("/api", connectedReposRoute);
 
-// Named export required by Cloudflare Workflows
+// Named exports required by Cloudflare Workflows
 export { SkillVectorizationWorkflow };
+export { RepoDiscoveryWorkflow };
 
 // Export the Hono app as default export
 export default {
@@ -42,35 +44,66 @@ export default {
   fetch: app.fetch.bind(app),
 
   /**
-   * Queue consumer handler - triggered by messages on skill-vectorize-queue
-   * Each message triggers a new workflow instance for idempotent, durable processing
+   * Queue consumer handler - dispatches to the appropriate workflow based on queue name.
+   * Each message triggers a new workflow instance for idempotent, durable processing.
    */
   async queue(
-    batch: MessageBatch<VectorizeSkillWorkflowInput>,
+    batch: MessageBatch,
     env: Bindings,
     ctx: ExecutionContext
   ): Promise<void> {
-    for (const message of batch.messages) {
-      const payload = message.body;
+    if (batch.queue === "repo-discovery-queue") {
+      for (const message of batch.messages) {
+        const payload = message.body as DiscoverRepoQueueMessage;
 
-      try {
-        console.log(`[queue] Creating workflow instance for ${payload.sourceId}`);
+        try {
+          console.log(
+            `[queue] Creating repo discovery workflow for ${payload.githubOwner}/${payload.githubRepo}`
+          );
 
-        // Create a new workflow instance for this skill
-        // This provides durable execution with automatic retries and observability
-        const instance = await env.SKILL_VECTORIZATION_WORKFLOW.create({
-          params: payload
-        });
+          const instance = await env.REPO_DISCOVERY_WORKFLOW.create({
+            params: payload,
+          });
 
-        console.log(`[queue] Workflow instance created: ${instance.id} for ${payload.sourceId}`);
+          console.log(
+            `[queue] Repo discovery workflow created: ${instance.id} for ${payload.githubOwner}/${payload.githubRepo}`
+          );
 
-        // Acknowledge the message - workflow now owns the processing
-        message.ack();
-      } catch (error) {
-        console.error(`[queue] Failed to create workflow for ${payload.sourceId}:`, error);
+          message.ack();
+        } catch (error) {
+          console.error(
+            `[queue] Failed to create repo discovery workflow for ${payload.githubOwner}/${payload.githubRepo}:`,
+            error
+          );
 
-        // Retry the message (will go to DLQ after max_retries)
-        message.retry();
+          message.retry();
+        }
+      }
+    } else {
+      // Default: skill-vectorize-queue
+      for (const message of batch.messages) {
+        const payload = message.body as VectorizeSkillWorkflowInput;
+
+        try {
+          console.log(`[queue] Creating workflow instance for ${payload.sourceId}`);
+
+          const instance = await env.SKILL_VECTORIZATION_WORKFLOW.create({
+            params: payload,
+          });
+
+          console.log(
+            `[queue] Workflow instance created: ${instance.id} for ${payload.sourceId}`
+          );
+
+          message.ack();
+        } catch (error) {
+          console.error(
+            `[queue] Failed to create workflow for ${payload.sourceId}:`,
+            error
+          );
+
+          message.retry();
+        }
       }
     }
   },

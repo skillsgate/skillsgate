@@ -38,6 +38,10 @@
       {
         "queue": "skill-vectorize-queue",
         "binding": "VECTORIZE_QUEUE"
+      },
+      {
+        "queue": "repo-discovery-queue",
+        "binding": "DISCOVERY_QUEUE"
       }
     ],
     "consumers": [
@@ -47,6 +51,13 @@
         "max_batch_timeout": 1,
         "max_retries": 3,
         "dead_letter_queue": "skill-vectorize-dlq"
+      },
+      {
+        "queue": "repo-discovery-queue",
+        "max_batch_size": 1,
+        "max_batch_timeout": 1,
+        "max_retries": 3,
+        "dead_letter_queue": "repo-discovery-dlq"
       }
     ]
   },
@@ -55,6 +66,11 @@
       "name": "skill-vectorization",
       "binding": "SKILL_VECTORIZATION_WORKFLOW",
       "class_name": "SkillVectorizationWorkflow"
+    },
+    {
+      "name": "repo-discovery",
+      "binding": "REPO_DISCOVERY_WORKFLOW",
+      "class_name": "RepoDiscoveryWorkflow"
     }
   ]
 }

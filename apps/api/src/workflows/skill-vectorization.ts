@@ -1,4 +1,4 @@
-import { WorkflowEntrypoint, WorkflowStep, WorkflowEvent } from "cloudflare:workers";
+import { WorkflowEntrypoint, WorkflowStep, WorkflowEvent, NonRetryableError } from "cloudflare:workers";
 import type { DatabaseClient } from "@skillsgate/database";
 import type { Bindings, VectorizeSkillWorkflowInput } from "../types";
 import { parseSkillMd, type ParsedSkillMd } from "../lib/skill-parser";
@@ -7,17 +7,6 @@ import { OpenAIEmbeddingProvider } from "../lib/embedding";
 import { enrichSkillWithLlm, type LlmEnrichment } from "../lib/llm-enrichment";
 import { insertSkillChunks, deleteSkillChunks } from "../lib/vector-store";
 import { createDatabaseClient } from "@skillsgate/database";
-
-/**
- * Non-retryable error - indicates a permanent failure that should not be retried.
- * Examples: 404 errors, invalid configuration, validation failures
- */
-export class NonRetryableError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "NonRetryableError";
-  }
-}
 
 /**
  * Retryable error - indicates a transient failure that should be retried.
@@ -213,6 +202,13 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       // ─────────────────────────────────────────────────────────────────
       await step.do('mark-complete', async () => {
         console.log(`[vectorize] Completed: ${sourceId} (${chunks.length} chunks)`);
+
+        // Mark vectorization_request as completed (if one exists for this sourceId)
+        await db.$executeRaw`
+          UPDATE vectorization_requests
+          SET status = 'completed', updated_at = NOW()
+          WHERE source_id = ${sourceId}
+        `;
       });
 
       return {
@@ -227,6 +223,17 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
 
     } catch (error) {
       console.error(`[vectorize] Failed for ${sourceId}:`, error);
+
+      // Best-effort: mark vectorization_request as failed
+      try {
+        await db.$executeRaw`
+          UPDATE vectorization_requests
+          SET status = 'failed', error = ${error instanceof Error ? error.message : String(error)}, updated_at = NOW()
+          WHERE source_id = ${sourceId}
+        `;
+      } catch (markError) {
+        console.error('[vectorize] Failed to mark request as failed:', markError);
+      }
 
       // Re-throw retryable errors for automatic retry
       if (error instanceof RetryableError) {

@@ -28,6 +28,26 @@ interface SearchResponse {
   };
 }
 
+function buildInstallCmd(githubUrl: string): string | null {
+  if (!githubUrl) return null;
+  try {
+    const url = new URL(githubUrl);
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (parts.length < 2) return null;
+    const ownerRepo = `${parts[0]}/${parts[1]}`;
+    if (parts.length > 4) {
+      const pathParts = parts.slice(4);
+      if (pathParts.at(-1)?.toUpperCase() === "SKILL.MD") pathParts.pop();
+      if (pathParts.length > 0) {
+        return `skillsgate add ${ownerRepo}@${pathParts.at(-1)} -y`;
+      }
+    }
+    return `skillsgate add ${ownerRepo} -y`;
+  } catch {
+    return null;
+  }
+}
+
 export async function runSearch(args: string[]): Promise<void> {
   const query = args.join(" ").trim();
 
@@ -122,8 +142,9 @@ export async function runSearch(args: string[]): Promise<void> {
         console.log(`     ${pc.dim("Categories:")} ${result.categories.join(", ")}`);
       }
 
-      if (result.installCommand) {
-        console.log(`     ${pc.green("$")} ${result.installCommand}`);
+      const installCmd = buildInstallCmd(result.githubUrl);
+      if (installCmd) {
+        console.log(`     ${pc.green("$")} ${installCmd}`);
       }
 
       if (result.githubUrl) {

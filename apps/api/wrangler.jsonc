@@ -1,76 +1,89 @@
 {
-  "name": "skillsgate-api",
-  "main": "src/index.ts",
-  "compatibility_date": "2025-12-01",
-  "compatibility_flags": ["nodejs_compat"],
-  "hyperdrive": [
-    {
-      "binding": "HYPERDRIVE",
-      "id": "a7e64ebf303b48599a157bc62b37e67f",
-      "localConnectionString": "postgresql://user:password@localhost:5432/skillsgate"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "R2_SKILLS",
-      "bucket_name": "skillsgate-skills"
-    },
-    {
-      "binding": "R2_WORKFLOW_ARTIFACTS",
-      "bucket_name": "skillsgate-workflow-artifacts"
-    }
-  ],
-  "analytics_engine_datasets": [
-    { "binding": "TELEMETRY", "dataset": "skillsgate_cli" }
-  ],
-  "observability": { "enabled": true },
-  "define": {
-    "import.meta.url": "\"file:///worker.js\""
-  },
-  "routes": [
-    {
-      "pattern": "api.skillsgate.ai/*",
-      "zone_name": "skillsgate.ai"
-    }
-  ],
-  "queues": {
-    "producers": [
-      {
-        "queue": "skill-vectorize-queue",
-        "binding": "VECTORIZE_QUEUE"
-      },
-      {
-        "queue": "repo-discovery-queue",
-        "binding": "DISCOVERY_QUEUE"
-      }
-    ],
-    "consumers": [
-      {
-        "queue": "skill-vectorize-queue",
-        "max_batch_size": 1,
-        "max_batch_timeout": 1,
-        "max_retries": 3,
-        "dead_letter_queue": "skill-vectorize-dlq"
-      },
-      {
-        "queue": "repo-discovery-queue",
-        "max_batch_size": 1,
-        "max_batch_timeout": 1,
-        "max_retries": 3,
-        "dead_letter_queue": "repo-discovery-dlq"
-      }
-    ]
-  },
-  "workflows": [
-    {
-      "name": "skill-vectorization",
-      "binding": "SKILL_VECTORIZATION_WORKFLOW",
-      "class_name": "SkillVectorizationWorkflow"
-    },
-    {
-      "name": "repo-discovery",
-      "binding": "REPO_DISCOVERY_WORKFLOW",
-      "class_name": "RepoDiscoveryWorkflow"
-    }
-  ]
+	"name": "skillsgate-api",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-12-01",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"hyperdrive": [
+		{
+			"binding": "HYPERDRIVE",
+			"id": "a7e64ebf303b48599a157bc62b37e67f",
+			"localConnectionString": "postgresql://user:password@localhost:5432/skillsgate"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "R2_SKILLS",
+			"bucket_name": "skillsgate-skills"
+		},
+		{
+			"binding": "R2_WORKFLOW_ARTIFACTS",
+			"bucket_name": "skillsgate-workflow-artifacts"
+		}
+	],
+	"kv_namespaces": [
+		{
+			"binding": "CACHE",
+			"id": "4d6bccc6916943a1864e8fdc6601cac5"
+		}
+	],
+	"analytics_engine_datasets": [
+		{
+			"binding": "TELEMETRY",
+			"dataset": "skillsgate_cli"
+		}
+	],
+	"observability": {
+		"enabled": true
+	},
+	"define": {
+		"import.meta.url": "\"file:///worker.js\""
+	},
+	"routes": [
+		{
+			"pattern": "api.skillsgate.ai/*",
+			"zone_name": "skillsgate.ai"
+		}
+	],
+	"queues": {
+		"producers": [
+			{
+				"queue": "skill-vectorize-queue",
+				"binding": "VECTORIZE_QUEUE"
+			},
+			{
+				"queue": "repo-discovery-queue",
+				"binding": "DISCOVERY_QUEUE"
+			}
+		],
+		"consumers": [
+			{
+				"queue": "skill-vectorize-queue",
+				"max_batch_size": 1,
+				"max_batch_timeout": 1,
+				"max_retries": 3,
+				"dead_letter_queue": "skill-vectorize-dlq"
+			},
+			{
+				"queue": "repo-discovery-queue",
+				"max_batch_size": 1,
+				"max_batch_timeout": 1,
+				"max_retries": 3,
+				"dead_letter_queue": "repo-discovery-dlq"
+			}
+		]
+	},
+	"workflows": [
+		{
+			"name": "skill-vectorization",
+			"binding": "SKILL_VECTORIZATION_WORKFLOW",
+			"class_name": "SkillVectorizationWorkflow"
+		},
+		{
+			"name": "repo-discovery",
+			"binding": "REPO_DISCOVERY_WORKFLOW",
+			"class_name": "RepoDiscoveryWorkflow"
+		}
+	]
 }

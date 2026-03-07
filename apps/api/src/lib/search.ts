@@ -2,6 +2,8 @@ import type { DatabaseClient } from "@skillsgate/database";
 import { OpenAIEmbeddingProvider } from "./embedding";
 import { searchVectors, type VectorSearchResult } from "./vector-store";
 
+// ─── Types ──────────────────────────────────────────────────────────
+
 export interface SearchResult {
   skillId: string;
   slug: string;
@@ -15,16 +17,174 @@ export interface SearchResult {
   score: number;
 }
 
+/**
+ * Minimal skill metadata cached in KV for search result hydration.
+ * Only the fields needed to build a SearchResult — not the full Prisma model.
+ */
+export interface CachedSkillMeta {
+  id: string;
+  slug: string;
+  name: string;
+  summary: string | null;
+  description: string;
+  categories: string[];
+  capabilities: string[];
+  keywords: string[];
+  githubRepo: string | null;
+  githubPath: string | null;
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────
+
+/**
+ * Compute a hex-encoded SHA-256 hash using the Web Crypto API
+ * (available in Cloudflare Workers).
+ */
+async function sha256(text: string): Promise<string> {
+  const data = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(hash)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+// ─── Skill Metadata Hydration (with KV cache) ──────────────────────
+
+/**
+ * Hydrate skill metadata for a list of skill IDs.
+ * Checks KV cache first (`skill:{id}`), fetches missing from DB,
+ * and writes fetched results back to KV with a 5-minute TTL.
+ *
+ * KV writes are non-blocking via `ctx.waitUntil()`.
+ * All KV operations are wrapped in try/catch so search still works
+ * if KV is unavailable.
+ */
+async function hydrateSkills(
+  db: DatabaseClient,
+  skillIds: string[],
+  cache: KVNamespace,
+  ctx?: ExecutionContext
+): Promise<Map<string, CachedSkillMeta>> {
+  const skillMap = new Map<string, CachedSkillMeta>();
+  const missingIds: string[] = [];
+
+  // 1. Try KV for each skill
+  try {
+    const cacheResults = await Promise.all(
+      skillIds.map(async (id) => {
+        try {
+          const cached = await cache.get(`skill:${id}`, "json");
+          return { id, cached };
+        } catch {
+          return { id, cached: null };
+        }
+      })
+    );
+
+    for (const { id, cached } of cacheResults) {
+      if (cached) {
+        skillMap.set(id, cached as CachedSkillMeta);
+      } else {
+        missingIds.push(id);
+      }
+    }
+  } catch {
+    // If the entire Promise.all fails, treat all IDs as cache misses
+    missingIds.length = 0;
+    missingIds.push(...skillIds);
+  }
+
+  // 2. Fetch missing from DB
+  if (missingIds.length > 0) {
+    const skills = await db.skill.findMany({
+      where: { id: { in: missingIds } },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        summary: true,
+        description: true,
+        categories: true,
+        capabilities: true,
+        keywords: true,
+        githubRepo: true,
+        githubPath: true,
+      },
+    });
+
+    for (const skill of skills) {
+      const meta: CachedSkillMeta = {
+        id: skill.id,
+        slug: skill.slug,
+        name: skill.name,
+        summary: skill.summary,
+        description: skill.description,
+        categories: (skill.categories as string[]) ?? [],
+        capabilities: (skill.capabilities as string[]) ?? [],
+        keywords: (skill.keywords as string[]) ?? [],
+        githubRepo: skill.githubRepo,
+        githubPath: skill.githubPath,
+      };
+      skillMap.set(skill.id, meta);
+
+      // Write-behind (non-blocking)
+      ctx?.waitUntil(
+        cache
+          .put(`skill:${skill.id}`, JSON.stringify(meta), {
+            expirationTtl: 300, // 5 minutes
+          })
+          .catch(() => {
+            // Silently ignore KV write failures
+          })
+      );
+    }
+  }
+
+  return skillMap;
+}
+
+// ─── Main Search Function ───────────────────────────────────────────
+
 export async function searchSkills(
   db: DatabaseClient,
   openaiApiKey: string,
   query: string,
-  limit: number
+  limit: number,
+  cache: KVNamespace,
+  ctx?: ExecutionContext
 ): Promise<SearchResult[]> {
-  const embedder = new OpenAIEmbeddingProvider(openaiApiKey);
+  // 1. Embed the query (with KV cache)
+  const normalized = query.trim().toLowerCase();
+  const embedCacheKey = `embed:${await sha256(normalized)}`;
 
-  // 1. Embed the query
-  const embedding = await embedder.embedQuery(query);
+  let embedding: number[] | null = null;
+
+  // Try cache first
+  try {
+    const cached = await cache.get(embedCacheKey, "json");
+    if (cached) {
+      embedding = cached as number[];
+    }
+  } catch {
+    // KV read failed — fall through to OpenAI
+  }
+
+  // Fallback to OpenAI on cache miss
+  if (!embedding) {
+    const embedder = new OpenAIEmbeddingProvider(openaiApiKey);
+    embedding = await embedder.embedQuery(query);
+
+    // Write-behind (non-blocking)
+    ctx?.waitUntil(
+      cache
+        .put(embedCacheKey, JSON.stringify(embedding), {
+          expirationTtl: 86400, // 24 hours
+        })
+        .catch(() => {
+          // Silently ignore KV write failures
+        })
+    );
+  }
 
   // 2. pgvector search with headroom for dedup
   const topK = limit * 4;
@@ -47,12 +207,9 @@ export async function searchSkills(
     .sort((a, b) => b.bestScore - a.bestScore)
     .slice(0, limit);
 
-  // 5. Batch fetch skill metadata
+  // 5. Batch fetch skill metadata (with KV cache)
   const skillIds = ranked.map((r) => r.skillId);
-  const skills = await db.skill.findMany({
-    where: { id: { in: skillIds } },
-  });
-  const skillMap = new Map(skills.map((s) => [s.id, s]));
+  const skillMap = await hydrateSkills(db, skillIds, cache, ctx);
 
   // 6. Build response
   return ranked.map(({ skillId, bestScore }) => {
@@ -68,9 +225,9 @@ export async function searchSkills(
       slug: skill?.slug ?? "",
       name: skill?.name ?? skillId,
       summary: skill?.summary ?? skill?.description ?? "",
-      categories: (skill?.categories as string[]) ?? [],
-      capabilities: (skill?.capabilities as string[]) ?? [],
-      keywords: (skill?.keywords as string[]) ?? [],
+      categories: skill?.categories ?? [],
+      capabilities: skill?.capabilities ?? [],
+      keywords: skill?.keywords ?? [],
       githubUrl,
       installCommand: deriveInstallCommand(githubRepo, githubPath),
       score: Math.round(bestScore * 1000) / 1000,

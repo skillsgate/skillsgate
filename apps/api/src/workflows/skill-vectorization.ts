@@ -201,6 +201,18 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       });
 
       // ─────────────────────────────────────────────────────────────────
+      // Step 8b: Invalidate Skill Metadata Cache
+      // ─────────────────────────────────────────────────────────────────
+      await step.do('invalidate-skill-cache', async () => {
+        try {
+          await this.env.CACHE.delete(`skill:${skill.id}`);
+        } catch {
+          // Non-critical — cache entry will expire via TTL (5 min)
+          console.warn(`[vectorize] Failed to invalidate cache for skill ${skill.id}`);
+        }
+      });
+
+      // ─────────────────────────────────────────────────────────────────
       // Step 9: Insert Vector Chunks
       // ─────────────────────────────────────────────────────────────────
       await step.do('insert-vectors', {

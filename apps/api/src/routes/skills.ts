@@ -179,6 +179,13 @@ skillsRoute.post("/skills/:id/files", async (c) => {
     sourceType: 'r2' as const,
   };
 
+  // Invalidate skill metadata cache (metadata may have changed from SKILL.md parse)
+  c.executionCtx.waitUntil(
+    c.env.CACHE.delete(`skill:${skillId}`).catch(() => {
+      // Silently ignore KV delete failures
+    })
+  );
+
   c.executionCtx.waitUntil(
     enqueueSkillVectorization(c.env.VECTORIZE_QUEUE, skillId, vectorizeMetadata)
       .then(() => {
@@ -245,6 +252,13 @@ skillsRoute.delete("/skills/:id", async (c) => {
   await db.skill.delete({
     where: { id: skillId },
   });
+
+  // Invalidate skill metadata cache
+  c.executionCtx.waitUntil(
+    c.env.CACHE.delete(`skill:${skillId}`).catch(() => {
+      // Silently ignore KV delete failures
+    })
+  );
 
   // If private, clean up the namespace
   if (skill.visibility === "private") {

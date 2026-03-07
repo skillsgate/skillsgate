@@ -15,6 +15,7 @@ export interface Bindings {
   REPO_DISCOVERY_WORKFLOW: Workflow;
   INTERNAL_API_KEY: string;
   GITHUB_TOKEN: string;
+  CACHE: KVNamespace;
 }
 
 export interface Variables {

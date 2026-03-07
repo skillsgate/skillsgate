@@ -33,7 +33,7 @@ searchRoute.post("/search", async (c) => {
   const userId = c.var.userId;
 
   // Search
-  const results = await searchSkills(db, c.env.OPENAI_API_KEY, query, limit);
+  const results = await searchSkills(db, c.env.OPENAI_API_KEY, query, limit, c.env.CACHE, c.executionCtx);
 
   // Record usage
   await db.searchUsage.create({

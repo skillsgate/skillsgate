@@ -56,8 +56,9 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
   async run(event: WorkflowEvent<VectorizeSkillWorkflowInput>, step: WorkflowStep): Promise<VectorizeResult> {
     const { sourceId, source, metadata, namespace, options } = event.payload;
 
-    // Create database client
-    const db = createDatabaseClient(this.env.HYPERDRIVE.connectionString);
+    // Helper: create a fresh DB client per step to avoid stale connections
+    // after workflow hibernation between steps.
+    const freshDb = () => createDatabaseClient(this.env.HYPERDRIVE.connectionString);
 
     try {
       // ─────────────────────────────────────────────────────────────────
@@ -93,10 +94,21 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       const existingCheck = await step.do('check-existing', {
         retries: { limit: 3, delay: '1 second', backoff: 'exponential' }
       }, async () => {
-        return this.checkExistingSkill(db, sourceId, metadata.slug, contentHash, options?.force);
+        return this.checkExistingSkill(freshDb(), sourceId, metadata.slug, contentHash, options?.force);
       });
 
       if (!existingCheck.shouldProceed) {
+        // Mark vectorization_request as completed so it's not retried
+        try {
+          const db = freshDb();
+          await (db.vectorizationRequest.updateMany as any)({
+            where: { sourceId },
+            data: { status: 'completed' },
+          });
+        } catch (e) {
+          console.warn(`[vectorize] Failed to mark skipped request as completed: ${sourceId}`, e);
+        }
+
         return {
           status: 'skipped',
           sourceId,
@@ -185,7 +197,7 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       const skill = await step.do('upsert-skill', {
         retries: { limit: 3, delay: '1 second', backoff: 'exponential' }
       }, async () => {
-        return this.upsertSkill(db, sourceId, metadata, parsed, llm, contentHash, existingCheck.existing);
+        return this.upsertSkill(freshDb(), sourceId, metadata, parsed, llm, contentHash, existingCheck.existing);
       });
 
       // ─────────────────────────────────────────────────────────────────
@@ -194,6 +206,7 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       await step.do('insert-vectors', {
         retries: { limit: 3, delay: '1 second', backoff: 'exponential' }
       }, async () => {
+        const db = freshDb();
         await deleteSkillChunks(db, skill.id);
         await insertSkillChunks(db, skill.id, namespace, chunks, embeddings);
       });
@@ -202,11 +215,12 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       // Step 10: Mark Complete
       // ─────────────────────────────────────────────────────────────────
       await step.do('mark-complete', {
-        retries: { limit: 2, delay: '1 second' },
+        retries: { limit: 5, delay: '2 seconds', backoff: 'exponential' },
+        timeout: '30 seconds',
       }, async () => {
         console.log(`[vectorize] Completed: ${sourceId} (${chunks.length} chunks)`);
 
-        // Mark vectorization_request as completed (if one exists for this sourceId)
+        const db = freshDb();
         await (db.vectorizationRequest.updateMany as any)({
           where: { sourceId },
           data: { status: 'completed' },
@@ -228,6 +242,7 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
 
       // Best-effort: mark vectorization_request as failed
       try {
+        const db = freshDb();
         await (db.vectorizationRequest.updateMany as any)({
           where: { sourceId },
           data: {

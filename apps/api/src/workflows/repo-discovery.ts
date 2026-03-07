@@ -29,10 +29,10 @@ export interface RepoDiscoveryResult {
  *
  * This workflow:
  * 1. Marks the discovered repo as "discovering"
- * 2. Fetches the full repo tree from GitHub
- * 3. Filters for SKILL.md files
- * 4. Inserts vectorization requests for each SKILL.md found
- * 5. Updates the discovered repo with results
+ * 2. Fetches the repo tree from GitHub and filters for SKILL.md files (single step
+ *    to avoid serializing the full tree as a workflow step output)
+ * 3. Bulk-inserts vectorization requests (chunked createMany, idempotent)
+ * 4. Updates the discovered repo with results (records truncation if applicable)
  *
  * The workflow uses the defaultBranch provided in the input — no main/master
  * fallback is attempted.
@@ -56,11 +56,14 @@ export class RepoDiscoveryWorkflow extends WorkflowEntrypoint<Bindings, RepoDisc
       });
 
       // ─────────────────────────────────────────────────────────────────
-      // Step 2: Fetch the full repo tree from GitHub
+      // Step 2: Fetch repo tree and find SKILL.md files
       // ─────────────────────────────────────────────────────────────────
-      const tree: GitHubTreeEntry[] = await step.do('fetch-repo-tree', {
+      // Merged into a single step so the full tree (potentially several MB
+      // for large repos) is never serialized as a Workflow step output.
+      // Only the filtered SKILL.md paths are returned.
+      const { skillPaths, truncated } = await step.do('fetch-and-find-skills', {
         retries: { limit: 3, delay: '1 second', backoff: 'exponential' },
-        timeout: '30 seconds',
+        timeout: '60 seconds',
       }, async () => {
         const url = `https://api.github.com/repos/${githubOwner}/${githubRepo}/git/trees/${defaultBranch}?recursive=1`;
 
@@ -98,25 +101,25 @@ export class RepoDiscoveryWorkflow extends WorkflowEntrypoint<Bindings, RepoDisc
           );
         }
 
-        return data.tree;
+        const paths = data.tree
+          .filter(
+            (entry) =>
+              entry.type === 'blob' &&
+              (entry.path.endsWith('/SKILL.md') || entry.path === 'SKILL.md'),
+          )
+          .map((entry) => entry.path);
+
+        return { skillPaths: paths, truncated: data.truncated };
       });
 
       // ─────────────────────────────────────────────────────────────────
-      // Step 3: Find SKILL.md files in the tree (deterministic, no retries)
+      // Step 3: Insert vectorization requests for each SKILL.md
       // ─────────────────────────────────────────────────────────────────
-      const skillPaths: string[] = await step.do('find-skill-files', async () => {
-        return tree.filter(
-          (entry) =>
-            entry.type === 'blob' &&
-            (entry.path.endsWith('/SKILL.md') || entry.path === 'SKILL.md'),
-        ).map((entry) => entry.path);
-      });
-
-      // ─────────────────────────────────────────────────────────────────
-      // Step 4: Insert vectorization requests for each SKILL.md
-      // ─────────────────────────────────────────────────────────────────
+      // Uses createMany with skipDuplicates for bulk insert. Chunked to
+      // stay within PostgreSQL's ~65k parameter limit (~5 fields × 500 = 2500).
       const insertedCount: number = await step.do('insert-requests', {
         retries: { limit: 3, delay: '1 second', backoff: 'exponential' },
+        timeout: '60 seconds',
       }, async () => {
         if (skillPaths.length === 0) {
           return 0;
@@ -124,33 +127,33 @@ export class RepoDiscoveryWorkflow extends WorkflowEntrypoint<Bindings, RepoDisc
 
         const db = createDatabaseClient(this.env.HYPERDRIVE.connectionString);
 
+        const CHUNK_SIZE = 500;
         let inserted = 0;
-        for (const path of skillPaths) {
-          const sourceId = `github:${githubOwner}/${githubRepo}:${path}`;
-          try {
-            await (db.vectorizationRequest.create as any)({
-              data: {
-                id: crypto.randomUUID(),
-                sourceId,
-                githubOwner,
-                githubRepo,
-                githubPath: path,
-                githubRef: defaultBranch,
-                discoveredRepoId,
-              },
-            });
-            inserted++;
-          } catch (e: any) {
-            // Unique constraint violation on sourceId — skip duplicate
-            if (e?.code === 'P2002') continue;
-            throw e;
-          }
+
+        for (let i = 0; i < skillPaths.length; i += CHUNK_SIZE) {
+          const chunk = skillPaths.slice(i, i + CHUNK_SIZE);
+          const data = chunk.map((path) => ({
+            id: crypto.randomUUID(),
+            sourceId: `github:${githubOwner}/${githubRepo}:${path}`,
+            githubOwner,
+            githubRepo,
+            githubPath: path,
+            githubRef: defaultBranch,
+            discoveredRepoId,
+          }));
+
+          const result = await (db.vectorizationRequest.createMany as any)({
+            data,
+            skipDuplicates: true,
+          });
+          inserted += result.count;
         }
+
         return inserted;
       });
 
       // ─────────────────────────────────────────────────────────────────
-      // Step 5: Mark repo as "discovered" or "not_found"
+      // Step 4: Mark repo as "discovered" or "not_found"
       // ─────────────────────────────────────────────────────────────────
       await step.do('mark-discovered', {
         retries: { limit: 1, delay: '1 second' },
@@ -169,6 +172,8 @@ export class RepoDiscoveryWorkflow extends WorkflowEntrypoint<Bindings, RepoDisc
               discoveryStatus: 'discovered',
               skillCount: skillPaths.length,
               lastDiscoveredAt: new Date(),
+              // Record if GitHub truncated the tree so we can revisit later
+              ...(truncated ? { discoveryError: 'GitHub tree was truncated; skill count may be incomplete' } : {}),
             },
           });
         }

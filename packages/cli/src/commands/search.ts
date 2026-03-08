@@ -131,7 +131,7 @@ export async function runSearch(args: string[]): Promise<void> {
       const result = data.results[i];
 
       console.log(
-        `  ${pc.bold(pc.cyan(`${i + 1}. ${result.name}`))}${result.slug ? pc.dim(` (${result.slug})`) : ""}`
+        `  ${pc.bold(pc.cyan(`${i + 1}. ${result.name}`))}`
       );
 
       if (result.summary) {

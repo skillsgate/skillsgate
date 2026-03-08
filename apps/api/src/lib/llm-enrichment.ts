@@ -11,14 +11,6 @@ export interface LlmEnrichment {
   chunks: LlmChunk[];
 }
 
-const DEFAULT_ENRICHMENT: LlmEnrichment = {
-  summary: "",
-  categories: [],
-  capabilities: [],
-  keywords: [],
-  chunks: [],
-};
-
 const SYSTEM_PROMPT = `You are a skill cataloguer. Analyze the skill and respond ONLY with valid JSON.
 
 Keys:
@@ -63,60 +55,53 @@ export async function enrichSkillWithLlm(
 ): Promise<LlmEnrichment> {
   const userMessage = buildUserMessage(frontmatter, body);
 
-  try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${openRouterApiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://skillsgate.ai",
-        "X-Title": "SkillsGate Vectorization",
-      },
-      body: JSON.stringify({
-        model: "deepseek/deepseek-v3.2",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userMessage },
-        ],
-        temperature: 0.2,
-        max_tokens: 2500,
-        response_format: { type: "json_object" },
-      }),
-    });
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${openRouterApiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://skillsgate.ai",
+      "X-Title": "SkillsGate Vectorization",
+    },
+    body: JSON.stringify({
+      model: "deepseek/deepseek-v3.2",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userMessage },
+      ],
+      temperature: 0.2,
+      max_tokens: 2500,
+      response_format: { type: "json_object" },
+    }),
+  });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.warn(`[llm-enrichment] OpenRouter ${response.status}: ${errorText}`);
-      return DEFAULT_ENRICHMENT;
-    }
-
-    const data = await response.json() as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) return DEFAULT_ENRICHMENT;
-
-    // Strip markdown code fences if present
-    const cleaned = content
-      .replace(/^```(?:json)?\s*\n?/i, "")
-      .replace(/\n?```\s*$/i, "")
-      .trim();
-
-    const parsed = JSON.parse(cleaned);
-    return {
-      summary: typeof parsed.summary === "string" ? parsed.summary : "",
-      categories: asStringArray(parsed.categories),
-      capabilities: asStringArray(parsed.capabilities),
-      keywords: asStringArray(parsed.keywords),
-      chunks: asChunkArray(parsed.chunks),
-    };
-  } catch (error) {
-    console.warn(
-      "[llm-enrichment] Failed:",
-      error instanceof Error ? error.message : error
-    );
-    return DEFAULT_ENRICHMENT;
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`[llm-enrichment] OpenRouter ${response.status}: ${errorText}`);
   }
+
+  const data = await response.json() as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error(`[llm-enrichment] OpenRouter returned empty content: ${JSON.stringify(data)}`);
+  }
+
+  // Strip markdown code fences if present
+  const cleaned = content
+    .replace(/^```(?:json)?\s*\n?/i, "")
+    .replace(/\n?```\s*$/i, "")
+    .trim();
+
+  const parsed = JSON.parse(cleaned);
+  return {
+    summary: typeof parsed.summary === "string" ? parsed.summary : "",
+    categories: asStringArray(parsed.categories),
+    capabilities: asStringArray(parsed.capabilities),
+    keywords: asStringArray(parsed.keywords),
+    chunks: asChunkArray(parsed.chunks),
+  };
 }
 
 function asStringArray(value: unknown): string[] {

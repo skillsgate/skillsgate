@@ -18,7 +18,7 @@ datasource db {
 
 model Skill {
   id          String   @id
-  slug        String   @unique
+  slug        String
   sourceId    String?  @unique @map("source_id")
   name        String
   description String

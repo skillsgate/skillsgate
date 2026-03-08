@@ -41,16 +41,6 @@ skillsRoute.post("/skills", async (c) => {
 
   const { name, slug, description, visibility } = parsed.data;
 
-  // Check slug uniqueness
-  const existing = await db.skill.findUnique({
-    where: { slug },
-    select: { id: true },
-  });
-
-  if (existing) {
-    return c.json({ error: "Slug is already taken" }, 409);
-  }
-
   // Generate a cuid-style ID
   const skillId = crypto.randomUUID();
 

@@ -197,7 +197,7 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       const skill = await step.do('upsert-skill', {
         retries: { limit: 3, delay: '1 second', backoff: 'exponential' }
       }, async () => {
-        return this.upsertSkill(freshDb(), sourceId, metadata, parsed, llm, contentHash, existingCheck.existing);
+        return this.upsertSkill(freshDb(), sourceId, source, metadata, parsed, llm, contentHash, existingCheck.existing);
       });
 
       // ─────────────────────────────────────────────────────────────────
@@ -360,18 +360,11 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
     contentHash: string,
     force?: boolean
   ): Promise<{ shouldProceed: boolean; existing: { id: string; contentHash: string | null } | null }> {
-    // Look up by sourceId first, fall back to slug (for pre-migration records with null sourceId)
-    let existing = await (db.skill.findUnique as any)({
+    // Look up by sourceId only — slug is not unique
+    const existing = await (db.skill.findUnique as any)({
       where: { sourceId },
       select: { id: true, contentHash: true }
     });
-
-    if (!existing) {
-      existing = await (db.skill.findUnique as any)({
-        where: { slug },
-        select: { id: true, contentHash: true }
-      });
-    }
 
     if (force) {
       return { shouldProceed: true, existing };
@@ -392,6 +385,7 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
   private async upsertSkill(
     db: DatabaseClient,
     sourceId: string,
+    source: VectorizeSkillWorkflowInput['source'],
     metadata: VectorizeSkillWorkflowInput['metadata'],
     parsed: ParsedSkillMd,
     llm: LlmEnrichment,
@@ -406,6 +400,12 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       contentHash,
       vectorizedAt: new Date(),
     };
+
+    // Populate GitHub coordinates from source
+    if (source.type === 'github') {
+      contentData.githubRepo = source.repo;
+      contentData.githubPath = source.path;
+    }
 
     // Prefer frontmatter, fallback to LLM-generated values
     const categories = parsed.categories?.length ? parsed.categories : llm.categories;

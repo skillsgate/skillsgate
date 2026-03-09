@@ -12,6 +12,14 @@ export const skillsRoute = new Hono<{
 
 skillsRoute.use("*", authMiddleware);
 
+// ─── Constants ───────────────────────────────────────────────────
+
+const MAX_SKILLS_PER_USER = 30;
+const MAX_TOTAL_UPLOAD_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1 MB per file
+const MAX_SKILL_MD_SIZE = 500 * 1024; // 500 KB
+const MAX_FILE_COUNT = 50;
+
 // ─── Validation schemas ──────────────────────────────────────────
 
 const createSkillSchema = z.object({
@@ -40,6 +48,18 @@ skillsRoute.post("/skills", async (c) => {
   }
 
   const { name, slug, description, visibility } = parsed.data;
+
+  // Check skill count limit
+  const skillCount = await db.skill.count({
+    where: { publisherId: userId },
+  });
+
+  if (skillCount >= MAX_SKILLS_PER_USER) {
+    return c.json(
+      { error: `You have reached the maximum of ${MAX_SKILLS_PER_USER} skills. Delete an existing skill to publish a new one.` },
+      403,
+    );
+  }
 
   // Generate a cuid-style ID
   const skillId = crypto.randomUUID();
@@ -117,22 +137,53 @@ skillsRoute.post("/skills/:id/files", async (c) => {
 
   // Parse multipart form data
   const formData = await c.req.formData();
-  const files: { name: string; size: number; key: string }[] = [];
-  let skillMdContent: string | null = null;
+
+  // Collect and validate files before uploading to R2
+  const incoming: { filename: string; file: File; arrayBuffer: ArrayBuffer }[] = [];
+  let totalSize = 0;
 
   for (const [fieldName, value] of formData.entries()) {
     if (!(value instanceof File)) continue;
 
     const file = value as File;
     const filename = file.name || fieldName;
-    const key = `skills/${skillId}/${filename}`;
     const arrayBuffer = await file.arrayBuffer();
+    const size = arrayBuffer.byteLength;
+
+    // Per-file size check
+    if (filename === "SKILL.md" && size > MAX_SKILL_MD_SIZE) {
+      return c.json({ error: `SKILL.md is ${formatBytes(size)} (max ${formatBytes(MAX_SKILL_MD_SIZE)})` }, 400);
+    }
+    if (size > MAX_FILE_SIZE) {
+      return c.json({ error: `File "${filename}" is ${formatBytes(size)} (max ${formatBytes(MAX_FILE_SIZE)})` }, 400);
+    }
+
+    totalSize += size;
+    incoming.push({ filename, file, arrayBuffer });
+  }
+
+  // Total size check
+  if (totalSize > MAX_TOTAL_UPLOAD_SIZE) {
+    return c.json({ error: `Total upload size is ${formatBytes(totalSize)} (max ${formatBytes(MAX_TOTAL_UPLOAD_SIZE)})` }, 400);
+  }
+
+  // File count check
+  if (incoming.length > MAX_FILE_COUNT) {
+    return c.json({ error: `Too many files (${incoming.length}). Maximum is ${MAX_FILE_COUNT}.` }, 400);
+  }
+
+  // Upload validated files to R2
+  const files: { name: string; size: number; key: string }[] = [];
+  let skillMdContent: string | null = null;
+
+  for (const { filename, file, arrayBuffer } of incoming) {
+    const key = `skills/${skillId}/${filename}`;
 
     await c.env.R2_SKILLS.put(key, arrayBuffer, {
       httpMetadata: { contentType: file.type || "application/octet-stream" },
     });
 
-    files.push({ name: filename, size: file.size, key });
+    files.push({ name: filename, size: arrayBuffer.byteLength, key });
 
     if (filename === "SKILL.md") {
       skillMdContent = new TextDecoder().decode(arrayBuffer);
@@ -264,3 +315,13 @@ skillsRoute.delete("/skills/:id", async (c) => {
 
   return c.body(null, 204);
 });
+
+// ─── Helpers ─────────────────────────────────────────────────────
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  const value = bytes / Math.pow(1024, i);
+  return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}

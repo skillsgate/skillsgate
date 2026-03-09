@@ -1,14 +1,14 @@
 import { createRequestHandler } from "@react-router/cloudflare";
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore - build output exists after `react-router build`
+// Build output types don't match at dev time — only exists after `react-router build`
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 import * as build from "./build/server/index.js";
 
-const requestHandler = createRequestHandler({ build });
+const requestHandler = createRequestHandler(({ build } as any));
 
 export default {
 	async fetch(request: Request, env: CloudflareEnv, ctx: ExecutionContext) {
-		return requestHandler({
+		return (requestHandler as any)({
 			request,
 			env,
 			ctx,

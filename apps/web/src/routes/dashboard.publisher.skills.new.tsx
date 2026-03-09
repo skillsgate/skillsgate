@@ -18,6 +18,10 @@ function formatFileSize(bytes: number): string {
 }
 
 const SLUG_PATTERN = /^[a-z0-9-]+$/;
+const MAX_TOTAL_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1 MB per file
+const MAX_SKILL_MD_SIZE = 500 * 1024; // 500 KB
+const MAX_FILE_COUNT = 50;
 
 /* ─── Component ─── */
 
@@ -92,10 +96,39 @@ export default function NewSkillPage() {
 
 	function addFiles(incoming: FileList | File[]) {
 		const newFiles = Array.from(incoming);
+
+		// Validate individual file sizes
+		for (const f of newFiles) {
+			const limit = f.name === "SKILL.md" ? MAX_SKILL_MD_SIZE : MAX_FILE_SIZE;
+			if (f.size > limit) {
+				setUploadError(
+					`"${f.name}" is ${formatFileSize(f.size)} (max ${formatFileSize(limit)})`,
+				);
+				return;
+			}
+		}
+
 		setFiles((prev) => {
 			const existing = new Set(prev.map((f) => f.name));
 			const unique = newFiles.filter((f) => !existing.has(f.name));
-			return [...prev, ...unique];
+			const merged = [...prev, ...unique];
+
+			// Validate file count
+			if (merged.length > MAX_FILE_COUNT) {
+				setUploadError(`Too many files. Maximum is ${MAX_FILE_COUNT}.`);
+				return prev;
+			}
+
+			// Validate total size
+			const totalSize = merged.reduce((sum, f) => sum + f.size, 0);
+			if (totalSize > MAX_TOTAL_SIZE) {
+				setUploadError(
+					`Total size ${formatFileSize(totalSize)} exceeds limit of ${formatFileSize(MAX_TOTAL_SIZE)}.`,
+				);
+				return prev;
+			}
+
+			return merged;
 		});
 		setUploadError(null);
 	}
@@ -440,7 +473,8 @@ export default function NewSkillPage() {
 								Drag and drop files here, or click to browse
 							</p>
 							<p className="text-[11px] text-muted/50">
-								Must include SKILL.md
+								Must include SKILL.md. Max 5 MB total, 1 MB per
+								file.
 							</p>
 							<input
 								ref={fileInputRef}
@@ -526,6 +560,17 @@ export default function NewSkillPage() {
 									</div>
 								))}
 							</div>
+						)}
+
+						{/* Size summary */}
+						{files.length > 0 && (
+							<p className="text-[11px] text-muted/60">
+								{files.length} file(s),{" "}
+								{formatFileSize(
+									files.reduce((s, f) => s + f.size, 0),
+								)}{" "}
+								/ {formatFileSize(MAX_TOTAL_SIZE)}
+							</p>
 						)}
 
 						{/* Validation hint */}

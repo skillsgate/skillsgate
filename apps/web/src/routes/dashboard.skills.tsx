@@ -33,9 +33,9 @@ const EMPTY_DATA: DashboardSkillsData = { shared: [], orgs: [], catalogs: [] };
 
 async function fetchDashboardSkills(): Promise<DashboardSkillsData> {
 	try {
-		const res = await api.get("/api/dashboard/skills");
+		const res = await api.get<DashboardSkillsData>("/api/dashboard/skills");
 		if (!res.ok) return EMPTY_DATA;
-		return await res.json();
+		return res.data;
 	} catch {
 		return EMPTY_DATA;
 	}

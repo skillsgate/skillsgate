@@ -234,7 +234,7 @@ export default function Home() {
 						style={{ animationDelay: "0.6s" }}
 					>
 						<code className="text-[12px] font-mono text-muted bg-code-bg px-3 py-1.5 rounded-md border border-border">
-							$ npx skillsgate search "seo audit"
+							$ npx skillsgate search "react best practices"
 						</code>
 					</div>
 

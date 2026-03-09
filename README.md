@@ -2,30 +2,50 @@
 
 **The open marketplace for AI agent skills.**
 
-Find, install, and share skills that extend AI coding assistants like Claude Code, Cursor, Windsurf, GitHub Copilot, and 13 other agents.
+Discover, install, and publish skills for Claude Code, Cursor, Windsurf, GitHub Copilot, and 13 other AI coding agents — all from one place.
 
 [skillsgate.ai](https://skillsgate.ai) &middot; [npm package](https://www.npmjs.com/package/skillsgate)
 
 ---
 
-## The Problem
+## Why SkillsGate?
 
-AI coding skills are scattered across hundreds of GitHub repos with no central discovery. You can't find what exists, creators get no visibility, and every team reinvents the same workflows.
+AI coding skills are scattered across hundreds of GitHub repos. You can't find what exists, creators get no visibility, and every team builds the same workflows from scratch.
 
-## The Solution
-
-SkillsGate is **npm for AI skills** — a central hub with semantic search, trust signals, private skill sharing, and one-command installation across every major AI coding agent.
+SkillsGate fixes this. One search, one install command, every agent.
 
 ```bash
 npx skillsgate search "tailwind responsive"
-npx skillsgate add anthropics/skills@frontend-design
+npx skillsgate add @anthropic/frontend-design
 ```
 
-## What It Does
+---
 
-### Search
+## Get Started
 
-Describe what you need in plain English. SkillsGate uses semantic search powered by pgvector to understand intent, not just keywords.
+```bash
+# Install globally
+npm install -g skillsgate
+
+# Sign in (enables search + private skills)
+skillsgate login
+
+# Find a skill
+skillsgate search "SEO audit"
+
+# Install it — works across all your agents instantly
+skillsgate add @anthropic/audit-website
+```
+
+That's it. The skill is now available in Claude Code, Cursor, Windsurf, and every other agent you have installed.
+
+---
+
+## How It Works
+
+### Search with natural language
+
+Describe what you need. SkillsGate understands intent, not just keywords.
 
 ```bash
 skillsgate search "pdf manipulation"
@@ -33,128 +53,87 @@ skillsgate search "deploy to AWS"
 skillsgate search "code review best practices"
 ```
 
-### Install
-
-One command installs a skill across all your AI agents. Skills are symlinked into each agent's directory — no duplication, no manual setup.
+### Install from anywhere
 
 ```bash
-skillsgate add vercel-labs/agent-skills          # all skills in a repo
-skillsgate add anthropics/skills@audit-website   # specific skill
+skillsgate add @username/my-skill               # from SkillsGate
+skillsgate add vercel-labs/agent-skills          # from GitHub
+skillsgate add anthropics/skills@audit-website   # specific skill in a repo
 skillsgate add ./my-local-skills                 # from a local path
 ```
 
-Supports global (`-g`) and project-local installs. Works with symlinks (default) or file copies (`--copy`).
+One command installs across all your agents. No manual config, no duplication.
 
-### Private Skills
+### Publish your own skills
 
-Share skills with your team without making them public. SkillsGate supports per-skill access control — share individual skills with specific people by GitHub username.
+Share your workflows with the world — or keep them private for your team.
 
-- **Individual sharing** — Bob shares his deploy helper with Alice, but not his scratchpad
-- **Organization skills** — company-wide private skills accessible to all org members
-- **Publisher catalogs** — sell premium skill bundles with access gated by purchase
+```bash
+# Create a skill template
+skillsgate publish --init
 
-### 17 Supported Agents
+# Publish to SkillsGate
+skillsgate publish ./my-skill
+```
+
+Your skill gets a scoped identifier (`@username/skill-name`) and becomes instantly searchable and installable by anyone.
+
+### Private skills & team sharing
+
+Not everything should be public. SkillsGate gives you fine-grained control:
+
+- **Share with individuals** — grant access by GitHub username
+- **Organization skills** — private skills for your whole team
+- **Publisher catalogs** — bundle and distribute premium skills
+
+### 17 supported agents
 
 claude-code &middot; cursor &middot; github-copilot &middot; windsurf &middot; cline &middot; continue &middot; codex-cli &middot; amp &middot; goose &middot; junie &middot; kilo-code &middot; opencode &middot; openclaw &middot; pear-ai &middot; roo-code &middot; trae &middot; zed
 
-New agents are added regularly. The universal `.agents/skills/` directory works as a fallback for any MCP-compatible tool.
+The universal `.agents/skills/` directory works as a fallback for any MCP-compatible tool.
 
-## Quick Start
+---
 
-```bash
-# Install the CLI
-npm install -g skillsgate
+## CLI Reference
 
-# Authenticate (needed for search and private skills)
-skillsgate login
+| Command | Description |
+|---------|-------------|
+| `skillsgate add <source>` | Install from SkillsGate, GitHub, or local path |
+| `skillsgate search <query>` | Semantic search for skills |
+| `skillsgate publish [path]` | Publish a skill to SkillsGate |
+| `skillsgate remove [name]` | Remove installed skills |
+| `skillsgate list` | Show installed skills |
+| `skillsgate update [name]` | Check and apply updates |
+| `skillsgate sync` | Sync skills from node_modules |
+| `skillsgate login` | Sign in via browser |
+| `skillsgate logout` | Sign out |
+| `skillsgate whoami` | Show current user |
 
-# Search for skills
-skillsgate search "SEO audit"
+See the [CLI README](packages/cli/README.md) for full usage and options.
 
-# Install a skill
-skillsgate add squirrelscan/skills@audit-website
-
-# List what's installed
-skillsgate list
-```
+---
 
 ## Architecture
-
-SkillsGate is a monorepo with four packages:
 
 ```
 apps/
   api/        Hono API on Cloudflare Workers (api.skillsgate.ai)
   web/        React Router v7 on Cloudflare Workers (skillsgate.ai)
 packages/
-  cli/        CLI + MCP server (published as `skillsgate` on npm)
+  cli/        CLI published as `skillsgate` on npm
   database/   Prisma schema + migrations (PlanetScale Postgres)
 ```
-
-### Tech Stack
-
-| Layer | Technology |
-|-------|------------|
-| API | Hono on Cloudflare Workers |
-| Web | React Router v7, React 19, Tailwind CSS v4 |
-| Database | PlanetScale Postgres with pgvector |
-| Search | Semantic vector search (OpenAI embeddings, 1536-dim, HNSW index) |
-| Storage | Cloudflare R2 (skill files), KV (caching) |
-| Auth | Better Auth (GitHub + Google OAuth, device code flow for CLI) |
-| CLI | TypeScript, Commander, published on npm |
-
-### How Access Control Works
-
-Four namespace types handle every access pattern:
-
-| Scenario | Namespace | Who can see |
-|---|---|---|
-| Public skills | `public` | Everyone |
-| Org private | `org_{orgId}` | Org members |
-| Publisher catalog | `pub_{publisherId}` | Purchasers |
-| Individual private | `skill_{skillId}` | Owner + shared users |
-
-Granting or revoking access is an `INSERT` or `DELETE` on `namespace_access` — immediate, transactional, reflected on the next search.
 
 ## Development
 
 ```bash
-# Install dependencies
-npm install
-
-# Generate Prisma client
-npm run db:generate
-
-# Run the web app locally
-npm run dev
-
-# Deploy
-npm run deploy
+npm install          # install dependencies
+npm run db:generate  # generate Prisma client
+npm run dev          # run locally
+npm run deploy       # deploy to Cloudflare
 ```
 
-### Environment
-
-Requires:
-- Node.js 18+
-- Cloudflare account (Workers, R2, KV)
-- PlanetScale database with pgvector extension
-- GitHub OAuth app (for authentication)
-
-## CLI Reference
-
-| Command | Description |
-|---------|-------------|
-| `skillsgate add <source>` | Install skills from GitHub repo or local path |
-| `skillsgate remove [name]` | Remove installed skills |
-| `skillsgate list` | List installed skills |
-| `skillsgate update` | Check and apply skill updates |
-| `skillsgate search <query>` | Semantic search (requires auth) |
-| `skillsgate sync` | Sync skills from node_modules |
-| `skillsgate login` | Authenticate via browser |
-| `skillsgate logout` | Sign out |
-| `skillsgate whoami` | Show current user |
-
-See the [CLI README](packages/cli/README.md) for full usage and options.
+Requires Node.js 18+, a Cloudflare account, PlanetScale database, and a GitHub OAuth app.
 
 ## Contributing
 

@@ -63,6 +63,7 @@
 				"max_batch_size": 1,
 				"max_batch_timeout": 1,
 				"max_retries": 3,
+				"max_concurrency": 30,
 				"dead_letter_queue": "skill-vectorize-dlq"
 			},
 			{

@@ -398,10 +398,10 @@ export default function SkillDetailPage() {
 						<div className="flex items-center justify-between">
 							<span className="text-[13px] text-muted">Source</span>
 							<span className="text-[13px] text-foreground capitalize">
-								{data.skill.sourceType === "direct"
-									? "Direct upload"
+								{data.skill.sourceType === "r2" || data.skill.sourceType === "direct"
+									? "SkillsGate"
 									: data.skill.sourceType === "github"
-										? "Synced from GitHub"
+										? "GitHub"
 										: data.skill.sourceType}
 							</span>
 						</div>

@@ -98,7 +98,7 @@ function getMockSkills(): OrgSkill[] {
 			slug: "acme-onboarding",
 			name: "acme-onboarding",
 			description: "New developer onboarding guide",
-			sourceType: "direct",
+			sourceType: "r2",
 			createdAt: "2026-02-05T00:00:00Z",
 		},
 	];
@@ -397,8 +397,8 @@ export default function OrgManagementPage() {
 									</div>
 									<span className="flex-shrink-0 ml-3 text-[11px] font-mono text-muted">
 										{skill.sourceType === "github"
-											? "Synced from GitHub"
-											: "Direct upload"}
+											? "GitHub"
+											: "SkillsGate"}
 									</span>
 								</div>
 							))}

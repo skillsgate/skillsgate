@@ -142,7 +142,7 @@ export async function runSearch(args: string[]): Promise<void> {
         console.log(`     ${pc.dim("Categories:")} ${result.categories.join(", ")}`);
       }
 
-      const installCmd = buildInstallCmd(result.githubUrl);
+      const installCmd = result.installCommand || buildInstallCmd(result.githubUrl);
       if (installCmd) {
         console.log(`     ${pc.green("$")} ${installCmd}`);
       }

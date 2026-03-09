@@ -16,6 +16,7 @@ import { ParsedSource } from "../types.js";
  *   https://github.com/owner/repo
  *   https://github.com/owner/repo/tree/branch/path
  *   github.com/owner/repo
+ *   @username/slug             (SkillsGate published skill)
  */
 export function parseSource(source: string): ParsedSource {
   // 1. Try local path (starts with ./, ../, /, or ~/)
@@ -30,9 +31,13 @@ export function parseSource(source: string): ParsedSource {
   const shorthand = parseOwnerRepo(source);
   if (shorthand) return shorthand;
 
+  // 4. Try SkillsGate @username/slug
+  const sgSlug = parseSkillsGateSlug(source);
+  if (sgSlug) return sgSlug;
+
   throw new SourceParseError(
     `Could not parse source: "${source}". ` +
-      `Expected: owner/repo, owner/repo@skill, a GitHub URL, or a local path (./path).`,
+      `Expected: @username/slug, owner/repo, owner/repo@skill, a GitHub URL, or a local path (./path).`,
   );
 }
 
@@ -112,12 +117,30 @@ function parseLocalPath(input: string): ParsedSource | null {
   };
 }
 
+function parseSkillsGateSlug(input: string): ParsedSource | null {
+  // Match @username/slug format (e.g. @sultanvaliyev/audit-website)
+  const match = input.match(/^@([a-zA-Z0-9_.-]+)\/([a-z0-9]+(?:-[a-z0-9]+)*)$/);
+  if (!match) return null;
+
+  const [, username, slug] = match;
+  return {
+    type: "skillsgate",
+    url: `@${username}/${slug}`,
+    owner: "",
+    repo: "",
+    slug,
+    username,
+  };
+}
+
 export function getSourceLabel(source: ParsedSource): string {
   if (source.type === "local") return source.localPath!;
+  if (source.type === "skillsgate") return `@${source.username}/${source.slug}`;
   return `${source.owner}/${source.repo}`;
 }
 
 export function getOwnerRepo(source: ParsedSource): string {
+  if (source.type === "skillsgate") return `@${source.username}/${source.slug}`;
   return `${source.owner}/${source.repo}`;
 }
 

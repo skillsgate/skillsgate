@@ -13,6 +13,7 @@ import { skillsRoute } from "./routes/skills";
 import { githubRoute } from "./routes/github";
 import { connectedReposRoute } from "./routes/connected-repos";
 import { adminRoute } from "./routes/admin";
+import { skillDownloadRoute } from "./routes/skill-download";
 import { SkillVectorizationWorkflow } from "./workflows/skill-vectorization";
 import { RepoDiscoveryWorkflow } from "./workflows/repo-discovery";
 import type { VectorizeSkillWorkflowInput, DiscoverRepoQueueMessage } from "./types";
@@ -31,6 +32,7 @@ app.route("/api", dashboardRoute);
 app.route("/api", publisherRoute);
 app.route("/api", orgsRoute);
 app.route("/api", skillsRoute);
+app.route("/api", skillDownloadRoute);
 app.route("/api", githubRoute);
 app.route("/api", connectedReposRoute);
 

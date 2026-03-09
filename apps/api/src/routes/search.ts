@@ -23,9 +23,9 @@ searchRoute.post("/search", async (c) => {
     return c.json({ error: "query must be 500 characters or less" }, 400);
   }
 
-  // Validate limit
+  // Validate limit (max 5 results per search)
   let limit = body.limit ?? 5;
-  if (typeof limit !== "number" || limit < 1 || limit > 20) {
+  if (typeof limit !== "number" || limit < 1 || limit > 5) {
     limit = 5;
   }
 

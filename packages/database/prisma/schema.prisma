@@ -58,6 +58,7 @@ model Skill {
   org           Organization?   @relation(fields: [orgId], references: [id])
   connectedRepo ConnectedRepo? @relation(fields: [connectedRepoId], references: [id])
 
+  @@unique([publisherId, slug], map: "idx_skills_publisher_slug")
   @@index([githubRepo, githubPath], map: "idx_skills_github")
   @@index([downloads(sort: Desc)], map: "idx_skills_downloads")
   @@index([createdAt(sort: Desc)], map: "idx_skills_created")

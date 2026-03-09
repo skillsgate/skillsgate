@@ -118,14 +118,14 @@ function printHelp(): void {
 
   console.log();
   console.log(`  ${BOLD("skillsgate")} ${DIM(`v${VERSION}`)}`);
-  console.log(`  ${DIM("Install and manage AI agent skills from GitHub")}`);
+  console.log(`  ${DIM("Install and manage AI agent skills")}`);
   console.log();
   console.log(`  ${BOLD("Usage:")}`);
   console.log(`    skillsgate ${DIM("<command>")} ${DIM("[options]")}`);
   console.log();
   console.log(`  ${BOLD("Commands:")}`);
   console.log(
-    `    add ${DIM("<source>")}     Install skills from a GitHub repo`,
+    `    add ${DIM("<source>")}     Install skills from SkillsGate, GitHub repo, or local path`,
   );
   console.log(`    remove ${DIM("[name]")}    Uninstall skills`);
   console.log(`    list               Show installed skills`);
@@ -142,6 +142,7 @@ function printHelp(): void {
   console.log(`    whoami             Show current user`);
   console.log();
   console.log(`  ${BOLD("Examples:")}`);
+  console.log(`    skillsgate add @username/audit-website ${DIM("# install from SkillsGate")}`);
   console.log(`    skillsgate add vercel-labs/agent-skills`);
   console.log(`    skillsgate add vercel-labs/agent-skills@my-skill`);
   console.log(`    skillsgate add https://github.com/owner/repo`);

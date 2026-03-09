@@ -1,6 +1,7 @@
 import type { DatabaseClient } from "@skillsgate/database";
 import { OpenAIEmbeddingProvider } from "./embedding";
 import { searchVectors, type VectorSearchResult } from "./vector-store";
+import { enrichUsersWithGithubUsername } from "./users";
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -32,6 +33,8 @@ export interface CachedSkillMeta {
   keywords: string[];
   githubRepo: string | null;
   githubPath: string | null;
+  sourceType: string | null;
+  publisherId: string | null;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -109,6 +112,8 @@ async function hydrateSkills(
         keywords: true,
         githubRepo: true,
         githubPath: true,
+        sourceType: true,
+        publisherId: true,
       },
     });
 
@@ -124,6 +129,8 @@ async function hydrateSkills(
         keywords: (skill.keywords as string[]) ?? [],
         githubRepo: skill.githubRepo,
         githubPath: skill.githubPath,
+        sourceType: skill.sourceType,
+        publisherId: skill.publisherId,
       };
       skillMap.set(skill.id, meta);
 
@@ -211,34 +218,56 @@ export async function searchSkills(
   const skillIds = ranked.map((r) => r.skillId);
   const skillMap = await hydrateSkills(db, skillIds, cache, ctx);
 
-  // 6. Build response
+  // 6. Resolve publisher GitHub usernames for R2-sourced skills
+  const r2PublisherIds = [...skillMap.values()]
+    .filter((s) => s.sourceType === "r2" && s.publisherId)
+    .map((s) => s.publisherId!);
+  const publisherUsernames =
+    r2PublisherIds.length > 0
+      ? await enrichUsersWithGithubUsername(db, r2PublisherIds)
+      : new Map<string, string>();
+
+  // 7. Build response
   return ranked.map(({ skillId, bestScore }) => {
     const skill = skillMap.get(skillId);
+    const slug = skill?.slug ?? "";
+    const sourceType = skill?.sourceType ?? null;
     const githubRepo = skill?.githubRepo ?? "";
     const githubPath = skill?.githubPath ?? "";
     const githubUrl = githubRepo
       ? `https://github.com/${githubRepo}${githubPath ? `/blob/main/${githubPath}` : ""}`
       : "";
+    const publisherUsername =
+      skill?.publisherId ? publisherUsernames.get(skill.publisherId) ?? null : null;
 
     return {
       skillId,
-      slug: skill?.slug ?? "",
+      slug,
       name: skill?.name ?? skillId,
       summary: skill?.summary ?? skill?.description ?? "",
       categories: skill?.categories ?? [],
       capabilities: skill?.capabilities ?? [],
       keywords: skill?.keywords ?? [],
       githubUrl,
-      installCommand: deriveInstallCommand(githubRepo, githubPath),
+      installCommand: deriveInstallCommand(slug, sourceType, publisherUsername, githubRepo, githubPath),
       score: Math.round(bestScore * 1000) / 1000,
     };
   });
 }
 
 function deriveInstallCommand(
+  slug: string,
+  sourceType: string | null,
+  publisherUsername: string | null,
   githubRepo: string,
   githubPath: string
 ): string | null {
+  // R2-sourced skills (directly published to SkillsGate): install by @username/slug
+  if (sourceType === "r2" && slug && publisherUsername) {
+    return `skillsgate add @${publisherUsername}/${slug} -y`;
+  }
+
+  // GitHub-sourced skills: install via owner/repo
   if (!githubRepo) return null;
 
   const isSingleSkill = githubPath === "SKILL.md" || !githubPath;

@@ -1,6 +1,8 @@
 import * as p from "@clack/prompts";
 import { readSkillLock, addSkillToLock } from "../core/skill-lock.js";
 import { fetchTreeSha, cloneRepo, cleanupTempDir } from "../core/git.js";
+import { downloadSkill } from "../core/skillsgate-client.js";
+import { getToken } from "../utils/auth-store.js";
 import { parseSource } from "../core/source-parser.js";
 import { discoverSkills } from "../core/skill-discovery.js";
 import { installSkillForAgent, sanitizeName } from "../core/installer.js";
@@ -49,7 +51,61 @@ export async function runUpdate(args: string[]): Promise<void> {
   let upToDateCount = 0;
 
   for (const [, skills] of sourceGroups) {
-    const parsed = parseSource(skills[0][1].originalUrl);
+    const entry0 = skills[0][1];
+
+    // SkillsGate-sourced skills: always re-download (no hash-based detection)
+    if (entry0.sourceType === "skillsgate") {
+      for (const [name, entry] of skills) {
+        spinner.message(`Updating ${name} from SkillsGate...`);
+
+        let tmpDir: string | undefined;
+        try {
+          // Parse @username/slug from the stored originalUrl
+          const sgMatch = entry.originalUrl.match(/^@([^/]+)\/(.+)$/);
+          if (!sgMatch) {
+            p.log.warn(`Invalid SkillsGate source for "${name}": ${entry.originalUrl}`);
+            continue;
+          }
+          const [, sgUsername, sgSlug] = sgMatch;
+
+          const token = await getToken();
+          tmpDir = await downloadSkill(sgUsername, sgSlug, token);
+          const discovered = await discoverSkills(tmpDir);
+          const matched = discovered.filter(
+            (s) => sanitizeName(s.name) === name,
+          );
+
+          if (matched.length === 0) {
+            p.log.warn(
+              `Skill "${name}" no longer exists on SkillsGate`,
+            );
+            continue;
+          }
+
+          const agents = await detectInstalledAgents();
+          for (const skill of matched) {
+            for (const agent of agents) {
+              await installSkillForAgent(skill, agent, "global", "symlink");
+            }
+          }
+
+          await addSkillToLock(name, {
+            source: entry.source,
+            sourceType: entry.sourceType,
+            originalUrl: entry.originalUrl,
+            skillFolderHash: "",
+          });
+
+          updatedCount++;
+        } finally {
+          if (tmpDir) await cleanupTempDir(tmpDir);
+        }
+      }
+      continue;
+    }
+
+    // GitHub-sourced skills: hash-based update detection
+    const parsed = parseSource(entry0.originalUrl);
     const { owner, repo } = parsed;
 
     for (const [name, entry] of skills) {

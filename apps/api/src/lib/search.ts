@@ -9,6 +9,7 @@ export interface SearchResult {
   skillId: string;
   slug: string;
   name: string;
+  description: string;
   summary: string;
   categories: string[];
   capabilities: string[];
@@ -244,7 +245,8 @@ export async function searchSkills(
       skillId,
       slug,
       name: skill?.name ?? skillId,
-      summary: skill?.summary ?? skill?.description ?? "",
+      description: skill?.description ?? "",
+      summary: skill?.summary ?? "",
       categories: skill?.categories ?? [],
       capabilities: skill?.capabilities ?? [],
       keywords: skill?.keywords ?? [],

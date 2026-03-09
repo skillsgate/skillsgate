@@ -9,6 +9,7 @@ interface SearchResult {
   skillId: string;
   slug: string;
   name: string;
+  description: string;
   summary: string;
   categories: string[];
   capabilities: string[];
@@ -134,8 +135,10 @@ export async function runSearch(args: string[]): Promise<void> {
         `  ${pc.bold(pc.cyan(`${i + 1}. ${result.name}`))}`
       );
 
-      if (result.summary) {
-        console.log(`     ${pc.dim(result.summary)}`);
+      const displayText = result.summary || result.description;
+      if (displayText) {
+        const truncated = displayText.length > 200 ? displayText.slice(0, 197) + "..." : displayText;
+        console.log(`     ${pc.dim(truncated)}`);
       }
 
       if (result.categories.length > 0) {

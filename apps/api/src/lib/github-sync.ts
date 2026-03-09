@@ -473,7 +473,8 @@ async function handleDeletions(params: HandleDeletionsParams): Promise<void> {
 
 /**
  * Clean up all resources for a connected repo: R2 files, skill_chunks,
- * skill records, namespaces, and finally the connected_repos record.
+ * skill records, and namespaces. Does NOT delete the connected_repos
+ * record itself — the caller is responsible for that.
  */
 export async function disconnectRepo(params: DisconnectRepoParams): Promise<void> {
   const { connectedRepoId, db, r2 } = params;
@@ -507,7 +508,4 @@ export async function disconnectRepo(params: DisconnectRepoParams): Promise<void
       }
     }
   }
-
-  // Delete the connected repo record itself
-  await db.connectedRepo.delete({ where: { id: connectedRepoId } });
 }

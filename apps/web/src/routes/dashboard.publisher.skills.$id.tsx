@@ -89,6 +89,7 @@ export default function SkillDetailPage() {
 
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
+	const [deleteError, setDeleteError] = useState<string | null>(null);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -182,14 +183,20 @@ export default function SkillDetailPage() {
 
 	async function handleDelete() {
 		setIsDeleting(true);
+		setDeleteError(null);
 
-		const res = await api.delete(`/api/skills/${id}`);
+		try {
+			const res = await api.delete(`/api/skills/${id}`);
 
-		if (res.ok) {
-			navigate("/dashboard/publisher/skills", { replace: true });
-		} else {
+			if (res.ok) {
+				navigate("/dashboard/publisher/skills", { replace: true });
+			} else {
+				setDeleteError(res.error ?? "Failed to delete skill.");
+				setIsDeleting(false);
+			}
+		} catch {
+			setDeleteError("Network error. Please try again.");
 			setIsDeleting(false);
-			setShowDeleteDialog(false);
 		}
 	}
 
@@ -433,8 +440,12 @@ export default function SkillDetailPage() {
 					message={`Permanently delete "${data.skill.name}"? This action cannot be undone. All shared access will be revoked.`}
 					confirmLabel="Delete"
 					onConfirm={handleDelete}
-					onCancel={() => setShowDeleteDialog(false)}
+					onCancel={() => {
+						setShowDeleteDialog(false);
+						setDeleteError(null);
+					}}
 					isLoading={isDeleting}
+					error={deleteError}
 				/>
 			)}
 		</div>

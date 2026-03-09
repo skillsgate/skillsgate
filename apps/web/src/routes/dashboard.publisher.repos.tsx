@@ -78,6 +78,7 @@ export default function PublisherReposPage() {
 	const [disconnectTarget, setDisconnectTarget] =
 		useState<ConnectedRepo | null>(null);
 	const [isDisconnecting, setIsDisconnecting] = useState(false);
+	const [disconnectError, setDisconnectError] = useState<string | null>(null);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -126,19 +127,27 @@ export default function PublisherReposPage() {
 	async function handleDisconnect() {
 		if (!disconnectTarget) return;
 		setIsDisconnecting(true);
+		setDisconnectError(null);
 
-		const res = await api.delete(
-			`/api/connected-repos/${disconnectTarget.id}`,
-		);
-
-		if (res.ok) {
-			setRepos((prev) =>
-				prev.filter((r) => r.id !== disconnectTarget.id),
+		try {
+			const res = await api.delete(
+				`/api/connected-repos/${disconnectTarget.id}`,
 			);
-		}
 
-		setIsDisconnecting(false);
-		setDisconnectTarget(null);
+			if (res.ok) {
+				setRepos((prev) =>
+					prev.filter((r) => r.id !== disconnectTarget.id),
+				);
+				setIsDisconnecting(false);
+				setDisconnectTarget(null);
+			} else {
+				setDisconnectError(res.error ?? "Failed to disconnect repo.");
+				setIsDisconnecting(false);
+			}
+		} catch {
+			setDisconnectError("Network error. Please try again.");
+			setIsDisconnecting(false);
+		}
 	}
 
 	if (loading) {
@@ -339,8 +348,12 @@ export default function PublisherReposPage() {
 					message={`Disconnect ${disconnectTarget.githubOwner}/${disconnectTarget.githubRepo}? Skills synced from this repo will remain but will no longer update automatically.`}
 					confirmLabel="Disconnect"
 					onConfirm={handleDisconnect}
-					onCancel={() => setDisconnectTarget(null)}
+					onCancel={() => {
+						setDisconnectTarget(null);
+						setDisconnectError(null);
+					}}
 					isLoading={isDisconnecting}
+					error={disconnectError}
 				/>
 			)}
 		</div>

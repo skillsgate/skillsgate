@@ -7,6 +7,7 @@ type ConfirmationDialogProps = {
 	onConfirm: () => void;
 	onCancel: () => void;
 	isLoading?: boolean;
+	error?: string | null;
 };
 
 export function ConfirmationDialog({
@@ -16,6 +17,7 @@ export function ConfirmationDialog({
 	onConfirm,
 	onCancel,
 	isLoading = false,
+	error,
 }: ConfirmationDialogProps) {
 	const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -45,9 +47,14 @@ export function ConfirmationDialog({
 				<h3 className="text-[16px] font-semibold text-foreground mb-2">
 					{title}
 				</h3>
-				<p className="text-[14px] text-muted leading-relaxed mb-6">
+				<p className="text-[14px] text-muted leading-relaxed mb-4">
 					{message}
 				</p>
+				{error && (
+					<p className="text-[13px] text-red-400 mb-4">
+						{error}
+					</p>
+				)}
 				<div className="flex items-center justify-end gap-3">
 					<button
 						onClick={onCancel}

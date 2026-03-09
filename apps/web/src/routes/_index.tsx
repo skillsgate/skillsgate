@@ -196,7 +196,7 @@ export default function Home() {
 						className="animate-fade-up mt-6 md:mt-8 text-[15px] md:text-[17px] leading-relaxed text-muted max-w-xl mx-auto"
 						style={{ animationDelay: "0.35s" }}
 					>
-						15,000+ skills indexed and semantic-searchable — your AI agent
+						45,000+ skills indexed and semantic-searchable — your AI agent
 						finds exactly what it needs. Works with Claude Code, Cursor,
 						Windsurf, and more.
 					</p>
@@ -245,7 +245,7 @@ export default function Home() {
 					>
 						<div className="text-center">
 							<div className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">
-								15,000+
+								45,000+
 							</div>
 							<div className="text-[11px] font-mono tracking-wider uppercase text-muted mt-1">
 								Skills indexed

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { api } from "~/lib/api";
 import { authClient } from "~/lib/auth-client";
 
@@ -37,7 +37,6 @@ export function SkillSearch() {
 	const [noResults, setNoResults] = useState(false);
 
 	const abortRef = useRef<AbortController | null>(null);
-	const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
@@ -48,18 +47,15 @@ export function SkillSearch() {
 
 	useEffect(() => {
 		return () => {
-			if (debounceRef.current) clearTimeout(debounceRef.current);
 			if (abortRef.current) abortRef.current.abort();
 		};
 	}, []);
 
-	const search = useCallback(async (q: string) => {
+	async function search(q: string) {
 		if (abortRef.current) abortRef.current.abort();
 
 		if (q.length < 2) {
-			setResults([]);
-			setError(null);
-			setNoResults(false);
+			setError("Enter at least 2 characters");
 			return;
 		}
 
@@ -89,17 +85,13 @@ export function SkillSearch() {
 		} else {
 			setError("Something went wrong. Please try again.");
 		}
-	}, []);
+	}
 
-	function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-		const value = e.target.value;
-		setQuery(value);
-
-		if (debounceRef.current) clearTimeout(debounceRef.current);
-
-		debounceRef.current = setTimeout(() => {
-			search(value.trim());
-		}, 400);
+	function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+		if (e.key === "Enter") {
+			e.preventDefault();
+			search(query.trim());
+		}
 	}
 
 	function handleSignIn(provider: "github" | "google") {
@@ -185,11 +177,17 @@ export function SkillSearch() {
 						ref={inputRef}
 						type="text"
 						value={query}
-						onChange={handleInputChange}
+						onChange={(e) => setQuery(e.target.value)}
+						onKeyDown={handleKeyDown}
 						disabled={remaining === 0}
-						placeholder='Search skills — try "audit website performance" or "react testing"...'
+						placeholder='Search skills — try "audit website performance"...'
 						className="w-full bg-transparent text-[14px] text-foreground placeholder:text-muted/60 placeholder:font-light focus:outline-none disabled:opacity-50"
 					/>
+					{!isLoading && query.length === 0 && (
+						<span className="ml-3 flex-shrink-0 text-[11px] font-mono text-muted/40 hidden sm:block">
+							ENTER
+						</span>
+					)}
 					{isLoading && (
 						<div className="ml-3 flex-shrink-0">
 							<div className="h-4 w-4 animate-spin rounded-full border-2 border-muted border-t-foreground" />

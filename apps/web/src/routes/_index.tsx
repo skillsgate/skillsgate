@@ -1,4 +1,5 @@
 import { Navbar } from "~/components/navbar";
+import { SkillSearch } from "~/components/skill-search";
 import { useReveal } from "~/components/use-reveal";
 
 /* ─── Mock data ─── */
@@ -206,26 +207,7 @@ export default function Home() {
 						className="animate-fade-up mt-10 md:mt-12 max-w-lg mx-auto"
 						style={{ animationDelay: "0.5s" }}
 					>
-						<div className="relative group">
-							<div className="absolute inset-0 rounded-xl border border-border group-hover:border-accent/40 transition-colors" />
-							<div className="relative flex items-center px-5 py-4">
-								<svg
-									className="w-4 h-4 text-muted mr-3 flex-shrink-0"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									strokeWidth="1.5"
-									strokeLinecap="round"
-									strokeLinejoin="round"
-								>
-									<circle cx="11" cy="11" r="8" />
-									<line x1="21" y1="21" x2="16.65" y2="16.65" />
-								</svg>
-								<span className="text-[14px] text-muted/60 font-light">
-									Search skills — try "audit website performance" or "react testing"...
-								</span>
-							</div>
-						</div>
+						<SkillSearch />
 					</div>
 
 					{/* Quick install hint */}

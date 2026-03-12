@@ -157,7 +157,10 @@ function printHelp(): void {
   console.log(`    skillsgate add https://github.com/owner/repo`);
   console.log(`    skillsgate add ./local/skills`);
   console.log(`    skillsgate search "tailwind CSS"`);
-  console.log(`    skillsgate scan @username/audit-website ${DIM("# security scan before installing")}`);
+  console.log(`    skillsgate scan @username/audit-website ${DIM("# scan a SkillsGate skill")}`);
+  console.log(`    skillsgate scan owner/repo              ${DIM("# scan a GitHub repo")}`);
+  console.log(`    skillsgate scan owner/repo@skill-name   ${DIM("# scan a specific skill in a repo")}`);
+  console.log(`    skillsgate scan ./local/skill            ${DIM("# scan a local path")}`);
   console.log(`    skillsgate remove my-skill`);
   console.log(`    skillsgate list -g`);
   console.log(`    skillsgate update`);
@@ -171,6 +174,10 @@ function printHelp(): void {
   console.log(`    -a, --agent <id>   Target specific agent(s)`);
   console.log(`    --all              Select all skills/agents`);
   console.log(`    --copy             Use copy mode instead of symlink`);
+  console.log(`    -s, --scanner      Force a specific scanner ${DIM("(scan only)")}`);
+  console.log(`    --timeout <sec>    Scanner timeout, default 120 ${DIM("(scan only)")}`);
+  console.log(`    --raw              Show raw scanner output ${DIM("(scan only)")}`);
+  console.log(`    --no-share         Don't share results with community ${DIM("(scan only)")}`);
   console.log(`    -v, --version      Show version`);
   console.log(`    -h, --help         Show this help`);
   console.log();

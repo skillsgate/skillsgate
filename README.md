@@ -85,10 +85,11 @@ Skills run on your machine. Scan them first — SkillsGate uses your own AI codi
 ```bash
 skillsgate scan @username/audit-website        # scan a SkillsGate skill
 skillsgate scan vercel-labs/agent-skills        # scan a GitHub repo
+skillsgate scan owner/repo@skill-name          # scan a specific skill in a repo
 skillsgate scan ./local-skill                   # scan a local path
 ```
 
-Supports Claude Code, Codex CLI, OpenCode, Goose, and Aider. After scanning, share your results with the community to help others make informed decisions.
+Supports Claude Code, Codex CLI, OpenCode, Goose, and Aider. Use `--scanner` to pick a specific tool, `--timeout` to adjust the limit, or `--raw` for unprocessed output. After scanning, share your results with the community to help others make informed decisions.
 
 ### Private skills & team sharing
 

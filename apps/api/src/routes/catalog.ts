@@ -280,6 +280,7 @@ catalogRoute.get("/skills/:slug", async (c) => {
             github_repo, github_path, source_type, publisher_id, created_at, updated_at
      FROM skills
      WHERE slug = $1 AND visibility = 'public'
+     ORDER BY created_at DESC
      LIMIT 1`,
     slug
   );
@@ -310,12 +311,17 @@ catalogRoute.get("/skills/:slug", async (c) => {
       if (row.source_type === "github" && githubRepo) {
         // Determine the raw content URL
         let rawPath = githubPath;
+        if (rawPath) {
+          rawPath = rawPath.replace(/\/+$/, "");
+        }
         if (!rawPath || !rawPath.endsWith("SKILL.md")) {
           rawPath = rawPath ? `${rawPath}/SKILL.md` : "SKILL.md";
         }
         const rawUrl = `https://raw.githubusercontent.com/${githubRepo}/main/${rawPath}`;
 
-        const headers: Record<string, string> = {};
+        const headers: Record<string, string> = {
+          "User-Agent": "SkillsGate/1.0",
+        };
         if (c.env.GITHUB_TOKEN) {
           headers["Authorization"] = `token ${c.env.GITHUB_TOKEN}`;
         }

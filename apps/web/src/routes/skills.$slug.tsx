@@ -34,6 +34,26 @@ marked.setOptions({
 	breaks: true,
 });
 
+// ─── HTML sanitizer for user-contributed markdown ───────────────────
+
+function sanitizeHtml(html: string): string {
+	// Remove script, iframe, object, embed, form, style tags and their content
+	let clean = html.replace(
+		/<(script|iframe|object|embed|form|style)\b[^<]*(?:(?!<\/\1>)<[^<]*)*<\/\1>/gi,
+		""
+	);
+	// Remove self-closing/unclosed dangerous tags
+	clean = clean.replace(/<(script|iframe|object|embed|link)\b[^>]*\/?>/gi, "");
+	// Remove event handler attributes (on*)
+	clean = clean.replace(
+		/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi,
+		""
+	);
+	// Remove javascript: URLs
+	clean = clean.replace(/href\s*=\s*["']?\s*javascript:/gi, 'href="');
+	return clean;
+}
+
 // ─── Page Component ─────────────────────────────────────────────────
 
 export default function SkillDetailPage() {
@@ -73,7 +93,8 @@ export default function SkillDetailPage() {
 	const renderedHtml = useMemo(() => {
 		if (!content) return "";
 		try {
-			return marked(content) as string;
+			const raw = marked(content) as string;
+			return sanitizeHtml(raw);
 		} catch {
 			return "";
 		}

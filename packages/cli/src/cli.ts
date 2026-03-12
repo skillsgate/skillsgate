@@ -11,6 +11,7 @@ import { runLogout } from "./commands/logout.js";
 import { runWhoami } from "./commands/whoami.js";
 import { runSearch } from "./commands/search.js";
 import { runPublish } from "./commands/publish.js";
+import { runScan } from "./commands/scan.js";
 import { flushTelemetry } from "./telemetry.js";
 
 // "SKILLS" in dark silver (dim), "GATE" in bright white (bold)
@@ -93,6 +94,11 @@ async function main(): Promise<void> {
       await runPublish(restArgs);
       break;
 
+    case "scan":
+    case "audit":
+      await runScan(restArgs);
+      break;
+
     case "--version":
     case "-v":
       console.log(`skillsgate v${VERSION}`);
@@ -137,6 +143,9 @@ function printHelp(): void {
   console.log(
     `    publish ${DIM("[path]")}   Publish a skill to SkillsGate`,
   );
+  console.log(
+    `    scan ${DIM("<source>")}     Security-scan skills before installing`,
+  );
   console.log(`    login              Authenticate with SkillsGate`);
   console.log(`    logout             Sign out`);
   console.log(`    whoami             Show current user`);
@@ -148,6 +157,7 @@ function printHelp(): void {
   console.log(`    skillsgate add https://github.com/owner/repo`);
   console.log(`    skillsgate add ./local/skills`);
   console.log(`    skillsgate search "tailwind CSS"`);
+  console.log(`    skillsgate scan @username/audit-website ${DIM("# security scan before installing")}`);
   console.log(`    skillsgate remove my-skill`);
   console.log(`    skillsgate list -g`);
   console.log(`    skillsgate update`);

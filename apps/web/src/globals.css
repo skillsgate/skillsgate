@@ -278,6 +278,14 @@ details[open] .faq-icon {
 	border-radius: 8px;
 }
 
+/* ─── Hidden scrollbar (sidebar) ─── */
+.lg\:overflow-y-auto {
+	scrollbar-width: none;
+}
+.lg\:overflow-y-auto::-webkit-scrollbar {
+	display: none;
+}
+
 /* ─── Smooth theme transition ─── */
 html.transitioning,
 html.transitioning *,

@@ -95,7 +95,9 @@ export default function SkillDetailPage() {
 	const renderedHtml = useMemo(() => {
 		if (!content) return "";
 		try {
-			const raw = marked(content) as string;
+			// Strip YAML frontmatter (---...---)
+			const stripped = content.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, "");
+			const raw = marked(stripped) as string;
 			return sanitizeHtml(raw);
 		} catch {
 			return "";
@@ -294,7 +296,7 @@ export default function SkillDetailPage() {
 
 					{/* ─── Sidebar ───────────────────────────────────────── */}
 					<aside className="w-full lg:w-80 flex-shrink-0">
-						<div className="lg:sticky lg:top-24 space-y-5">
+						<div className="lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-1 space-y-5">
 							{/* Install command */}
 							{skill.installCommand && (
 								<div className="bg-card-bg border border-card-border rounded-xl p-5">

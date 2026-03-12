@@ -171,6 +171,113 @@ details[open] .faq-icon {
 	transition: transform 0.2s ease;
 }
 
+/* ─── Markdown prose styles (skill detail page) ─── */
+.skill-prose {
+	line-height: 1.75;
+	color: var(--muted);
+}
+.skill-prose h1,
+.skill-prose h2,
+.skill-prose h3,
+.skill-prose h4 {
+	color: var(--foreground);
+	font-weight: 600;
+	margin-top: 2em;
+	margin-bottom: 0.75em;
+}
+.skill-prose h1 {
+	font-size: 1.5rem;
+}
+.skill-prose h2 {
+	font-size: 1.25rem;
+	border-bottom: 1px solid var(--border);
+	padding-bottom: 0.5em;
+}
+.skill-prose h3 {
+	font-size: 1.1rem;
+}
+.skill-prose p {
+	margin-bottom: 1em;
+}
+.skill-prose a {
+	color: var(--accent);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+.skill-prose a:hover {
+	color: var(--foreground);
+}
+.skill-prose code {
+	font-family: var(--font-geist-mono);
+	font-size: 0.85em;
+	background: var(--code-bg);
+	padding: 0.15em 0.4em;
+	border-radius: 4px;
+	border: 1px solid var(--border);
+}
+.skill-prose pre {
+	background: var(--code-bg);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 1em 1.25em;
+	overflow-x: auto;
+	margin: 1.5em 0;
+}
+.skill-prose pre code {
+	background: none;
+	border: none;
+	padding: 0;
+	font-size: 0.8rem;
+	line-height: 1.6;
+}
+.skill-prose ul,
+.skill-prose ol {
+	padding-left: 1.5em;
+	margin-bottom: 1em;
+}
+.skill-prose li {
+	margin-bottom: 0.35em;
+}
+.skill-prose ul {
+	list-style-type: disc;
+}
+.skill-prose ol {
+	list-style-type: decimal;
+}
+.skill-prose blockquote {
+	border-left: 3px solid var(--border);
+	padding-left: 1em;
+	color: var(--muted);
+	font-style: italic;
+	margin: 1.5em 0;
+}
+.skill-prose table {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 1.5em 0;
+}
+.skill-prose th,
+.skill-prose td {
+	border: 1px solid var(--border);
+	padding: 0.5em 0.75em;
+	text-align: left;
+	font-size: 0.875rem;
+}
+.skill-prose th {
+	background: var(--surface-hover);
+	color: var(--foreground);
+	font-weight: 600;
+}
+.skill-prose hr {
+	border: none;
+	border-top: 1px solid var(--border);
+	margin: 2em 0;
+}
+.skill-prose img {
+	max-width: 100%;
+	border-radius: 8px;
+}
+
 /* ─── Smooth theme transition ─── */
 html.transitioning,
 html.transitioning *,

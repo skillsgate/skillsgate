@@ -93,16 +93,29 @@ export default function SkillDetailPage() {
 	}, [path]);
 
 	const renderedHtml = useMemo(() => {
-		if (!content) return "";
+		if (!content || !skill) return "";
 		try {
 			// Strip YAML frontmatter (---...---)
 			const stripped = content.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, "");
-			const raw = marked(stripped) as string;
-			return sanitizeHtml(raw);
+			let html = sanitizeHtml(marked(stripped) as string);
+
+			// Rewrite relative links to point to GitHub
+			if (skill.githubUrl) {
+				const dirUrl = skill.githubUrl.replace(/\/[^/]+$/, "");
+				html = html.replace(
+					/href="(\.\/|(?!https?:\/\/|mailto:|#)[^"]*\.md[^"]*)"/g,
+					(_, relPath) => {
+						const clean = relPath.replace(/^\.\//, "");
+						return `href="${dirUrl}/${clean}" target="_blank" rel="noopener noreferrer"`;
+					}
+				);
+			}
+
+			return html;
 		} catch {
 			return "";
 		}
-	}, [content]);
+	}, [content, skill]);
 
 	async function handleCopy() {
 		if (!skill?.installCommand) return;

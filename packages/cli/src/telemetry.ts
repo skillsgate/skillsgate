@@ -161,3 +161,51 @@ export function trackList(data: { skillCount?: number }): void {
     // never crash
   }
 }
+
+export function trackScan(data: {
+  source?: string;
+  sourceType?: string;
+  scanner?: string;
+  risk?: string;
+  findingCount?: number;
+  durationMs?: number;
+  parseFailed?: boolean;
+  shared?: boolean;
+}): void {
+  try {
+    trackEvent({
+      e: "scan",
+      source: data.source,
+      sourceType: data.sourceType,
+      scanner: data.scanner,
+      risk: data.risk,
+      findingCount: data.findingCount,
+      durationMs: data.durationMs,
+      parseFailed: data.parseFailed ? "1" : "0",
+      shared: data.shared ? "1" : "0",
+    });
+  } catch {
+    // never crash
+  }
+}
+
+export function trackScanError(data: {
+  source?: string;
+  sourceType?: string;
+  scanner?: string;
+  errorCode: string;
+  errorMessage?: string;
+}): void {
+  try {
+    trackEvent({
+      e: "scan_error",
+      source: data.source,
+      sourceType: data.sourceType,
+      scanner: data.scanner,
+      errorCode: data.errorCode,
+      errorMessage: data.errorMessage?.slice(0, 200),
+    });
+  } catch {
+    // never crash
+  }
+}

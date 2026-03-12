@@ -9,7 +9,10 @@ export interface LlmEnrichment {
   capabilities: string[];
   keywords: string[];
   chunks: LlmChunk[];
+  model: string;
 }
+
+const ENRICHMENT_MODEL = "qwen/qwen3-235b-a22b-2507";
 
 const SYSTEM_PROMPT = `You are a skill cataloguer. Analyze the skill and respond ONLY with valid JSON.
 
@@ -64,7 +67,7 @@ export async function enrichSkillWithLlm(
       "X-Title": "SkillsGate Vectorization",
     },
     body: JSON.stringify({
-      model: "deepseek/deepseek-v3.2",
+      model: ENRICHMENT_MODEL,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userMessage },
@@ -101,6 +104,7 @@ export async function enrichSkillWithLlm(
     capabilities: asStringArray(parsed.capabilities),
     keywords: asStringArray(parsed.keywords),
     chunks: asChunkArray(parsed.chunks),
+    model: ENRICHMENT_MODEL,
   };
 }
 

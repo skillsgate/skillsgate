@@ -399,6 +399,7 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       summary: parsed.summary || llm.summary || undefined,
       contentHash,
       vectorizedAt: new Date(),
+      enrichmentModel: llm.model,
     };
 
     // Populate GitHub coordinates from source

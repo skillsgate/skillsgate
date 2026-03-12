@@ -46,7 +46,8 @@ model Skill {
   downloads Int @default(0)
 
   // Vectorization
-  vectorizedAt DateTime? @map("vectorized_at") @db.Timestamptz
+  vectorizedAt    DateTime? @map("vectorized_at") @db.Timestamptz
+  enrichmentModel String?   @map("enrichment_model")
 
   // Timestamps
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz

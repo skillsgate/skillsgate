@@ -9,6 +9,9 @@ export default [
 	route("api/auth/device/code", "routes/api.auth.device.code.tsx"),
 	route("api/auth/device/exchange", "routes/api.auth.device.exchange.tsx"),
 
+	// Skill detail (splat for multi-segment paths like /skills/owner/repo/name)
+	route("skills/*", "routes/skills.$.tsx"),
+
 	// Dashboard routes
 	layout("routes/dashboard.tsx", [
 		route("dashboard", "routes/dashboard._index.tsx"),

@@ -134,3 +134,50 @@ export interface DirectoryValidationResult {
   skillName: string | null;
   errors: string[];
 }
+
+// ---------- Scan Types ----------
+
+export type ScannerType = "claude-code" | "codex-cli" | "opencode" | "goose" | "aider";
+
+export type SeverityLevel = "info" | "low" | "medium" | "high" | "critical";
+
+export type RiskAssessment = "CLEAN" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
+export interface ScannerConfig {
+  name: ScannerType;
+  displayName: string;
+  binary: string;
+  insideEnvVars: string[];
+  buildArgs: (prompt: string) => string[];
+  parseOutput: (stdout: string, stderr: string) => ScanReport | null;
+}
+
+export interface ScanFinding {
+  file: string;
+  line?: number;
+  severity: SeverityLevel;
+  category: string;
+  description: string;
+}
+
+export interface ScanReport {
+  risk: RiskAssessment;
+  findings: ScanFinding[];
+  summary: string;
+  raw?: string;
+}
+
+export interface InvocationResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  timedOut: boolean;
+}
+
+export interface ScanSummary {
+  sourceId: string;
+  totalScans: number;
+  riskBreakdown: Record<RiskAssessment, number>;
+  topFindings: { category: string; count: number; avgSeverity: string }[];
+  lastScannedAt: string | null;
+}

@@ -13,6 +13,7 @@ type SearchResult = {
 	keywords: string[];
 	githubUrl: string;
 	installCommand: string | null;
+	urlPath: string;
 	score: number;
 };
 
@@ -38,6 +39,7 @@ type KeywordSearchResponse = {
 		keywords: string[];
 		githubUrl: string;
 		installCommand: string | null;
+		urlPath: string;
 	}[];
 	meta: {
 		total: number;
@@ -296,7 +298,7 @@ function SearchResultCard({ result, showScore }: { result: SearchResult; showSco
 
 	return (
 		<a
-			href={`/skills/${result.slug}`}
+			href={`/skills/${result.urlPath}`}
 			className="group relative block bg-card-bg border border-card-border rounded-xl p-5 hover:border-accent/30 transition-all duration-300 no-underline"
 		>
 			<div className="flex items-start justify-between gap-4">

@@ -15,6 +15,7 @@ type CatalogSkill = {
 	keywords: string[];
 	githubUrl: string;
 	installCommand: string | null;
+	urlPath: string;
 };
 
 type CatalogResponse = {
@@ -316,7 +317,7 @@ export default function Home() {
 									return (
 										<a
 											key={skill.skillId}
-											href={`/skills/${skill.slug}`}
+											href={`/skills/${skill.urlPath}`}
 											className="group relative bg-card-bg border border-card-border rounded-xl p-5 hover:border-accent/30 transition-all duration-300 no-underline"
 											style={{ transitionDelay: `${(i % 6) * 60}ms` }}
 										>

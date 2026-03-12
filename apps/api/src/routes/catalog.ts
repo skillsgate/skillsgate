@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getDb } from "@skillsgate/database";
 import { deriveInstallCommand } from "../lib/install-command";
+import { deriveUrlPath } from "../lib/url-path";
 import type { Bindings, Variables } from "../types";
 
 export const catalogRoute = new Hono<{
@@ -23,6 +24,7 @@ interface CatalogSkill {
   github_path: string | null;
   source_type: string | null;
   publisher_id: string | null;
+  source_id: string | null;
 }
 
 interface CatalogSkillDetail extends CatalogSkill {
@@ -42,6 +44,7 @@ interface CatalogResponse {
     keywords: string[];
     githubUrl: string;
     installCommand: string | null;
+    urlPath: string;
   }[];
   meta: { total: number; limit: number; offset: number; hasMore: boolean };
 }
@@ -85,6 +88,7 @@ function mapSkill(row: CatalogSkill) {
       githubRepo,
       githubPath
     ),
+    urlPath: deriveUrlPath(row.source_id, row.id),
   };
 }
 
@@ -129,7 +133,7 @@ catalogRoute.get("/skills", async (c) => {
 
   const rows: CatalogSkill[] = await (db.$queryRawUnsafe as any)(
     `SELECT id, slug, name, description, summary, categories, capabilities, keywords,
-            github_repo, github_path, source_type, publisher_id
+            github_repo, github_path, source_type, publisher_id, source_id
      FROM skills
      WHERE visibility = 'public'
      ORDER BY
@@ -213,7 +217,7 @@ catalogRoute.get("/skills/search", async (c) => {
 
   const rows: CatalogSkill[] = await (db.$queryRawUnsafe as any)(
     `SELECT id, slug, name, description, summary, categories, capabilities, keywords,
-            github_repo, github_path, source_type, publisher_id
+            github_repo, github_path, source_type, publisher_id, source_id
      FROM skills
      WHERE visibility = 'public' AND (
        name ILIKE $1 OR slug ILIKE $1 OR description ILIKE $1
@@ -258,38 +262,79 @@ catalogRoute.get("/skills/search", async (c) => {
   } satisfies CatalogResponse);
 });
 
-// ─── GET /skills/:slug — Skill detail with SKILL.md content ─────────
+// ─── GET /skills/detail — Skill detail with SKILL.md content ─────────
 
-catalogRoute.get("/skills/:slug", async (c) => {
+catalogRoute.get("/skills/detail", async (c) => {
   const ip = getClientIp(c);
   const allowed = await checkRateLimit(c.env.CACHE, ip);
   if (!allowed) {
     return c.json({ error: "Rate limit exceeded. Try again in a minute." }, 429);
   }
 
-  const slug = c.req.param("slug");
-  if (!slug || slug.length > 200) {
-    return c.json({ error: "Invalid slug" }, 400);
+  const path = c.req.query("path")?.trim();
+  if (!path || path.length > 300) {
+    return c.json({ error: "Invalid path" }, 400);
   }
 
   const db = getDb(c.env);
+  let row: CatalogSkillDetail | null = null;
 
-  // Look up skill by slug
-  const rows: CatalogSkillDetail[] = await (db.$queryRawUnsafe as any)(
-    `SELECT id, slug, name, description, summary, categories, capabilities, keywords,
-            github_repo, github_path, source_type, publisher_id, created_at, updated_at
-     FROM skills
-     WHERE slug = $1 AND visibility = 'public'
-     ORDER BY created_at DESC
-     LIMIT 1`,
-    slug
-  );
+  // Check if path looks like a UUID (for R2/non-GitHub skills)
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  if (rows.length === 0) {
+  if (uuidPattern.test(path)) {
+    // Lookup by skill id
+    const rows: CatalogSkillDetail[] = await (db.$queryRawUnsafe as any)(
+      `SELECT id, slug, name, description, summary, categories, capabilities, keywords,
+              github_repo, github_path, source_type, publisher_id, source_id, created_at, updated_at
+       FROM skills
+       WHERE id = $1 AND visibility = 'public'
+       LIMIT 1`,
+      path
+    );
+    row = rows[0] ?? null;
+  } else {
+    // Parse as owner/repo/skill-name format
+    const segments = path.split("/");
+    if (segments.length >= 2) {
+      const owner = segments[0];
+      const repo = segments[1];
+      const skillName = segments.length >= 3 ? segments[segments.length - 1] : null;
+      const githubRepo = `${owner}/${repo}`;
+
+      let rows: CatalogSkillDetail[];
+      if (skillName) {
+        // Match: github_repo = 'owner/repo' AND github_path contains 'skill-name'
+        rows = await (db.$queryRawUnsafe as any)(
+          `SELECT id, slug, name, description, summary, categories, capabilities, keywords,
+                  github_repo, github_path, source_type, publisher_id, source_id, created_at, updated_at
+           FROM skills
+           WHERE github_repo = $1 AND github_path LIKE $2 AND visibility = 'public'
+           ORDER BY created_at DESC
+           LIMIT 1`,
+          githubRepo,
+          `%${skillName}%`
+        );
+      } else {
+        // Just owner/repo — find skill at repo root
+        rows = await (db.$queryRawUnsafe as any)(
+          `SELECT id, slug, name, description, summary, categories, capabilities, keywords,
+                  github_repo, github_path, source_type, publisher_id, source_id, created_at, updated_at
+           FROM skills
+           WHERE github_repo = $1 AND visibility = 'public'
+           ORDER BY created_at DESC
+           LIMIT 1`,
+          githubRepo
+        );
+      }
+      row = rows[0] ?? null;
+    }
+  }
+
+  if (!row) {
     return c.json({ error: "Skill not found" }, 404);
   }
 
-  const row = rows[0];
   const githubRepo = row.github_repo ?? "";
   const githubPath = row.github_path ?? "";
   const githubUrl = githubRepo
@@ -297,7 +342,7 @@ catalogRoute.get("/skills/:slug", async (c) => {
     : "";
 
   // Fetch SKILL.md content (with KV caching)
-  const cacheKey = `skill_content:${slug}`;
+  const cacheKey = `skill_content:${row.id}`;
   let content: string | null = null;
 
   try {
@@ -353,7 +398,7 @@ catalogRoute.get("/skills/:slug", async (c) => {
     try {
       c.env.TELEMETRY.writeDataPoint({
         indexes: ["skill_view"],
-        blobs: [slug, ip],
+        blobs: [path, ip],
       });
     } catch {}
   })());
@@ -377,6 +422,7 @@ catalogRoute.get("/skills/:slug", async (c) => {
         githubRepo,
         githubPath
       ),
+      urlPath: deriveUrlPath(row.source_id, row.id),
       createdAt: new Date(row.created_at).toISOString(),
       updatedAt: new Date(row.updated_at).toISOString(),
     },

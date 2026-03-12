@@ -4,6 +4,7 @@ import { searchVectors, type VectorSearchResult } from "./vector-store";
 import { enrichUsersWithGithubUsername } from "./users";
 import { rerankResults } from "./reranker";
 import { deriveInstallCommand } from "./install-command";
+import { deriveUrlPath } from "./url-path";
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -18,6 +19,7 @@ export interface SearchResult {
   keywords: string[];
   githubUrl: string;
   installCommand: string | null;
+  urlPath: string;
   score: number;
 }
 
@@ -38,6 +40,7 @@ export interface CachedSkillMeta {
   githubPath: string | null;
   sourceType: string | null;
   publisherId: string | null;
+  sourceId: string | null;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -117,6 +120,7 @@ async function hydrateSkills(
         githubPath: true,
         sourceType: true,
         publisherId: true,
+        sourceId: true,
       },
     });
 
@@ -134,6 +138,7 @@ async function hydrateSkills(
         githubPath: skill.githubPath,
         sourceType: skill.sourceType,
         publisherId: skill.publisherId,
+        sourceId: skill.sourceId,
       };
       skillMap.set(skill.id, meta);
 
@@ -258,6 +263,7 @@ export async function searchSkills(
       keywords: skill?.keywords ?? [],
       githubUrl,
       installCommand: deriveInstallCommand(slug, sourceType, publisherUsername, githubRepo, githubPath),
+      urlPath: deriveUrlPath(skill?.sourceId ?? null, skillId),
       score: Math.round(bestScore * 1000) / 1000,
     };
   });

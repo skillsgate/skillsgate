@@ -18,6 +18,7 @@ type SkillDetail = {
 	githubUrl: string;
 	githubRepo: string;
 	installCommand: string | null;
+	urlPath: string;
 	createdAt: string;
 	updatedAt: string;
 };
@@ -57,7 +58,8 @@ function sanitizeHtml(html: string): string {
 // ─── Page Component ─────────────────────────────────────────────────
 
 export default function SkillDetailPage() {
-	const { slug } = useParams();
+	const params = useParams();
+	const path = params["*"]; // e.g. "anthropics/skills/react-best-practices" or "uuid-here"
 	const [skill, setSkill] = useState<SkillDetail | null>(null);
 	const [content, setContent] = useState<string>("");
 	const [isLoading, setIsLoading] = useState(true);
@@ -65,13 +67,13 @@ export default function SkillDetailPage() {
 	const [copied, setCopied] = useState(false);
 
 	useEffect(() => {
-		if (!slug) return;
+		if (!path) return;
 
 		setIsLoading(true);
 		setError(null);
 
 		publicApi
-			.get<SkillDetailResponse>(`/api/v1/skills/${encodeURIComponent(slug)}`)
+			.get<SkillDetailResponse>(`/api/v1/skills/detail?path=${encodeURIComponent(path)}`)
 			.then((res) => {
 				if (res.ok) {
 					setSkill(res.data.skill);
@@ -88,7 +90,7 @@ export default function SkillDetailPage() {
 			.finally(() => {
 				setIsLoading(false);
 			});
-	}, [slug]);
+	}, [path]);
 
 	const renderedHtml = useMemo(() => {
 		if (!content) return "";

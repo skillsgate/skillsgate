@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { SEARCH_API_URL } from "../constants.js";
+import type { ScanFinding, ScanSummary } from "../types.js";
 
 interface DownloadedFile {
   path: string;
@@ -96,4 +97,44 @@ export async function downloadSkill(
   }
 
   return tmpDir;
+}
+
+export async function submitScanReport(
+  data: {
+    sourceId: string;
+    contentHash: string;
+    scannerType: string;
+    risk: string;
+    summary: string;
+    findings: ScanFinding[];
+  },
+  token: string
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${SEARCH_API_URL}/api/v1/scans`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchScanSummary(
+  sourceId: string
+): Promise<ScanSummary | null> {
+  try {
+    const res = await fetch(
+      `${SEARCH_API_URL}/api/v1/scans/${encodeURIComponent(sourceId)}/summary`
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as ScanSummary;
+  } catch {
+    return null;
+  }
 }

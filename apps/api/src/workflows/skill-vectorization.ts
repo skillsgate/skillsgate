@@ -120,8 +120,8 @@ export class SkillVectorizationWorkflow extends WorkflowEntrypoint<Bindings, Vec
       // Step 5: LLM Enrichment
       // ─────────────────────────────────────────────────────────────────
       const llm = await step.do('llm-enrichment', {
-        retries: { limit: 2, delay: '5 seconds', backoff: 'exponential' },
-        timeout: '2 minutes'
+        retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' },
+        timeout: '3 minutes'
       }, async () => {
         // Build frontmatter object for the prompt
         const frontmatter: Record<string, unknown> = {};

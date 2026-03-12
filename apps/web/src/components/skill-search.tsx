@@ -38,7 +38,6 @@ type KeywordSearchResponse = {
 		keywords: string[];
 		githubUrl: string;
 		installCommand: string | null;
-		downloads: number;
 	}[];
 	meta: {
 		total: number;

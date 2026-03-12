@@ -23,7 +23,6 @@ interface CatalogSkill {
   github_path: string | null;
   source_type: string | null;
   publisher_id: string | null;
-  downloads: number;
 }
 
 interface CatalogResponse {
@@ -38,7 +37,6 @@ interface CatalogResponse {
     keywords: string[];
     githubUrl: string;
     installCommand: string | null;
-    downloads: number;
   }[];
   meta: { total: number; limit: number; offset: number; hasMore: boolean };
 }
@@ -82,7 +80,6 @@ function mapSkill(row: CatalogSkill) {
       githubRepo,
       githubPath
     ),
-    downloads: row.downloads ?? 0,
   };
 }
 
@@ -127,13 +124,13 @@ catalogRoute.get("/skills", async (c) => {
 
   const rows: CatalogSkill[] = await (db.$queryRawUnsafe as any)(
     `SELECT id, slug, name, description, summary, categories, capabilities, keywords,
-            github_repo, github_path, source_type, publisher_id, downloads
+            github_repo, github_path, source_type, publisher_id
      FROM skills
      WHERE visibility = 'public'
      ORDER BY
        CASE
-         WHEN github_repo LIKE 'vercel-labs/%' THEN 1
-         WHEN github_repo LIKE 'anthropics/skills%' THEN 2
+         WHEN github_repo LIKE 'anthropics/skills%' THEN 1
+         WHEN github_repo LIKE 'vercel-labs/%' THEN 2
          WHEN github_repo LIKE 'remotion-dev/skills%' THEN 3
          WHEN github_repo LIKE 'microsoft/github-copilot-for-azure%' THEN 4
          WHEN github_repo LIKE 'browser-use/browser-use%' THEN 5
@@ -141,6 +138,7 @@ catalogRoute.get("/skills", async (c) => {
          WHEN github_repo LIKE 'google-labs-code/%' THEN 7
          ELSE 100
        END,
+       md5(id || CURRENT_DATE::text),
        created_at DESC
      LIMIT $1 OFFSET $2`,
     limit,
@@ -199,7 +197,7 @@ catalogRoute.get("/skills/search", async (c) => {
 
   const rows: CatalogSkill[] = await (db.$queryRawUnsafe as any)(
     `SELECT id, slug, name, description, summary, categories, capabilities, keywords,
-            github_repo, github_path, source_type, publisher_id, downloads
+            github_repo, github_path, source_type, publisher_id
      FROM skills
      WHERE visibility = 'public' AND (
        name ILIKE $1 OR slug ILIKE $1 OR description ILIKE $1

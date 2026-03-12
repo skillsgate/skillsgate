@@ -15,7 +15,6 @@ type CatalogSkill = {
 	keywords: string[];
 	githubUrl: string;
 	installCommand: string | null;
-	downloads: number;
 };
 
 type CatalogResponse = {
@@ -112,11 +111,6 @@ const FAQ_ITEMS = [
 		a: "Searching, browsing, and installing public skills is completely free.",
 	},
 ];
-
-function formatDownloads(n: number): string {
-	if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-	return String(n);
-}
 
 function useCatalog() {
 	const [skills, setSkills] = useState<CatalogSkill[]>([]);
@@ -336,9 +330,6 @@ export default function Home() {
 														SKILL.md
 													</span>
 												</div>
-												<span className="text-[11px] font-mono text-muted">
-													{formatDownloads(skill.downloads)}
-												</span>
 											</div>
 
 											{/* Name */}

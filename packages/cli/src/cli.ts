@@ -174,9 +174,9 @@ function printHelp(): void {
   console.log(`    -a, --agent <id>   Target specific agent(s)`);
   console.log(`    --all              Select all skills/agents`);
   console.log(`    --copy             Use copy mode instead of symlink`);
-  console.log(`    -s, --scanner      Force a specific scanner ${DIM("(scan only)")}`);
-  console.log(`    --timeout <sec>    Scanner timeout, default 120 ${DIM("(scan only)")}`);
-  console.log(`    --raw              Show raw scanner output ${DIM("(scan only)")}`);
+  console.log(`    -s, --scanner      Force a specific coding agent ${DIM("(scan only)")}`);
+  console.log(`    --timeout <sec>    Agent timeout, default 120 ${DIM("(scan only)")}`);
+  console.log(`    --raw              Show raw agent output ${DIM("(scan only)")}`);
   console.log(`    --no-share         Don't share results with community ${DIM("(scan only)")}`);
   console.log(`    -v, --version      Show version`);
   console.log(`    -h, --help         Show this help`);

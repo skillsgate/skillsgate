@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Navbar } from "~/components/navbar";
 import { SkillSearch } from "~/components/skill-search";
 import { useReveal } from "~/components/use-reveal";
 import { publicApi } from "~/lib/api";
+import { FavoritesProvider, useFavorites } from "~/hooks/use-favorites";
+import { FavoriteButton } from "~/components/favorite-button";
 
 type CatalogSkill = {
 	skillId: string;
@@ -148,9 +150,111 @@ function useCatalog() {
 	return { skills, total, hasMore, isLoading, isLoadingMore, loadMore };
 }
 
+function CatalogGrid({ catalog }: { catalog: ReturnType<typeof useCatalog> }) {
+	const { checkFavorites } = useFavorites();
+	const prevLength = useCallback(() => catalog.skills.length, [catalog.skills.length]);
+
+	// Batch-check new skill IDs whenever skills change
+	useEffect(() => {
+		if (catalog.skills.length > 0) {
+			checkFavorites(catalog.skills.map((s) => s.skillId));
+		}
+	}, [catalog.skills.length, checkFavorites]);
+
+	return (
+		<>
+			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+				{catalog.skills.map((skill, i) => {
+					const publisher = skill.githubUrl
+						? skill.githubUrl.replace("https://github.com/", "").split("/")[0]
+						: null;
+
+					return (
+						<a
+							key={skill.skillId}
+							href={`/skills/${skill.urlPath}`}
+							className="group relative bg-card-bg border border-card-border rounded-xl p-5 hover:border-accent/30 transition-all duration-300 no-underline"
+							style={{ transitionDelay: `${(i % 6) * 60}ms` }}
+						>
+							{/* Header */}
+							<div className="flex items-start justify-between mb-3">
+								<div className="flex items-center gap-2">
+									<div className="w-2 h-2 rounded-full bg-accent/40" />
+									<span className="text-[11px] font-mono text-muted tracking-wide">
+										SKILL.md
+									</span>
+								</div>
+								<FavoriteButton skillId={skill.skillId} />
+							</div>
+
+							{/* Name */}
+							<h3 className="text-[15px] font-semibold text-foreground mb-2 group-hover:text-foreground/90">
+								{skill.name}
+							</h3>
+
+							{/* Publisher */}
+							{publisher && (
+								<p className="text-[12px] font-mono text-accent mb-3">
+									from "{publisher}"
+								</p>
+							)}
+
+							{/* Description */}
+							<p className="text-[13px] text-muted leading-relaxed line-clamp-3">
+								{skill.summary || skill.description}
+							</p>
+
+							{/* Categories */}
+							{skill.categories.length > 0 && (
+								<div className="flex flex-wrap gap-2 mt-4">
+									{skill.categories.slice(0, 3).map((cat) => (
+										<span
+											key={cat}
+											className="text-[10px] font-mono tracking-wider uppercase text-muted/60 bg-surface-hover px-2 py-0.5 rounded"
+										>
+											{cat}
+										</span>
+									))}
+								</div>
+							)}
+						</a>
+					);
+				})}
+			</div>
+
+			{/* Load more button */}
+			{catalog.hasMore && (
+				<div className="mt-10 text-center">
+					<button
+						onClick={catalog.loadMore}
+						disabled={catalog.isLoadingMore}
+						className="inline-flex items-center gap-2 px-6 py-2.5 text-[13px] font-medium text-muted border border-border rounded-lg hover:text-foreground hover:border-accent/40 transition-colors disabled:opacity-50"
+					>
+						{catalog.isLoadingMore ? (
+							<>
+								<div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+								Loading...
+							</>
+						) : (
+							"Load more"
+						)}
+					</button>
+				</div>
+			)}
+		</>
+	);
+}
+
 export default function Home() {
 	const containerRef = useReveal();
 	const catalog = useCatalog();
+
+	const initialSkillIds = useMemo(
+		() => catalog.skills.map((s) => s.skillId),
+		// Only compute on first load
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[catalog.isLoading]
+	);
 
 	return (
 		<div ref={containerRef} className="min-h-screen">
@@ -307,85 +411,9 @@ export default function Home() {
 
 					{/* Real skill cards */}
 					{!catalog.isLoading && catalog.skills.length > 0 && (
-						<>
-							<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-								{catalog.skills.map((skill, i) => {
-									const publisher = skill.githubUrl
-										? skill.githubUrl.replace("https://github.com/", "").split("/")[0]
-										: null;
-
-									return (
-										<a
-											key={skill.skillId}
-											href={`/skills/${skill.urlPath}`}
-											className="group relative bg-card-bg border border-card-border rounded-xl p-5 hover:border-accent/30 transition-all duration-300 no-underline"
-											style={{ transitionDelay: `${(i % 6) * 60}ms` }}
-										>
-											{/* Header */}
-											<div className="flex items-start justify-between mb-3">
-												<div className="flex items-center gap-2">
-													<div className="w-2 h-2 rounded-full bg-accent/40" />
-													<span className="text-[11px] font-mono text-muted tracking-wide">
-														SKILL.md
-													</span>
-												</div>
-											</div>
-
-											{/* Name */}
-											<h3 className="text-[15px] font-semibold text-foreground mb-2 group-hover:text-foreground/90">
-												{skill.name}
-											</h3>
-
-											{/* Publisher */}
-											{publisher && (
-												<p className="text-[12px] font-mono text-accent mb-3">
-													from "{publisher}"
-												</p>
-											)}
-
-											{/* Description */}
-											<p className="text-[13px] text-muted leading-relaxed line-clamp-3">
-												{skill.summary || skill.description}
-											</p>
-
-											{/* Categories */}
-											{skill.categories.length > 0 && (
-												<div className="flex flex-wrap gap-2 mt-4">
-													{skill.categories.slice(0, 3).map((cat) => (
-														<span
-															key={cat}
-															className="text-[10px] font-mono tracking-wider uppercase text-muted/60 bg-surface-hover px-2 py-0.5 rounded"
-														>
-															{cat}
-														</span>
-													))}
-												</div>
-											)}
-										</a>
-									);
-								})}
-							</div>
-
-							{/* Load more button */}
-							{catalog.hasMore && (
-								<div className="mt-10 text-center">
-									<button
-										onClick={catalog.loadMore}
-										disabled={catalog.isLoadingMore}
-										className="inline-flex items-center gap-2 px-6 py-2.5 text-[13px] font-medium text-muted border border-border rounded-lg hover:text-foreground hover:border-accent/40 transition-colors disabled:opacity-50"
-									>
-										{catalog.isLoadingMore ? (
-											<>
-												<div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted border-t-foreground" />
-												Loading...
-											</>
-										) : (
-											"Load more"
-										)}
-									</button>
-								</div>
-							)}
-						</>
+						<FavoritesProvider initialSkillIds={initialSkillIds}>
+							<CatalogGrid catalog={catalog} />
+						</FavoritesProvider>
 					)}
 				</div>
 			</section>
@@ -526,7 +554,7 @@ export default function Home() {
 							{/* Terminal body */}
 							<div className="p-5 font-mono text-[12px] leading-6 space-y-1">
 								<p className="text-muted">$ skillsgate scan @vercel/v0</p>
-								<p className="text-muted/60 mt-3">◆ Select a scanning tool:</p>
+								<p className="text-muted/60 mt-3">◆ Select a coding agent to run the scan:</p>
 								<p className="text-foreground">● Claude Code <span className="text-muted/40">(recommended - read-only mode)</span></p>
 								<p className="text-muted/40">○ Codex CLI</p>
 								<p className="text-muted/40">○ Goose</p>
@@ -576,7 +604,7 @@ export default function Home() {
 									<line x1="12" y1="17" x2="12" y2="21" />
 								</svg>
 							</div>
-							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">5 scanners supported</h3>
+							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">5 coding agents supported</h3>
 							<p className="text-[12px] text-muted leading-relaxed">
 								Claude Code, Codex CLI, OpenCode, Goose, and Aider — use whichever you have installed
 							</p>

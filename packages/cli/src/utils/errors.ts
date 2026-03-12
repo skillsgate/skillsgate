@@ -37,8 +37,8 @@ export class NoAgentsDetectedError extends SkillsGateError {
 export class NoScannersAvailableError extends SkillsGateError {
   constructor() {
     super(
-      "No scanning tools found on your system.\n\n" +
-        "Install one of the following:\n" +
+      "No supported coding agents found on your system.\n\n" +
+        "Install one of the following to use scan:\n" +
         "  • Claude Code  — https://docs.anthropic.com/en/docs/claude-code\n" +
         "  • Codex CLI    — https://github.com/openai/codex\n" +
         "  • OpenCode     — https://github.com/opencode-ai/opencode\n" +
@@ -52,8 +52,8 @@ export class NoScannersAvailableError extends SkillsGateError {
 export class ScannerInsideOnlyError extends SkillsGateError {
   constructor(scannerName: string) {
     super(
-      `The only scanning tool available is ${scannerName}, but you're currently running inside it.\n` +
-        "Install a second scanning tool to avoid recursive invocation.",
+      `The only coding agent available is ${scannerName}, but you're currently running inside it.\n` +
+        "Install a second coding agent to avoid recursive invocation.",
       "SCANNER_INSIDE_ONLY",
     );
   }
@@ -63,7 +63,7 @@ export class ScannerTimeoutError extends SkillsGateError {
   constructor(scannerName: string, timeoutSec: number) {
     super(
       `${scannerName} timed out after ${timeoutSec}s.\n` +
-        "Try increasing the timeout with --timeout <seconds> or use a different scanning tool.",
+        "Try increasing the timeout with --timeout <seconds> or use a different agent.",
       "SCANNER_TIMEOUT",
     );
   }

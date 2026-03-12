@@ -196,7 +196,7 @@ export async function runScan(args: string[]): Promise<void> {
       );
       if (!scannerEntry) {
         throw new SkillsGateError(
-          `Unknown scanner: "${options.scanner}". Available: ${Object.keys(SCANNERS).join(", ")}`,
+          `Unknown agent: "${options.scanner}". Available: ${Object.keys(SCANNERS).join(", ")}`,
           "UNKNOWN_SCANNER",
         );
       }
@@ -214,7 +214,7 @@ export async function runScan(args: string[]): Promise<void> {
       }
       if (!filtered.find((s) => s.name === scannerEntry.name)) {
         throw new SkillsGateError(
-          `Scanner "${options.scanner}" is not available on this system.`,
+          `"${options.scanner}" is not available on this system.`,
           "SCANNER_NOT_AVAILABLE",
         );
       }
@@ -223,7 +223,7 @@ export async function runScan(args: string[]): Promise<void> {
       selectedScanner = filtered[0];
     } else {
       const selected = await p.select({
-        message: "Select a scanning tool:",
+        message: "Select a coding agent to run the scan:",
         options: filtered.map((s) => ({
           value: s.name,
           label: s.displayName,
@@ -281,7 +281,7 @@ export async function runScan(args: string[]): Promise<void> {
 
     if (detectCreditsExhausted(result.stderr, result.stdout)) {
       throw new SkillsGateError(
-        `${selectedScanner.displayName} ran out of API credits. Try a different scanner with --scanner.`,
+        `${selectedScanner.displayName} ran out of API credits. Try a different agent with --scanner.`,
         "CREDITS_EXHAUSTED",
       );
     }
@@ -300,7 +300,7 @@ export async function runScan(args: string[]): Promise<void> {
 
     if (!report) {
       parseFailed = true;
-      p.log.warn("Could not parse structured output from scanner.");
+      p.log.warn("Could not parse structured output.");
       if (result.stdout) {
         p.log.message(fmt.dim(result.stdout.slice(0, 1000)));
       }

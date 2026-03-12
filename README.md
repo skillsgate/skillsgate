@@ -78,6 +78,18 @@ skillsgate publish ./my-skill
 
 Your skill gets a scoped identifier (`@username/skill-name`) and becomes instantly searchable and installable by anyone.
 
+### Security scan before you install
+
+Skills run on your machine. Scan them first — SkillsGate uses your own AI coding tool to analyze skills for prompt injection, data exfiltration, malicious commands, and more.
+
+```bash
+skillsgate scan @username/audit-website        # scan a SkillsGate skill
+skillsgate scan vercel-labs/agent-skills        # scan a GitHub repo
+skillsgate scan ./local-skill                   # scan a local path
+```
+
+Supports Claude Code, Codex CLI, OpenCode, Goose, and Aider. After scanning, share your results with the community to help others make informed decisions.
+
 ### Private skills & team sharing
 
 Not everything should be public. SkillsGate gives you fine-grained control:
@@ -99,6 +111,7 @@ The universal `.agents/skills/` directory works as a fallback for any MCP-compat
 | Command | Description |
 |---------|-------------|
 | `skillsgate add <source>` | Install from SkillsGate, GitHub, or local path |
+| `skillsgate scan <source>` | Security-scan skills before installing |
 | `skillsgate search <query>` | Semantic search for skills |
 | `skillsgate publish [path]` | Publish a skill to SkillsGate |
 | `skillsgate remove [name]` | Remove installed skills |

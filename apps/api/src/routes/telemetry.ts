@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { getDb } from "@skillsgate/database";
 import type { Bindings, Variables } from "../types";
 
-const VALID_EVENTS = new Set(["add", "remove", "search", "update", "sync", "list"]);
+const VALID_EVENTS = new Set(["add", "remove", "search", "update", "sync", "list", "scan", "scan_error"]);
 
 export const telemetryRoute = new Hono<{
   Bindings: Bindings;

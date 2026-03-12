@@ -2,6 +2,7 @@ import type { DatabaseClient } from "@skillsgate/database";
 import { OpenAIEmbeddingProvider } from "./embedding";
 import { searchVectors, type VectorSearchResult } from "./vector-store";
 import { enrichUsersWithGithubUsername } from "./users";
+import { rerankResults } from "./reranker";
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -209,17 +210,21 @@ export async function searchSkills(
     }
   }
 
-  // 4. Rank and take top N
-  const ranked = [...skillGroups.entries()]
+  // 4. Pre-rank and take wider pool for re-ranking
+  const rerankPoolSize = Math.min(skillGroups.size, limit * 3);
+  const preRanked = [...skillGroups.entries()]
     .map(([skillId, bestScore]) => ({ skillId, bestScore }))
     .sort((a, b) => b.bestScore - a.bestScore)
-    .slice(0, limit);
+    .slice(0, rerankPoolSize);
 
-  // 5. Batch fetch skill metadata (with KV cache)
-  const skillIds = ranked.map((r) => r.skillId);
-  const skillMap = await hydrateSkills(db, skillIds, cache, ctx);
+  // 5. Batch fetch skill metadata for re-ranking pool (with KV cache)
+  const poolSkillIds = preRanked.map((r) => r.skillId);
+  const skillMap = await hydrateSkills(db, poolSkillIds, cache, ctx);
 
-  // 6. Resolve publisher GitHub usernames for R2-sourced skills
+  // 6. Re-rank using metadata signals, then take top N
+  const ranked = rerankResults(normalized, preRanked, skillMap).slice(0, limit);
+
+  // 7. Resolve publisher GitHub usernames for R2-sourced skills
   const r2PublisherIds = [...skillMap.values()]
     .filter((s) => s.sourceType === "r2" && s.publisherId)
     .map((s) => s.publisherId!);
@@ -228,7 +233,7 @@ export async function searchSkills(
       ? await enrichUsersWithGithubUsername(db, r2PublisherIds)
       : new Map<string, string>();
 
-  // 7. Build response
+  // 8. Build response
   return ranked.map(({ skillId, bestScore }) => {
     const skill = skillMap.get(skillId);
     const slug = skill?.slug ?? "";

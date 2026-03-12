@@ -242,6 +242,12 @@ export async function runScan(args: string[]): Promise<void> {
       selectedScanner = SCANNERS[selected as ScannerType];
     }
 
+    p.log.info(
+      fmt.dim(
+        `Using ${selectedScanner.displayName}'s default model. To change it, update your ${selectedScanner.displayName} configuration.`,
+      ),
+    );
+
     // Build prompt and invoke scanner
     const prompt = buildScanPrompt(
       skills.map((s) => ({

@@ -91,6 +91,7 @@ model User {
   grantedAccess           NamespaceAccess[]      @relation("grantedAccess")
   publishedSkills         Skill[]                @relation("publishedSkills")
   githubInstallations      GitHubInstallation[]
+  communityScans          CommunityScan[]
 
   @@map("users")
 }
@@ -372,4 +373,31 @@ model Purchase {
 
   @@unique([namespaceId, userId])
   @@map("purchases")
+}
+
+// ─── Community Scans ─────────────────────────────────────────────
+
+model CommunityScan {
+  id           String   @id @default(cuid())
+  sourceId     String   @map("source_id")
+  skillId      String?  @map("skill_id")
+  contentHash  String   @map("content_hash")
+
+  scannerType  String   @map("scanner_type")
+
+  risk         String
+  summary      String?  @db.Text
+  findings     Json     @default("[]")
+  findingCount Int      @default(0) @map("finding_count")
+
+  userId       String   @map("user_id")
+
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@unique([sourceId, userId, contentHash])
+  @@index([sourceId])
+  @@index([skillId])
+  @@map("community_scans")
 }

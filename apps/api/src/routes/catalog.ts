@@ -145,12 +145,23 @@ catalogRoute.get("/skills", async (c) => {
     offset
   );
 
-  const response: CatalogResponse = {
-    skills: rows.map(mapSkill),
-    meta: { total, limit, offset, hasMore: offset + rows.length < total },
-  };
+  const skills = rows.map(mapSkill);
 
-  return c.json(response);
+  // Telemetry (non-blocking)
+  c.executionCtx.waitUntil((async () => {
+    try {
+      c.env.TELEMETRY.writeDataPoint({
+        indexes: ["catalog_browse"],
+        blobs: [ip],
+        doubles: [total, limit, offset, skills.length],
+      });
+    } catch {}
+  })());
+
+  return c.json({
+    skills,
+    meta: { total, limit, offset, hasMore: offset + skills.length < total },
+  } satisfies CatalogResponse);
 });
 
 // ─── GET /skills/search — Keyword search ────────────────────────────
@@ -215,10 +226,29 @@ catalogRoute.get("/skills/search", async (c) => {
     offset
   );
 
-  const response: CatalogResponse = {
-    skills: rows.map(mapSkill),
-    meta: { total, limit, offset, hasMore: offset + rows.length < total },
-  };
+  const skills = rows.map(mapSkill);
 
-  return c.json(response);
+  // Telemetry: per-result analytics (non-blocking)
+  c.executionCtx.waitUntil((async () => {
+    try {
+      c.env.TELEMETRY.writeDataPoint({
+        indexes: ["keyword_search"],
+        blobs: [q, ip],
+        doubles: [total, limit, offset, skills.length],
+      });
+      for (let i = 0; i < skills.length; i++) {
+        const s = skills[i];
+        c.env.TELEMETRY.writeDataPoint({
+          indexes: ["keyword_search_result"],
+          blobs: [q, s.skillId, s.slug, s.name],
+          doubles: [i + 1, skills.length],
+        });
+      }
+    } catch {}
+  })());
+
+  return c.json({
+    skills,
+    meta: { total, limit, offset, hasMore: offset + skills.length < total },
+  } satisfies CatalogResponse);
 });

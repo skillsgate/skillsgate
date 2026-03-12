@@ -1,64 +1,27 @@
+import { useState, useEffect, useCallback } from "react";
 import { Navbar } from "~/components/navbar";
 import { SkillSearch } from "~/components/skill-search";
 import { useReveal } from "~/components/use-reveal";
+import { publicApi } from "~/lib/api";
 
-/* ─── Mock data ─── */
-const FEATURED_SKILLS = [
-	{
-		slug: "frontend-design",
-		name: "frontend-design",
-		description:
-			"Create distinctive, production-grade frontend interfaces with high design quality. Generates creative, polished code that avoids generic AI aesthetics.",
-		publisher: "anthropic",
-		categories: ["frontend", "design"],
-		downloads: 112800,
-	},
-	{
-		slug: "vercel-react-best-practices",
-		name: "react-best-practices",
-		description:
-			"Enforces React best practices including proper hook usage, component patterns, performance optimizations, and modern concurrent features.",
-		publisher: "vercel-labs",
-		categories: ["frontend", "react"],
-		downloads: 181000,
-	},
-	{
-		slug: "audit-website",
-		name: "audit-website",
-		description:
-			"Run comprehensive Lighthouse audits on any URL. Measures performance, accessibility, SEO, and best practices with actionable recommendations.",
-		publisher: "anthropic",
-		categories: ["devops", "testing"],
-		downloads: 94200,
-	},
-	{
-		slug: "azure-deploy",
-		name: "azure-deploy",
-		description:
-			"Deploy applications to Azure with best practices. Handles App Service, Functions, Container Apps, and AKS with proper configuration.",
-		publisher: "microsoft",
-		categories: ["cloud", "deployment"],
-		downloads: 93700,
-	},
-	{
-		slug: "remotion-best-practices",
-		name: "remotion-best-practices",
-		description:
-			"Build programmatic videos with Remotion. Covers composition setup, animation timing, audio sync, and rendering optimizations.",
-		publisher: "remotion-dev",
-		categories: ["media", "react"],
-		downloads: 119500,
-	},
-	{
-		slug: "web-design-guidelines",
-		name: "web-design-guidelines",
-		description:
-			"Professional web design standards covering layout systems, typography scales, color theory, responsive patterns, and accessibility compliance.",
-		publisher: "vercel-labs",
-		categories: ["frontend", "design"],
-		downloads: 139400,
-	},
-];
+type CatalogSkill = {
+	skillId: string;
+	slug: string;
+	name: string;
+	description: string;
+	summary: string;
+	categories: string[];
+	capabilities: string[];
+	keywords: string[];
+	githubUrl: string;
+	installCommand: string | null;
+	downloads: number;
+};
+
+type CatalogResponse = {
+	skills: CatalogSkill[];
+	meta: { total: number; limit: number; offset: number; hasMore: boolean };
+};
 
 const FEATURES = [
 	{
@@ -155,8 +118,44 @@ function formatDownloads(n: number): string {
 	return String(n);
 }
 
+function useCatalog() {
+	const [skills, setSkills] = useState<CatalogSkill[]>([]);
+	const [total, setTotal] = useState(0);
+	const [hasMore, setHasMore] = useState(false);
+	const [isLoading, setIsLoading] = useState(true);
+	const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+	const fetchSkills = useCallback(async (offset: number) => {
+		const res = await publicApi.get<CatalogResponse>(
+			`/api/v1/skills?limit=24&offset=${offset}`
+		);
+		if (res.ok) {
+			if (offset === 0) {
+				setSkills(res.data.skills);
+			} else {
+				setSkills((prev) => [...prev, ...res.data.skills]);
+			}
+			setTotal(res.data.meta.total);
+			setHasMore(res.data.meta.hasMore);
+		}
+	}, []);
+
+	useEffect(() => {
+		fetchSkills(0).finally(() => setIsLoading(false));
+	}, [fetchSkills]);
+
+	const loadMore = useCallback(async () => {
+		setIsLoadingMore(true);
+		await fetchSkills(skills.length);
+		setIsLoadingMore(false);
+	}, [fetchSkills, skills.length]);
+
+	return { skills, total, hasMore, isLoading, isLoadingMore, loadMore };
+}
+
 export default function Home() {
 	const containerRef = useReveal();
+	const catalog = useCatalog();
 
 	return (
 		<div ref={containerRef} className="min-h-screen">
@@ -265,88 +264,139 @@ export default function Home() {
 				</div>
 			</section>
 
-			{/* ═══ FEATURED SKILLS ═══ */}
+			{/* ═══ BROWSE SKILLS ═══ */}
 			<section id="skills" className="py-20 md:py-28 border-t border-border">
 				<div className="max-w-6xl mx-auto px-6">
 					<div className="reveal flex items-end justify-between mb-12 md:mb-16">
 						<div>
 							<p className="text-[11px] font-mono tracking-[0.2em] uppercase text-muted mb-3">
-								Featured
+								Catalog
 							</p>
 							<h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">
-								Popular skills
+								Browse skills
+								{catalog.total > 0 && (
+									<span className="ml-3 text-[14px] font-normal text-muted">
+										{catalog.total.toLocaleString()} total
+									</span>
+								)}
 							</h2>
 						</div>
-						<a
-							href="#"
-							className="hidden sm:inline-flex text-[13px] text-muted hover:text-foreground transition-colors items-center gap-1.5"
-						>
-							View all
-							<svg
-								width="14"
-								height="14"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								strokeWidth="1.5"
-								strokeLinecap="round"
-								strokeLinejoin="round"
-							>
-								<line x1="5" y1="12" x2="19" y2="12" />
-								<polyline points="12 5 19 12 12 19" />
-							</svg>
-						</a>
 					</div>
 
-					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-						{FEATURED_SKILLS.map((skill, i) => (
-							<div
-								key={skill.slug}
-								className="reveal group relative bg-card-bg border border-card-border rounded-xl p-5 hover:border-accent/30 transition-all duration-300"
-								style={{ transitionDelay: `${i * 60}ms` }}
-							>
-								{/* Header */}
-								<div className="flex items-start justify-between mb-3">
-									<div className="flex items-center gap-2">
-										<div className="w-2 h-2 rounded-full bg-accent/40" />
-										<span className="text-[11px] font-mono text-muted tracking-wide">
-											SKILL.md
-										</span>
+					{/* Loading skeleton */}
+					{catalog.isLoading && (
+						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+							{Array.from({ length: 6 }).map((_, i) => (
+								<div
+									key={i}
+									className="bg-card-bg border border-card-border rounded-xl p-5 animate-pulse"
+								>
+									<div className="flex items-start justify-between mb-3">
+										<div className="h-3 w-16 bg-surface-hover rounded" />
+										<div className="h-3 w-10 bg-surface-hover rounded" />
 									</div>
-									<span className="text-[11px] font-mono text-muted">
-										{formatDownloads(skill.downloads)}
-									</span>
+									<div className="h-4 w-32 bg-surface-hover rounded mb-2" />
+									<div className="h-3 w-24 bg-surface-hover rounded mb-3" />
+									<div className="space-y-1.5">
+										<div className="h-3 w-full bg-surface-hover rounded" />
+										<div className="h-3 w-4/5 bg-surface-hover rounded" />
+									</div>
+									<div className="flex gap-2 mt-4">
+										<div className="h-4 w-14 bg-surface-hover rounded" />
+										<div className="h-4 w-14 bg-surface-hover rounded" />
+									</div>
 								</div>
+							))}
+						</div>
+					)}
 
-								{/* Name */}
-								<h3 className="text-[15px] font-semibold text-foreground mb-2 group-hover:text-foreground/90">
-									{skill.name}
-								</h3>
+					{/* Real skill cards */}
+					{!catalog.isLoading && catalog.skills.length > 0 && (
+						<>
+							<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+								{catalog.skills.map((skill, i) => {
+									const publisher = skill.githubUrl
+										? skill.githubUrl.replace("https://github.com/", "").split("/")[0]
+										: null;
 
-								{/* Publisher */}
-								<p className="text-[12px] font-mono text-accent mb-3">
-									from "{skill.publisher}"
-								</p>
-
-								{/* Description */}
-								<p className="text-[13px] text-muted leading-relaxed line-clamp-3">
-									{skill.description}
-								</p>
-
-								{/* Categories */}
-								<div className="flex gap-2 mt-4">
-									{skill.categories.map((cat) => (
-										<span
-											key={cat}
-											className="text-[10px] font-mono tracking-wider uppercase text-muted/60 bg-surface-hover px-2 py-0.5 rounded"
+									return (
+										<a
+											key={skill.skillId}
+											href={skill.githubUrl || "#"}
+											target={skill.githubUrl ? "_blank" : undefined}
+											rel={skill.githubUrl ? "noopener noreferrer" : undefined}
+											className="reveal group relative bg-card-bg border border-card-border rounded-xl p-5 hover:border-accent/30 transition-all duration-300 no-underline"
+											style={{ transitionDelay: `${(i % 6) * 60}ms` }}
 										>
-											{cat}
-										</span>
-									))}
-								</div>
+											{/* Header */}
+											<div className="flex items-start justify-between mb-3">
+												<div className="flex items-center gap-2">
+													<div className="w-2 h-2 rounded-full bg-accent/40" />
+													<span className="text-[11px] font-mono text-muted tracking-wide">
+														SKILL.md
+													</span>
+												</div>
+												<span className="text-[11px] font-mono text-muted">
+													{formatDownloads(skill.downloads)}
+												</span>
+											</div>
+
+											{/* Name */}
+											<h3 className="text-[15px] font-semibold text-foreground mb-2 group-hover:text-foreground/90">
+												{skill.name}
+											</h3>
+
+											{/* Publisher */}
+											{publisher && (
+												<p className="text-[12px] font-mono text-accent mb-3">
+													from "{publisher}"
+												</p>
+											)}
+
+											{/* Description */}
+											<p className="text-[13px] text-muted leading-relaxed line-clamp-3">
+												{skill.summary || skill.description}
+											</p>
+
+											{/* Categories */}
+											{skill.categories.length > 0 && (
+												<div className="flex flex-wrap gap-2 mt-4">
+													{skill.categories.slice(0, 3).map((cat) => (
+														<span
+															key={cat}
+															className="text-[10px] font-mono tracking-wider uppercase text-muted/60 bg-surface-hover px-2 py-0.5 rounded"
+														>
+															{cat}
+														</span>
+													))}
+												</div>
+											)}
+										</a>
+									);
+								})}
 							</div>
-						))}
-					</div>
+
+							{/* Load more button */}
+							{catalog.hasMore && (
+								<div className="mt-10 text-center">
+									<button
+										onClick={catalog.loadMore}
+										disabled={catalog.isLoadingMore}
+										className="inline-flex items-center gap-2 px-6 py-2.5 text-[13px] font-medium text-muted border border-border rounded-lg hover:text-foreground hover:border-accent/40 transition-colors disabled:opacity-50"
+									>
+										{catalog.isLoadingMore ? (
+											<>
+												<div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+												Loading...
+											</>
+										) : (
+											"Load more"
+										)}
+									</button>
+								</div>
+							)}
+						</>
+					)}
 				</div>
 			</section>
 

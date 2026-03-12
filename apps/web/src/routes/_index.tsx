@@ -325,7 +325,7 @@ export default function Home() {
 											href={skill.githubUrl || "#"}
 											target={skill.githubUrl ? "_blank" : undefined}
 											rel={skill.githubUrl ? "noopener noreferrer" : undefined}
-											className="reveal group relative bg-card-bg border border-card-border rounded-xl p-5 hover:border-accent/30 transition-all duration-300 no-underline"
+											className="group relative bg-card-bg border border-card-border rounded-xl p-5 hover:border-accent/30 transition-all duration-300 no-underline"
 											style={{ transitionDelay: `${(i % 6) * 60}ms` }}
 										>
 											{/* Header */}

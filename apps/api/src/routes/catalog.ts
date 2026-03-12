@@ -25,6 +25,11 @@ interface CatalogSkill {
   publisher_id: string | null;
 }
 
+interface CatalogSkillDetail extends CatalogSkill {
+  created_at: string | Date;
+  updated_at: string | Date;
+}
+
 interface CatalogResponse {
   skills: {
     skillId: string;
@@ -164,7 +169,7 @@ catalogRoute.get("/skills", async (c) => {
   } satisfies CatalogResponse);
 });
 
-// ─── GET /skills/search — Keyword search ────────────────────────────
+// ─── GET /skills/search — Keyword search ─────────────────────────────
 
 catalogRoute.get("/skills/search", async (c) => {
   const ip = getClientIp(c);
@@ -251,4 +256,124 @@ catalogRoute.get("/skills/search", async (c) => {
     skills,
     meta: { total, limit, offset, hasMore: offset + skills.length < total },
   } satisfies CatalogResponse);
+});
+
+// ─── GET /skills/:slug — Skill detail with SKILL.md content ─────────
+
+catalogRoute.get("/skills/:slug", async (c) => {
+  const ip = getClientIp(c);
+  const allowed = await checkRateLimit(c.env.CACHE, ip);
+  if (!allowed) {
+    return c.json({ error: "Rate limit exceeded. Try again in a minute." }, 429);
+  }
+
+  const slug = c.req.param("slug");
+  if (!slug || slug.length > 200) {
+    return c.json({ error: "Invalid slug" }, 400);
+  }
+
+  const db = getDb(c.env);
+
+  // Look up skill by slug
+  const rows: CatalogSkillDetail[] = await (db.$queryRawUnsafe as any)(
+    `SELECT id, slug, name, description, summary, categories, capabilities, keywords,
+            github_repo, github_path, source_type, publisher_id, created_at, updated_at
+     FROM skills
+     WHERE slug = $1 AND visibility = 'public'
+     LIMIT 1`,
+    slug
+  );
+
+  if (rows.length === 0) {
+    return c.json({ error: "Skill not found" }, 404);
+  }
+
+  const row = rows[0];
+  const githubRepo = row.github_repo ?? "";
+  const githubPath = row.github_path ?? "";
+  const githubUrl = githubRepo
+    ? `https://github.com/${githubRepo}${githubPath ? `/blob/main/${githubPath}` : ""}`
+    : "";
+
+  // Fetch SKILL.md content (with KV caching)
+  const cacheKey = `skill_content:${slug}`;
+  let content: string | null = null;
+
+  try {
+    content = await c.env.CACHE.get(cacheKey);
+  } catch {
+    // Cache miss or error — continue to fetch
+  }
+
+  if (!content) {
+    try {
+      if (row.source_type === "github" && githubRepo) {
+        // Determine the raw content URL
+        let rawPath = githubPath;
+        if (!rawPath || !rawPath.endsWith("SKILL.md")) {
+          rawPath = rawPath ? `${rawPath}/SKILL.md` : "SKILL.md";
+        }
+        const rawUrl = `https://raw.githubusercontent.com/${githubRepo}/main/${rawPath}`;
+
+        const headers: Record<string, string> = {};
+        if (c.env.GITHUB_TOKEN) {
+          headers["Authorization"] = `token ${c.env.GITHUB_TOKEN}`;
+        }
+
+        const res = await fetch(rawUrl, { headers });
+        if (res.ok) {
+          content = await res.text();
+        }
+      } else if (row.source_type === "r2") {
+        const r2Object = await c.env.R2_SKILLS.get(`skills/${row.id}/SKILL.md`);
+        if (r2Object) {
+          content = await r2Object.text();
+        }
+      }
+    } catch {
+      // Failed to fetch content — continue without it
+    }
+
+    // Cache the content if we got it
+    if (content) {
+      c.executionCtx.waitUntil(
+        c.env.CACHE.put(cacheKey, content, { expirationTtl: 3600 }).catch(() => {})
+      );
+    }
+  }
+
+  // Telemetry (non-blocking)
+  c.executionCtx.waitUntil((async () => {
+    try {
+      c.env.TELEMETRY.writeDataPoint({
+        indexes: ["skill_view"],
+        blobs: [slug, ip],
+      });
+    } catch {}
+  })());
+
+  return c.json({
+    skill: {
+      skillId: row.id,
+      slug: row.slug,
+      name: row.name,
+      description: row.description,
+      summary: row.summary ?? "",
+      categories: parseJsonArray(row.categories),
+      capabilities: parseJsonArray(row.capabilities),
+      keywords: parseJsonArray(row.keywords),
+      githubUrl,
+      githubRepo,
+      installCommand: deriveInstallCommand(
+        row.slug,
+        row.source_type,
+        null,
+        githubRepo,
+        githubPath
+      ),
+      createdAt: new Date(row.created_at).toISOString(),
+      updatedAt: new Date(row.updated_at).toISOString(),
+    },
+    content: content ?? "",
+  });
 });

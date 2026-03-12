@@ -127,15 +127,24 @@ catalogRoute.get("/skills", async (c) => {
   const db = getDb(c.env);
 
   const countResult = await (db.$queryRawUnsafe as any)(
-    `SELECT COUNT(*)::int AS total FROM skills WHERE visibility = 'public'`
+    `SELECT COUNT(*)::int AS total FROM (
+       SELECT DISTINCT ON (COALESCE(github_repo, id), name) id
+       FROM skills WHERE visibility = 'public'
+       ORDER BY COALESCE(github_repo, id), name, created_at DESC
+     ) deduped`
   );
   const total: number = countResult[0]?.total ?? 0;
 
   const rows: CatalogSkill[] = await (db.$queryRawUnsafe as any)(
-    `SELECT id, slug, name, description, summary, categories, capabilities, keywords,
-            github_repo, github_path, source_type, publisher_id, source_id
-     FROM skills
-     WHERE visibility = 'public'
+    `SELECT * FROM (
+       SELECT DISTINCT ON (COALESCE(github_repo, id), name)
+              id, slug, name, description, summary, categories, capabilities, keywords,
+              github_repo, github_path, source_type, publisher_id, source_id,
+              created_at
+       FROM skills
+       WHERE visibility = 'public'
+       ORDER BY COALESCE(github_repo, id), name, created_at DESC
+     ) deduped
      ORDER BY
        CASE
          WHEN github_repo LIKE 'anthropics/skills%' THEN 1
@@ -204,27 +213,36 @@ catalogRoute.get("/skills/search", async (c) => {
   const prefixPattern = `${q}%`;
 
   const countResult = await (db.$queryRawUnsafe as any)(
-    `SELECT COUNT(*)::int AS total FROM skills
-     WHERE visibility = 'public' AND (
-       name ILIKE $1 OR slug ILIKE $1 OR description ILIKE $1
-       OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(keywords, '[]'::jsonb)) kw WHERE kw ILIKE $1)
-       OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(categories, '[]'::jsonb)) cat WHERE cat ILIKE $1)
-       OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(capabilities, '[]'::jsonb)) cap WHERE cap ILIKE $1)
-     )`,
+    `SELECT COUNT(*)::int AS total FROM (
+       SELECT DISTINCT ON (COALESCE(github_repo, id), name) id
+       FROM skills
+       WHERE visibility = 'public' AND (
+         name ILIKE $1 OR slug ILIKE $1 OR description ILIKE $1
+         OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(keywords, '[]'::jsonb)) kw WHERE kw ILIKE $1)
+         OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(categories, '[]'::jsonb)) cat WHERE cat ILIKE $1)
+         OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(capabilities, '[]'::jsonb)) cap WHERE cap ILIKE $1)
+       )
+       ORDER BY COALESCE(github_repo, id), name, created_at DESC
+     ) deduped`,
     likePattern
   );
   const total: number = countResult[0]?.total ?? 0;
 
   const rows: CatalogSkill[] = await (db.$queryRawUnsafe as any)(
-    `SELECT id, slug, name, description, summary, categories, capabilities, keywords,
-            github_repo, github_path, source_type, publisher_id, source_id
-     FROM skills
-     WHERE visibility = 'public' AND (
-       name ILIKE $1 OR slug ILIKE $1 OR description ILIKE $1
-       OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(keywords, '[]'::jsonb)) kw WHERE kw ILIKE $1)
-       OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(categories, '[]'::jsonb)) cat WHERE cat ILIKE $1)
-       OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(capabilities, '[]'::jsonb)) cap WHERE cap ILIKE $1)
-     )
+    `SELECT * FROM (
+       SELECT DISTINCT ON (COALESCE(github_repo, id), name)
+              id, slug, name, description, summary, categories, capabilities, keywords,
+              github_repo, github_path, source_type, publisher_id, source_id,
+              created_at
+       FROM skills
+       WHERE visibility = 'public' AND (
+         name ILIKE $1 OR slug ILIKE $1 OR description ILIKE $1
+         OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(keywords, '[]'::jsonb)) kw WHERE kw ILIKE $1)
+         OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(categories, '[]'::jsonb)) cat WHERE cat ILIKE $1)
+         OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(capabilities, '[]'::jsonb)) cap WHERE cap ILIKE $1)
+       )
+       ORDER BY COALESCE(github_repo, id), name, created_at DESC
+     ) deduped
      ORDER BY
        CASE WHEN name ILIKE $2 OR slug ILIKE $2 THEN 0 ELSE 1 END,
        created_at DESC

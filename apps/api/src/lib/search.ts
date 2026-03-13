@@ -227,10 +227,27 @@ export async function searchSkills(
   const poolSkillIds = preRanked.map((r) => r.skillId);
   const skillMap = await hydrateSkills(db, poolSkillIds, cache, ctx);
 
-  // 6. Re-rank using metadata signals, then take top N
-  const ranked = rerankResults(normalized, preRanked, skillMap).slice(0, limit);
+  // 6. Dedup by slug — multiple skill records can exist for the same
+  //    underlying project (e.g. re-ingested during discovery runs).
+  //    Keep only the highest-scoring entry per slug.
+  const seenSlugs = new Map<string, number>();
+  const dedupedPool: typeof preRanked = [];
+  for (const entry of preRanked) {
+    const meta = skillMap.get(entry.skillId);
+    const slug = meta?.slug ?? entry.skillId;
+    const prev = seenSlugs.get(slug);
+    if (prev === undefined) {
+      seenSlugs.set(slug, dedupedPool.length);
+      dedupedPool.push(entry);
+    } else if (entry.bestScore > dedupedPool[prev].bestScore) {
+      dedupedPool[prev] = entry;
+    }
+  }
 
-  // 7. Resolve publisher GitHub usernames for R2-sourced skills
+  // 7. Re-rank using metadata signals, then take top N
+  const ranked = rerankResults(normalized, dedupedPool, skillMap).slice(0, limit);
+
+  // 8. Resolve publisher GitHub usernames for R2-sourced skills
   const r2PublisherIds = [...skillMap.values()]
     .filter((s) => s.sourceType === "r2" && s.publisherId)
     .map((s) => s.publisherId!);
@@ -239,7 +256,7 @@ export async function searchSkills(
       ? await enrichUsersWithGithubUsername(db, r2PublisherIds)
       : new Map<string, string>();
 
-  // 8. Build response
+  // 9. Build response
   return ranked.map(({ skillId, bestScore }) => {
     const skill = skillMap.get(skillId);
     const slug = skill?.slug ?? "";

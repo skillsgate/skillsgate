@@ -30,9 +30,12 @@ export default function DashboardLayout() {
 	}
 
 	const isPublisher = location.pathname.startsWith("/dashboard/publisher");
+	const isFavorites = location.pathname === "/dashboard/favorites";
 	const isSkills =
-		location.pathname === "/dashboard/skills" ||
-		location.pathname === "/dashboard";
+		!isFavorites &&
+		!isPublisher &&
+		(location.pathname === "/dashboard/skills" ||
+			location.pathname === "/dashboard");
 
 	return (
 		<div className="min-h-screen">
@@ -58,6 +61,16 @@ export default function DashboardLayout() {
 								}`}
 							>
 								Skills
+							</Link>
+							<Link
+								to="/dashboard/favorites"
+								className={`px-3 py-1.5 text-[13px] font-medium rounded-md transition-colors ${
+									isFavorites
+										? "text-foreground bg-surface-hover"
+										: "text-muted hover:text-foreground"
+								}`}
+							>
+								Favorites
 							</Link>
 							<Link
 								to="/dashboard/publisher/skills"

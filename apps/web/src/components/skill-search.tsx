@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { api, publicApi } from "~/lib/api";
 import { authClient } from "~/lib/auth-client";
+import { FavoritesProvider } from "~/hooks/use-favorites";
+import { FavoriteButton } from "~/components/favorite-button";
 
 type SearchResult = {
 	skillId: string;
@@ -247,11 +249,13 @@ export function SkillSearch() {
 
 			{/* Results */}
 			{results.length > 0 && (
-				<div className="animate-slide-down mt-6 space-y-3 text-left">
-					{results.map((result) => (
-						<SearchResultCard key={result.skillId} result={result} showScore={isAuthed ?? false} />
-					))}
-				</div>
+				<FavoritesProvider initialSkillIds={results.map((r) => r.skillId)}>
+					<div className="animate-slide-down mt-6 space-y-3 text-left">
+						{results.map((result) => (
+							<SearchResultCard key={result.skillId} result={result} showScore={isAuthed ?? false} />
+						))}
+					</div>
+				</FavoritesProvider>
 			)}
 		</div>
 	);
@@ -362,7 +366,9 @@ function SearchResultCard({ result, showScore }: { result: SearchResult; showSco
 					)}
 				</div>
 
-				{/* GitHub link */}
+				{/* Favorite + GitHub link */}
+				<div className="flex flex-shrink-0 items-center gap-1">
+					<FavoriteButton skillId={result.skillId} />
 				{result.githubUrl && (
 					<button
 						type="button"
@@ -379,6 +385,7 @@ function SearchResultCard({ result, showScore }: { result: SearchResult; showSco
 						</svg>
 					</button>
 				)}
+				</div>
 			</div>
 		</a>
 	);

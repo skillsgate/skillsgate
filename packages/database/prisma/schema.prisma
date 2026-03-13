@@ -55,6 +55,7 @@ model Skill {
   publishedAt DateTime? @map("published_at") @db.Timestamptz
 
   chunks        SkillChunk[]
+  favorites     Favorite[]
   publisher     User?           @relation("publishedSkills", fields: [publisherId], references: [id])
   org           Organization?   @relation(fields: [orgId], references: [id])
   connectedRepo ConnectedRepo? @relation(fields: [connectedRepoId], references: [id])
@@ -82,6 +83,7 @@ model User {
   accounts    Account[]
   deviceCodes DeviceCode[]
   searchUsage SearchUsage[]
+  favorites   Favorite[]
 
   ownedNamespaces         Namespace[]            @relation("ownedNamespaces")
   namespaceAccess         NamespaceAccess[]
@@ -141,6 +143,23 @@ model Verification {
   updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("verifications")
+}
+
+// ─── Favorites ───────────────────────────────────────────────────
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  skillId   String   @map("skill_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skillId], map: "uq_favorites_user_skill")
+  @@index([userId], map: "idx_favorites_user")
+  @@index([skillId], map: "idx_favorites_skill")
+  @@map("favorites")
 }
 
 // ─── Device code flow ──────────────────────────────────────────────

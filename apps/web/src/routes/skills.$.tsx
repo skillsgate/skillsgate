@@ -3,6 +3,8 @@ import { useParams, Link } from "react-router";
 import { Navbar } from "~/components/navbar";
 import { publicApi } from "~/lib/api";
 import { marked } from "marked";
+import { FavoritesProvider } from "~/hooks/use-favorites";
+import { FavoriteButtonWide } from "~/components/favorite-button";
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -222,6 +224,7 @@ export default function SkillDetailPage() {
 	// ─── Skill detail ─────────────────────────────────────────────────
 
 	return (
+		<FavoritesProvider initialSkillIds={[skill.skillId]}>
 		<div className="min-h-screen">
 			<Navbar />
 
@@ -310,6 +313,9 @@ export default function SkillDetailPage() {
 					{/* ─── Sidebar ───────────────────────────────────────── */}
 					<aside className="w-full lg:w-80 flex-shrink-0">
 						<div className="lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-1 space-y-5">
+							{/* Save to favorites */}
+							<FavoriteButtonWide skillId={skill.skillId} />
+
 							{/* Install command */}
 							{skill.installCommand && (
 								<div className="bg-card-bg border border-card-border rounded-xl p-5">
@@ -485,5 +491,6 @@ export default function SkillDetailPage() {
 				</div>
 			</div>
 		</div>
+		</FavoritesProvider>
 	);
 }

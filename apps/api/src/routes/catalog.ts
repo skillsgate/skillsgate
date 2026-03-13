@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { getDb } from "@skillsgate/database";
+import { parseJsonArray, mapSkill, type CatalogSkillRow } from "../lib/skill-mapper";
 import { deriveInstallCommand } from "../lib/install-command";
 import { deriveUrlPath } from "../lib/url-path";
 import type { Bindings, Variables } from "../types";
@@ -11,21 +12,7 @@ export const catalogRoute = new Hono<{
 
 // ─── Types ──────────────────────────────────────────────────────────
 
-interface CatalogSkill {
-  id: string;
-  slug: string;
-  name: string;
-  description: string;
-  summary: string | null;
-  categories: unknown;
-  capabilities: unknown;
-  keywords: unknown;
-  github_repo: string | null;
-  github_path: string | null;
-  source_type: string | null;
-  publisher_id: string | null;
-  source_id: string | null;
-}
+type CatalogSkill = CatalogSkillRow;
 
 interface CatalogSkillDetail extends CatalogSkill {
   created_at: string | Date;
@@ -47,49 +34,6 @@ interface CatalogResponse {
     urlPath: string;
   }[];
   meta: { total: number; limit: number; offset: number; hasMore: boolean };
-}
-
-// ─── Helpers ────────────────────────────────────────────────────────
-
-function parseJsonArray(value: unknown): string[] {
-  if (Array.isArray(value)) return value as string[];
-  if (typeof value === "string") {
-    try {
-      const parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
-  return [];
-}
-
-function mapSkill(row: CatalogSkill) {
-  const githubRepo = row.github_repo ?? "";
-  const githubPath = row.github_path ?? "";
-  const githubUrl = githubRepo
-    ? `https://github.com/${githubRepo}${githubPath ? `/blob/main/${githubPath}` : ""}`
-    : "";
-
-  return {
-    skillId: row.id,
-    slug: row.slug,
-    name: row.name,
-    description: row.description,
-    summary: row.summary ?? "",
-    categories: parseJsonArray(row.categories),
-    capabilities: parseJsonArray(row.capabilities),
-    keywords: parseJsonArray(row.keywords),
-    githubUrl,
-    installCommand: deriveInstallCommand(
-      row.slug,
-      row.source_type,
-      null,
-      githubRepo,
-      githubPath
-    ),
-    urlPath: deriveUrlPath(row.source_id, row.id),
-  };
 }
 
 async function checkRateLimit(kv: KVNamespace, ip: string): Promise<boolean> {

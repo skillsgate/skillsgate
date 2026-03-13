@@ -152,9 +152,8 @@ function useCatalog() {
 
 function CatalogGrid({ catalog }: { catalog: ReturnType<typeof useCatalog> }) {
 	const { checkFavorites } = useFavorites();
-	const prevLength = useCallback(() => catalog.skills.length, [catalog.skills.length]);
 
-	// Batch-check new skill IDs whenever skills change
+	// Batch-check new skill IDs whenever skills change (e.g. after "Load more")
 	useEffect(() => {
 		if (catalog.skills.length > 0) {
 			checkFavorites(catalog.skills.map((s) => s.skillId));

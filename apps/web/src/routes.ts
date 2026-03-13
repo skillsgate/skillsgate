@@ -16,6 +16,7 @@ export default [
 	layout("routes/dashboard.tsx", [
 		route("dashboard", "routes/dashboard._index.tsx"),
 		route("dashboard/skills", "routes/dashboard.skills.tsx"),
+		route("dashboard/favorites", "routes/dashboard.favorites.tsx"),
 		layout("routes/dashboard.publisher.tsx", [
 			route("dashboard/publisher/skills", "routes/dashboard.publisher.skills.tsx"),
 			route("dashboard/publisher/skills/new", "routes/dashboard.publisher.skills.new.tsx"),

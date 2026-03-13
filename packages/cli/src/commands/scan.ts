@@ -381,26 +381,29 @@ export async function runScan(args: string[]): Promise<void> {
       }
 
       if (shouldShare) {
-        try {
-          const contentHash = createHash("sha256")
-            .update(skills.map((s) => s.content).join(""))
-            .digest("hex");
+        const contentHash = createHash("sha256")
+          .update(skills.map((s) => s.content).join(""))
+          .digest("hex");
 
-          await submitScanReport(
-            {
-              sourceId,
-              contentHash,
-              scannerType: selectedScanner.name,
-              risk: report.risk,
-              summary: report.summary,
-              findings: report.findings,
-            },
-            token,
-          );
+        const submitted = await submitScanReport(
+          {
+            sourceId,
+            contentHash,
+            scannerType: selectedScanner.name,
+            risk: report.risk,
+            summary: report.summary,
+            findings: report.findings,
+          },
+          token,
+        );
+
+        if (submitted) {
           p.log.success("Scan submitted to SkillsGate community.");
           shared = true;
-        } catch {
-          p.log.warn(fmt.dim("Could not submit to community."));
+        } else {
+          p.log.warn(
+            fmt.dim("Could not submit to community. Your session may have expired — try `skillsgate login` again."),
+          );
         }
       }
     }

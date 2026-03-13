@@ -53,6 +53,7 @@ type KeywordSearchResponse = {
 
 export function SkillSearch() {
 	const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
+	const [mode, setMode] = useState<"semantic" | "keyword">("semantic");
 	const [query, setQuery] = useState("");
 	const [results, setResults] = useState<SearchResult[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
@@ -137,7 +138,7 @@ export function SkillSearch() {
 		setError(null);
 		setNoResults(false);
 
-		if (isAuthed) {
+		if (isAuthed && mode === "semantic") {
 			await searchSemantic(q, controller.signal);
 		} else {
 			await searchKeyword(q, controller.signal);
@@ -187,9 +188,9 @@ export function SkillSearch() {
 						value={query}
 						onChange={(e) => setQuery(e.target.value)}
 						onKeyDown={handleKeyDown}
-						disabled={isAuthed && remaining === 0}
+						disabled={isAuthed && mode === "semantic" && remaining === 0}
 						placeholder={
-							isAuthed
+							isAuthed && mode === "semantic"
 								? 'Search skills — try "audit website performance"...'
 								: "Search skills by keyword..."
 						}
@@ -212,7 +213,21 @@ export function SkillSearch() {
 			<div className="mt-2 flex items-center justify-between">
 				<span className="text-[11px] font-mono text-muted/50">
 					{isAuthed ? (
-						<>&#10022; AI semantic search</>
+						<>
+							<button
+								onClick={() => setMode("semantic")}
+								className={`transition-colors ${mode === "semantic" ? "text-foreground" : "text-muted/40 hover:text-muted/70"}`}
+							>
+								&#10022; AI semantic
+							</button>
+							<span className="text-muted/30 mx-1.5">|</span>
+							<button
+								onClick={() => setMode("keyword")}
+								className={`transition-colors ${mode === "keyword" ? "text-foreground" : "text-muted/40 hover:text-muted/70"}`}
+							>
+								Keyword
+							</button>
+						</>
 					) : (
 						<>
 							Keyword search{" "}
@@ -226,7 +241,7 @@ export function SkillSearch() {
 						</>
 					)}
 				</span>
-				{isAuthed && remaining !== null && (
+				{isAuthed && mode === "semantic" && remaining !== null && (
 					<span className="text-[11px] font-mono text-muted/50">
 						{remaining} search{remaining !== 1 ? "es" : ""} remaining today
 					</span>

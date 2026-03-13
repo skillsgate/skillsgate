@@ -2,7 +2,7 @@
 import path from "node:path";
 import os from "node:os";
 
-export const VERSION = "0.1.8";
+export const VERSION = "0.1.9";
 export const AGENTS_DIR = ".agents";
 export const SKILLS_SUBDIR = "skills";
 export const UNIVERSAL_SKILLS_DIR = ".agents/skills";

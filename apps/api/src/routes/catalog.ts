@@ -333,7 +333,11 @@ catalogRoute.get("/skills/detail", async (c) => {
           headers["Authorization"] = `token ${c.env.GITHUB_TOKEN}`;
         }
 
-        const res = await fetch(rawUrl, { headers });
+        let res = await fetch(rawUrl, { headers });
+        // Retry without auth if token is expired/invalid
+        if (!res.ok && (res.status === 401 || res.status === 403) && c.env.GITHUB_TOKEN) {
+          res = await fetch(rawUrl, { headers: { "User-Agent": "SkillsGate/1.0" } });
+        }
         if (res.ok) {
           content = await res.text();
         }

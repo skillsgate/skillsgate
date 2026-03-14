@@ -12,6 +12,7 @@ import { runWhoami } from "./commands/whoami.js";
 import { runSearch } from "./commands/search.js";
 import { runPublish } from "./commands/publish.js";
 import { runScan } from "./commands/scan.js";
+import { runSetup } from "./commands/setup.js";
 import { flushTelemetry } from "./telemetry.js";
 
 // "SKILLS" in dark silver (dim), "GATE" in bright white (bold)
@@ -106,6 +107,10 @@ async function main(): Promise<void> {
       await runScan(restArgs);
       break;
 
+    case "setup":
+      await runSetup(restArgs);
+      break;
+
     case "--version":
     case "-v":
       console.log(`skillsgate v${VERSION}`);
@@ -157,6 +162,7 @@ function printHelp(): void {
   console.log(`    logout             Sign out`);
   console.log(`    whoami             Show current user`);
   console.log(`    mcp                Run as MCP server (stdio transport)`);
+  console.log(`    setup              Configure MCP for AI tools`);
   console.log();
   console.log(`  ${BOLD("Examples:")}`);
   console.log(`    skillsgate add @username/audit-website ${DIM("# install from SkillsGate")}`);

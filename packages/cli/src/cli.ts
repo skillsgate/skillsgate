@@ -36,6 +36,13 @@ async function main(): Promise<void> {
   const command = args[0];
   const restArgs = args.slice(1);
 
+  // MCP server mode — must run before logo/telemetry
+  if (command === "mcp") {
+    const { startMcpServer } = await import("./mcp/server.js");
+    await startMcpServer();
+    return;
+  }
+
   // Show logo for interactive commands
   if (command && !command.startsWith("-")) {
     printLogo();

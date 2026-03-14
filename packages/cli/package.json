@@ -14,6 +14,10 @@
     ".": {
       "types": "./dist/cli.d.ts",
       "import": "./dist/cli.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp/server.d.ts",
+      "import": "./dist/mcp/server.js"
     }
   },
   "engines": {
@@ -42,11 +46,13 @@
   },
   "dependencies": {
     "@clack/prompts": "^0.10.0",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "@napi-rs/keyring": "^1.2.0",
     "gray-matter": "^4.0.3",
     "open": "^11.0.0",
     "picocolors": "^1.1.1",
-    "simple-git": "^3.27.0"
+    "simple-git": "^3.27.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^22.7.4",

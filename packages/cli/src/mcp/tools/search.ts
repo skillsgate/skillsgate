@@ -25,27 +25,34 @@ export function registerSearch(server: McpServer): void {
           );
         }
 
-        const url = new URL("/v1/skills/search", SEARCH_API_URL);
-        url.searchParams.set("q", query);
-
-        const response = await fetch(url.toString(), {
-          method: "GET",
+        const response = await fetch(`${SEARCH_API_URL}/api/v1/search`, {
+          method: "POST",
           headers: {
-            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
+          body: JSON.stringify({ query }),
         });
 
-        if (!response.ok) {
-          const status = response.status;
-          if (status === 401) {
-            return mcpError(
-              "Session expired. Run `skillsgate login` to re-authenticate.",
-              "UNAUTHORIZED",
-            );
-          }
+        if (response.status === 401) {
           return mcpError(
-            `Search request failed with status ${status}`,
+            "Session expired. Run `skillsgate login` to re-authenticate.",
+            "AUTH_EXPIRED",
+          );
+        }
+
+        if (response.status === 429) {
+          const body = (await response.json()) as { message?: string };
+          return mcpError(
+            body.message ?? "Rate limit exceeded. Please try again later.",
+            "RATE_LIMITED",
+          );
+        }
+
+        if (!response.ok) {
+          const body = (await response.json().catch(() => ({ error: "Unknown error" }))) as { error?: string };
+          return mcpError(
+            body.error ?? `Search failed (${response.status})`,
             "SEARCH_FAILED",
           );
         }

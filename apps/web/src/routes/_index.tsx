@@ -42,7 +42,7 @@ const FEATURES = [
 	{
 		label: "INSTALL",
 		title: "Universal install via MCP",
-		comingSoon: true,
+		comingSoon: false,
 		description:
 			"One command installs skills for Claude Code, Cursor, Windsurf, and 15+ other AI agents. Works everywhere the Model Context Protocol is supported.",
 		icon: (

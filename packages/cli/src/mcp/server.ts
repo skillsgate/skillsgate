@@ -10,6 +10,9 @@ import { registerRemove } from "./tools/remove.js";
 import { registerUpdate } from "./tools/update.js";
 import { registerSync } from "./tools/sync.js";
 import { registerLogout } from "./tools/logout.js";
+import { registerPublish } from "./tools/publish.js";
+import { registerPublishInit } from "./tools/publish-init.js";
+import { registerScan } from "./tools/scan.js";
 
 export async function startMcpServer(): Promise<void> {
   const server = new McpServer({
@@ -29,6 +32,11 @@ export async function startMcpServer(): Promise<void> {
   registerUpdate(server);
   registerSync(server);
   registerLogout(server);
+
+  // Publish & scan tools
+  registerPublish(server);
+  registerPublishInit(server);
+  registerScan(server);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

@@ -156,6 +156,7 @@ function printHelp(): void {
   console.log(`    login              Authenticate with SkillsGate`);
   console.log(`    logout             Sign out`);
   console.log(`    whoami             Show current user`);
+  console.log(`    mcp                Run as MCP server (stdio transport)`);
   console.log();
   console.log(`  ${BOLD("Examples:")}`);
   console.log(`    skillsgate add @username/audit-website ${DIM("# install from SkillsGate")}`);

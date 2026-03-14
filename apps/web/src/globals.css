@@ -140,6 +140,22 @@ body::before {
 	animation: slide-down 0.3s ease both;
 }
 
+/* ─── Slide-in-left (docs mobile sidebar) ─── */
+@keyframes slide-in-left {
+	from {
+		opacity: 0;
+		transform: translateX(-100%);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+.animate-slide-in-left {
+	animation: slide-in-left 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* ─── Scroll-triggered reveal ─── */
 .reveal {
 	opacity: 0;

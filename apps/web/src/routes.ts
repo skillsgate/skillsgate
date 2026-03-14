@@ -2,6 +2,7 @@ import { type RouteConfig, index, route, layout } from "@react-router/dev/routes
 
 export default [
 	index("routes/_index.tsx"),
+	route("docs", "routes/docs.tsx"),
 	route("cli/auth", "routes/cli.auth.tsx"),
 	route("api/auth/*", "routes/api.auth.$.tsx"),
 	route("api/github/authorize", "routes/api.github.authorize.tsx"),

@@ -30,22 +30,22 @@ export function Navbar() {
 				{/* Center nav links */}
 				<div className="hidden md:flex items-center gap-8">
 					<a
-						href="#skills"
+						href="/#skills"
 						className="text-[13px] tracking-wide uppercase text-muted hover:text-foreground transition-colors"
 					>
 						Skills
 					</a>
 					<a
-						href="#features"
+						href="/#features"
 						className="text-[13px] tracking-wide uppercase text-muted hover:text-foreground transition-colors"
 					>
 						Features
 					</a>
 					<a
-						href="#faq"
+						href="/docs"
 						className="text-[13px] tracking-wide uppercase text-muted hover:text-foreground transition-colors"
 					>
-						FAQ
+						Docs
 					</a>
 					<a
 						href="https://github.com/skillsgate/skillsgate"

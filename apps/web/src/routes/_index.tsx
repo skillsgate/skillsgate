@@ -522,96 +522,6 @@ export default function Home() {
 				</div>
 			</section>
 
-			{/* ═══ SECURITY SCAN ═══ */}
-			<section className="py-20 md:py-28 border-t border-border">
-				<div className="max-w-5xl mx-auto px-6">
-					<div className="reveal text-center mb-14 md:mb-20">
-						<p className="text-[11px] font-mono tracking-[0.2em] uppercase text-muted mb-3">
-							Security
-						</p>
-						<h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">
-							Scan before you install
-						</h2>
-						<p className="mt-4 text-[15px] text-muted max-w-lg mx-auto leading-relaxed">
-							Skills run on your machine. Use your own AI coding tool to analyze
-							them for threats — no server cost, full transparency.
-						</p>
-					</div>
-
-					{/* Terminal mockup */}
-					<div className="reveal max-w-2xl mx-auto mb-14">
-						<div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
-							{/* Terminal header */}
-							<div className="flex items-center gap-2 px-4 py-3 border-b border-border">
-								<div className="flex gap-1.5">
-									<div className="w-2.5 h-2.5 rounded-full bg-muted/20" />
-									<div className="w-2.5 h-2.5 rounded-full bg-muted/20" />
-									<div className="w-2.5 h-2.5 rounded-full bg-muted/20" />
-								</div>
-								<span className="text-[11px] font-mono text-muted/40 ml-2">Terminal</span>
-							</div>
-							{/* Terminal body */}
-							<div className="p-5 font-mono text-[12px] leading-6 space-y-1">
-								<p className="text-muted">$ skillsgate scan @vercel/v0</p>
-								<p className="text-muted/60 mt-3">◆ Select a coding agent to run the scan:</p>
-								<p className="text-foreground">● Claude Code <span className="text-muted/40">(recommended - read-only mode)</span></p>
-								<p className="text-muted/40">○ Codex CLI</p>
-								<p className="text-muted/40">○ Goose</p>
-								<p className="text-muted/60 mt-3">ℹ Using Claude Code's default model.</p>
-								<p className="text-muted/60">◇ Scanning with Claude Code...</p>
-								<p className="text-muted/60 mt-3">Risk: <span className="text-green-500 font-semibold">CLEAN</span></p>
-								<p className="text-muted/50 mt-1">No security issues found.</p>
-								<p className="text-muted/60 mt-3">◆ Share your scan results with the SkillsGate community?</p>
-								<p className="text-foreground">● Yes, share</p>
-								<p className="text-muted/60 mt-1">✔ Scan submitted to SkillsGate community.</p>
-							</div>
-						</div>
-					</div>
-
-					{/* Three feature pills */}
-					<div className="reveal grid grid-cols-1 md:grid-cols-3 gap-4">
-						<div className="bg-card-bg border border-card-border rounded-xl p-6 text-center">
-							<div className="flex justify-center mb-3">
-								<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted">
-									<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-								</svg>
-							</div>
-							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">8 threat categories</h3>
-							<p className="text-[12px] text-muted leading-relaxed">
-								Prompt injection, data exfiltration, credential harvesting, malicious commands, and more
-							</p>
-						</div>
-						<div className="bg-card-bg border border-card-border rounded-xl p-6 text-center">
-							<div className="flex justify-center mb-3">
-								<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted">
-									<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-									<circle cx="9" cy="7" r="4" />
-									<path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-									<path d="M16 3.13a4 4 0 0 1 0 7.75" />
-								</svg>
-							</div>
-							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">Crowd-sourced trust</h3>
-							<p className="text-[12px] text-muted leading-relaxed">
-								Share scan results with the community — see what others found before you install
-							</p>
-						</div>
-						<div className="bg-card-bg border border-card-border rounded-xl p-6 text-center">
-							<div className="flex justify-center mb-3">
-								<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted">
-									<rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-									<line x1="8" y1="21" x2="16" y2="21" />
-									<line x1="12" y1="17" x2="12" y2="21" />
-								</svg>
-							</div>
-							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">5 coding agents supported</h3>
-							<p className="text-[12px] text-muted leading-relaxed">
-								Claude Code, Codex CLI, OpenCode, Goose, and Aider — use whichever you have installed
-							</p>
-						</div>
-					</div>
-				</div>
-			</section>
-
 			{/* ═══ INSTALL / MCP SETUP ═══ */}
 			<section className="py-20 md:py-28 border-t border-border">
 				<div className="max-w-5xl mx-auto px-6">
@@ -696,6 +606,96 @@ export default function Home() {
 							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">CLI + MCP in one package</h3>
 							<p className="text-[12px] text-muted leading-relaxed">
 								Use from the terminal or let your AI agent invoke tools directly via the Model Context Protocol
+							</p>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			{/* ═══ SECURITY SCAN ═══ */}
+			<section className="py-20 md:py-28 border-t border-border">
+				<div className="max-w-5xl mx-auto px-6">
+					<div className="reveal text-center mb-14 md:mb-20">
+						<p className="text-[11px] font-mono tracking-[0.2em] uppercase text-muted mb-3">
+							Security
+						</p>
+						<h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">
+							Scan before you install
+						</h2>
+						<p className="mt-4 text-[15px] text-muted max-w-lg mx-auto leading-relaxed">
+							Skills run on your machine. Use your own AI coding tool to analyze
+							them for threats — no server cost, full transparency.
+						</p>
+					</div>
+
+					{/* Terminal mockup */}
+					<div className="reveal max-w-2xl mx-auto mb-14">
+						<div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
+							{/* Terminal header */}
+							<div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+								<div className="flex gap-1.5">
+									<div className="w-2.5 h-2.5 rounded-full bg-muted/20" />
+									<div className="w-2.5 h-2.5 rounded-full bg-muted/20" />
+									<div className="w-2.5 h-2.5 rounded-full bg-muted/20" />
+								</div>
+								<span className="text-[11px] font-mono text-muted/40 ml-2">Terminal</span>
+							</div>
+							{/* Terminal body */}
+							<div className="p-5 font-mono text-[12px] leading-6 space-y-1">
+								<p className="text-muted">$ skillsgate scan @vercel/v0</p>
+								<p className="text-muted/60 mt-3">◆ Select a coding agent to run the scan:</p>
+								<p className="text-foreground">● Claude Code <span className="text-muted/40">(recommended - read-only mode)</span></p>
+								<p className="text-muted/40">○ Codex CLI</p>
+								<p className="text-muted/40">○ Goose</p>
+								<p className="text-muted/60 mt-3">ℹ Using Claude Code's default model.</p>
+								<p className="text-muted/60">◇ Scanning with Claude Code...</p>
+								<p className="text-muted/60 mt-3">Risk: <span className="text-green-500 font-semibold">CLEAN</span></p>
+								<p className="text-muted/50 mt-1">No security issues found.</p>
+								<p className="text-muted/60 mt-3">◆ Share your scan results with the SkillsGate community?</p>
+								<p className="text-foreground">● Yes, share</p>
+								<p className="text-muted/60 mt-1">✔ Scan submitted to SkillsGate community.</p>
+							</div>
+						</div>
+					</div>
+
+					{/* Three feature pills */}
+					<div className="reveal grid grid-cols-1 md:grid-cols-3 gap-4">
+						<div className="bg-card-bg border border-card-border rounded-xl p-6 text-center">
+							<div className="flex justify-center mb-3">
+								<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted">
+									<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+								</svg>
+							</div>
+							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">8 threat categories</h3>
+							<p className="text-[12px] text-muted leading-relaxed">
+								Prompt injection, data exfiltration, credential harvesting, malicious commands, and more
+							</p>
+						</div>
+						<div className="bg-card-bg border border-card-border rounded-xl p-6 text-center">
+							<div className="flex justify-center mb-3">
+								<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted">
+									<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+									<circle cx="9" cy="7" r="4" />
+									<path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+									<path d="M16 3.13a4 4 0 0 1 0 7.75" />
+								</svg>
+							</div>
+							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">Crowd-sourced trust</h3>
+							<p className="text-[12px] text-muted leading-relaxed">
+								Share scan results with the community — see what others found before you install
+							</p>
+						</div>
+						<div className="bg-card-bg border border-card-border rounded-xl p-6 text-center">
+							<div className="flex justify-center mb-3">
+								<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted">
+									<rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+									<line x1="8" y1="21" x2="16" y2="21" />
+									<line x1="12" y1="17" x2="12" y2="21" />
+								</svg>
+							</div>
+							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">5 coding agents supported</h3>
+							<p className="text-[12px] text-muted leading-relaxed">
+								Claude Code, Codex CLI, OpenCode, Goose, and Aider — use whichever you have installed
 							</p>
 						</div>
 					</div>

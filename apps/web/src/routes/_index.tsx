@@ -612,6 +612,96 @@ export default function Home() {
 				</div>
 			</section>
 
+			{/* ═══ INSTALL / MCP SETUP ═══ */}
+			<section className="py-20 md:py-28 border-t border-border">
+				<div className="max-w-5xl mx-auto px-6">
+					<div className="reveal text-center mb-14 md:mb-20">
+						<p className="text-[11px] font-mono tracking-[0.2em] uppercase text-muted mb-3">
+							Install
+						</p>
+						<h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">
+							Set up in 30 seconds
+						</h2>
+						<p className="mt-4 text-[15px] text-muted max-w-lg mx-auto leading-relaxed">
+							One global install, one setup command. Your AI agent gets 12 new
+							tools to search, install, publish, and scan skills.
+						</p>
+					</div>
+
+					{/* Terminal mockup */}
+					<div className="reveal max-w-2xl mx-auto mb-14">
+						<div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
+							{/* Terminal header */}
+							<div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+								<div className="flex gap-1.5">
+									<div className="w-2.5 h-2.5 rounded-full bg-muted/20" />
+									<div className="w-2.5 h-2.5 rounded-full bg-muted/20" />
+									<div className="w-2.5 h-2.5 rounded-full bg-muted/20" />
+								</div>
+								<span className="text-[11px] font-mono text-muted/40 ml-2">Terminal</span>
+							</div>
+							{/* Terminal body */}
+							<div className="p-5 font-mono text-[12px] leading-6 space-y-1">
+								<p className="text-muted">$ npm install -g skillsgate</p>
+								<p className="text-muted/60 mt-3">✔ Installed skillsgate v0.2.0</p>
+								<p className="text-muted mt-4">$ skillsgate setup</p>
+								<p className="text-muted/60 mt-3">Detected AI tools:</p>
+								<p className="text-foreground">  ✔ Claude Code <span className="text-muted/40">(~/.claude.json)</span></p>
+								<p className="text-foreground">  ✔ Cursor <span className="text-muted/40">(~/.cursor/mcp.json)</span></p>
+								<p className="text-foreground">  ✔ Windsurf <span className="text-muted/40">(~/.windsurf/mcp.json)</span></p>
+								<p className="text-muted/60 mt-3">◆ Auto-configure MCP for these tools? <span className="text-foreground">Yes</span></p>
+								<p className="text-muted/60 mt-3">✔ Added SkillsGate MCP to Claude Code</p>
+								<p className="text-muted/60">✔ Added SkillsGate MCP to Cursor</p>
+								<p className="text-muted/60">✔ Added SkillsGate MCP to Windsurf</p>
+								<p className="text-muted/60 mt-3">Done! Your AI agents can now search, install, and manage skills.</p>
+							</div>
+						</div>
+					</div>
+
+					{/* Three feature pills */}
+					<div className="reveal grid grid-cols-1 md:grid-cols-3 gap-4">
+						<div className="bg-card-bg border border-card-border rounded-xl p-6 text-center">
+							<div className="flex justify-center mb-3">
+								<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted">
+									<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+									<polyline points="7 10 12 15 17 10" />
+									<line x1="12" y1="15" x2="12" y2="3" />
+								</svg>
+							</div>
+							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">12 MCP tools</h3>
+							<p className="text-[12px] text-muted leading-relaxed">
+								Search, add, remove, update, sync, publish, scan, and more — all available to your AI agent
+							</p>
+						</div>
+						<div className="bg-card-bg border border-card-border rounded-xl p-6 text-center">
+							<div className="flex justify-center mb-3">
+								<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted">
+									<rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+									<line x1="8" y1="21" x2="16" y2="21" />
+									<line x1="12" y1="17" x2="12" y2="21" />
+								</svg>
+							</div>
+							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">17+ agents supported</h3>
+							<p className="text-[12px] text-muted leading-relaxed">
+								Claude Code, Cursor, Windsurf, Copilot, Codex CLI, Cline, and many more
+							</p>
+						</div>
+						<div className="bg-card-bg border border-card-border rounded-xl p-6 text-center">
+							<div className="flex justify-center mb-3">
+								<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted">
+									<polyline points="16 18 22 12 16 6" />
+									<polyline points="8 6 2 12 8 18" />
+								</svg>
+							</div>
+							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">CLI + MCP in one package</h3>
+							<p className="text-[12px] text-muted leading-relaxed">
+								Use from the terminal or let your AI agent invoke tools directly via the Model Context Protocol
+							</p>
+						</div>
+					</div>
+				</div>
+			</section>
+
 			{/* ═══ FAQ ═══ */}
 			<section id="faq" className="py-20 md:py-28 border-t border-border">
 				<div className="max-w-3xl mx-auto px-6">

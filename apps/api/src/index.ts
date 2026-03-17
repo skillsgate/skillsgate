@@ -17,6 +17,7 @@ import { skillDownloadRoute } from "./routes/skill-download";
 import { catalogRoute } from "./routes/catalog";
 import { communityScansRoute } from "./routes/community-scans";
 import { favoritesRoute } from "./routes/favorites";
+import { blogRoute } from "./routes/blog";
 import { SkillVectorizationWorkflow } from "./workflows/skill-vectorization";
 import { RepoDiscoveryWorkflow } from "./workflows/repo-discovery";
 import type { VectorizeSkillWorkflowInput, DiscoverRepoQueueMessage } from "./types";
@@ -41,6 +42,7 @@ app.route("/api", githubRoute);
 app.route("/api", connectedReposRoute);
 app.route("/api", communityScansRoute);
 app.route("/api", favoritesRoute);
+app.route("/api", blogRoute);
 
 // Named exports required by Cloudflare Workflows
 export { SkillVectorizationWorkflow };

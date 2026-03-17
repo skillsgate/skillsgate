@@ -48,6 +48,12 @@ export function Navbar() {
 						Docs
 					</a>
 					<a
+						href="/blog"
+						className="text-[13px] tracking-wide uppercase text-muted hover:text-foreground transition-colors"
+					>
+						Blog
+					</a>
+					<a
 						href="https://github.com/skillsgate/skillsgate"
 						target="_blank"
 						rel="noopener noreferrer"

@@ -10,6 +10,10 @@ export default [
 	route("api/auth/device/code", "routes/api.auth.device.code.tsx"),
 	route("api/auth/device/exchange", "routes/api.auth.device.exchange.tsx"),
 
+	// Blog
+	route("blog", "routes/blog._index.tsx"),
+	route("blog/:slug", "routes/blog.$slug.tsx"),
+
 	// Skill detail (splat for multi-segment paths like /skills/owner/repo/name)
 	route("skills/*", "routes/skills.$.tsx"),
 

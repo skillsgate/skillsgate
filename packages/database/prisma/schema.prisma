@@ -420,3 +420,23 @@ model CommunityScan {
   @@index([skillId])
   @@map("community_scans")
 }
+
+// ─── Blog ───────────────────────────────────────────────────────
+
+model BlogPost {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  title       String
+  description String    @db.Text
+  content     String    @db.Text
+  author      String
+  coverImage  String?   @map("cover_image")
+  tags        Json      @default("[]")
+  published   Boolean   @default(false)
+  publishedAt DateTime? @map("published_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([published, publishedAt(sort: Desc)], map: "idx_blog_posts_published")
+  @@map("blog_posts")
+}

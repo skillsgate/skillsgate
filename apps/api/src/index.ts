@@ -31,6 +31,7 @@ app.route("/", telemetryRoute);
 app.route("/api", adminRoute);
 app.route("/api/v1", searchRoute);
 app.route("/api/v1", catalogRoute);
+app.route("/api", blogRoute);
 app.route("/api", usersRoute);
 app.route("/api", sharesRoute);
 app.route("/api", dashboardRoute);
@@ -42,7 +43,6 @@ app.route("/api", githubRoute);
 app.route("/api", connectedReposRoute);
 app.route("/api", communityScansRoute);
 app.route("/api", favoritesRoute);
-app.route("/api", blogRoute);
 
 // Named exports required by Cloudflare Workflows
 export { SkillVectorizationWorkflow };

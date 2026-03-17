@@ -19,7 +19,7 @@ export const links: LinksFunction = () => [
 		rel: "stylesheet",
 		href: "https://fonts.googleapis.com/css2?family=Sora:wght@100..800&family=Geist+Mono:wght@100..900&display=swap",
 	},
-	{ rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+	{ rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
 ];
 
 export const meta: MetaFunction = () => [

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "react-router";
+import type { MetaFunction, LoaderFunctionArgs } from "react-router";
 import { Navbar } from "~/components/navbar";
 import { publicApi } from "~/lib/api";
 import { marked } from "marked";
@@ -22,6 +23,75 @@ type BlogPost = {
 
 type BlogPostResponse = {
 	post: BlogPost;
+};
+
+type BlogPostMeta = {
+	title: string;
+	description: string;
+	coverImage: string | null;
+	author: string;
+	slug: string;
+	publishedAt: string;
+};
+
+// ─── Loader (server-side for SEO meta) ──────────────────────────────
+
+export async function loader({ params }: LoaderFunctionArgs) {
+	const slug = params.slug;
+	if (!slug) return { post: null };
+
+	try {
+		const res = await publicApi.get<BlogPostResponse>(
+			`/api/blog/${encodeURIComponent(slug)}`
+		);
+		if (res.ok) {
+			const { title, description, coverImage, author, slug: postSlug, publishedAt } = res.data.post;
+			return {
+				post: { title, description, coverImage, author, slug: postSlug, publishedAt } as BlogPostMeta,
+			};
+		}
+	} catch {
+		// fall through
+	}
+	return { post: null };
+}
+
+// ─── Meta (uses loader data for SEO) ────────────────────────────────
+
+export const meta: MetaFunction<typeof loader> = ({ data }) => {
+	const post = data?.post;
+	if (!post) {
+		return [
+			{ title: "Blog Post — SkillsGate" },
+			{ name: "description", content: "Read the latest from the SkillsGate team." },
+		];
+	}
+
+	const tags = [
+		{ title: `${post.title} — SkillsGate Blog` },
+		{ name: "description", content: post.description },
+		{ property: "og:title", content: post.title },
+		{ property: "og:description", content: post.description },
+		{ property: "og:url", content: `https://skillsgate.ai/blog/${post.slug}` },
+		{ property: "og:type", content: "article" },
+		{ property: "og:site_name", content: "SkillsGate" },
+		{ property: "article:published_time", content: post.publishedAt },
+		{ property: "article:author", content: post.author },
+		{ name: "twitter:title", content: post.title },
+		{ name: "twitter:description", content: post.description },
+	];
+
+	if (post.coverImage) {
+		tags.push(
+			{ property: "og:image", content: post.coverImage },
+			{ name: "twitter:card", content: "summary_large_image" },
+			{ name: "twitter:image", content: post.coverImage },
+		);
+	} else {
+		tags.push({ name: "twitter:card", content: "summary" });
+	}
+
+	return tags;
 };
 
 // ─── Configure marked ───────────────────────────────────────────────

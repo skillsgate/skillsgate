@@ -1,6 +1,32 @@
 import { useState, useEffect } from "react";
+import type { MetaFunction } from "react-router";
 import { Navbar } from "~/components/navbar";
 import { publicApi } from "~/lib/api";
+
+export const meta: MetaFunction = () => [
+	{ title: "Blog — SkillsGate" },
+	{
+		name: "description",
+		content:
+			"Announcements, tutorials, and insights from the SkillsGate team.",
+	},
+	{ property: "og:title", content: "Blog — SkillsGate" },
+	{
+		property: "og:description",
+		content:
+			"Announcements, tutorials, and insights from the SkillsGate team.",
+	},
+	{ property: "og:url", content: "https://skillsgate.ai/blog" },
+	{ property: "og:type", content: "website" },
+	{ property: "og:site_name", content: "SkillsGate" },
+	{ name: "twitter:card", content: "summary" },
+	{ name: "twitter:title", content: "Blog — SkillsGate" },
+	{
+		name: "twitter:description",
+		content:
+			"Announcements, tutorials, and insights from the SkillsGate team.",
+	},
+];
 
 type BlogPostSummary = {
 	id: string;

@@ -43,7 +43,8 @@ model Skill {
   priceCents      Int?    @map("price_cents")
 
   // Stats
-  downloads Int @default(0)
+  downloads   Int  @default(0)
+  githubStars Int? @map("github_stars")
 
   // Vectorization
   vectorizedAt    DateTime? @map("vectorized_at") @db.Timestamptz

@@ -50,6 +50,7 @@ async function makeRequest<T>(
 	const res = await fetch(url, {
 		method,
 		headers,
+		cache: "no-store" as RequestCache,
 		body: body !== undefined ? JSON.stringify(body) : undefined,
 		signal: options?.signal,
 	});

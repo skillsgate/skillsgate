@@ -58,7 +58,7 @@ const FEATURES = [
 		title: "AI-powered security scanning",
 		comingSoon: false,
 		description:
-			"Scan any skill before installing — detect prompt injection, data exfiltration, and malicious code using your own AI agent. Share results with the community to build collective trust.",
+			"Scan any skill before installing. Detect prompt injection, data exfiltration, and malicious code using your own AI agent. Share results with the community to build collective trust.",
 		icon: (
 			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
 				<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -95,7 +95,7 @@ const AGENTS = [
 const FAQ_ITEMS = [
 	{
 		q: "What are agent skills?",
-		a: "Agent skills are reusable instructions (SKILL.md files) that extend what AI coding assistants can do. They give your agent procedural knowledge — how to audit a website, set up a database, follow design patterns, and more.",
+		a: "Agent skills are reusable instructions (SKILL.md files) that extend what AI coding assistants can do. They give your agent procedural knowledge: how to audit a website, set up a database, follow design patterns, and more.",
 	},
 	{
 		q: "How do I install a skill?",
@@ -107,7 +107,7 @@ const FAQ_ITEMS = [
 	},
 	{
 		q: "Are these skills safe to use?",
-		a: "Run `skillsgate scan <source>` to analyze any skill before installing — it uses your own AI coding tool (Claude Code, Codex, etc.) to detect prompt injection, malicious code, and suspicious behavior. Scan results are crowd-sourced: after scanning, you can share findings with the community so others benefit too. Publishers also have trust tiers (Verified, Established, New).",
+		a: "Run `skillsgate scan <source>` to analyze any skill before installing. It uses your own AI coding tool (Claude Code, Codex, etc.) to detect prompt injection, malicious code, and suspicious behavior. Scan results are crowd-sourced: after scanning, you can share findings with the community so others benefit too. Publishers also have trust tiers (Verified, Established, New).",
 	},
 	{
 		q: "Is SkillsGate free?",
@@ -294,7 +294,7 @@ export default function Home() {
 						className="animate-fade-up mt-6 md:mt-8 text-[15px] md:text-[17px] leading-relaxed text-muted max-w-xl mx-auto"
 						style={{ animationDelay: "0.35s" }}
 					>
-						60,000+ skills indexed and semantic-searchable — your AI agent
+						80,000+ skills indexed and semantic-searchable. Your AI agent
 						finds exactly what it needs. Works with Claude Code, Cursor,
 						Windsurf, and more.
 					</p>
@@ -324,7 +324,7 @@ export default function Home() {
 					>
 						<div className="text-center">
 							<div className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">
-								60,000+
+								80,000+
 							</div>
 							<div className="text-[11px] font-mono tracking-wider uppercase text-muted mt-1">
 								Skills indexed
@@ -580,7 +580,7 @@ export default function Home() {
 							</div>
 							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">12 MCP tools</h3>
 							<p className="text-[12px] text-muted leading-relaxed">
-								Search, add, remove, update, sync, publish, scan, and more — all available to your AI agent
+								Search, add, remove, update, sync, publish, scan, and more. All available to your AI agent
 							</p>
 						</div>
 						<div className="bg-card-bg border border-card-border rounded-xl p-6 text-center">
@@ -624,7 +624,7 @@ export default function Home() {
 						</h2>
 						<p className="mt-4 text-[15px] text-muted max-w-lg mx-auto leading-relaxed">
 							Skills run on your machine. Use your own AI coding tool to analyze
-							them for threats — no server cost, full transparency.
+							them for threats. No server cost, full transparency.
 						</p>
 					</div>
 
@@ -682,7 +682,7 @@ export default function Home() {
 							</div>
 							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">Crowd-sourced trust</h3>
 							<p className="text-[12px] text-muted leading-relaxed">
-								Share scan results with the community — see what others found before you install
+								Share scan results with the community. See what others found before you install
 							</p>
 						</div>
 						<div className="bg-card-bg border border-card-border rounded-xl p-6 text-center">
@@ -695,7 +695,7 @@ export default function Home() {
 							</div>
 							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">5 coding agents supported</h3>
 							<p className="text-[12px] text-muted leading-relaxed">
-								Claude Code, Codex CLI, OpenCode, Goose, and Aider — use whichever you have installed
+								Claude Code, Codex CLI, OpenCode, Goose, and Aider. Use whichever you have installed
 							</p>
 						</div>
 					</div>

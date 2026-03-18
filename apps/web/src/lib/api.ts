@@ -164,4 +164,40 @@ export const api = {
 	patch<T>(path: string, body?: unknown, options?: RequestOptions) {
 		return makeRequest<T>("PATCH", path, body, options);
 	},
+	/** Upload FormData (multipart) — does NOT set Content-Type so the browser adds the boundary. */
+	async upload<T>(
+		path: string,
+		formData: FormData,
+		options?: RequestOptions,
+	): Promise<{ data: T; ok: true } | { error: string; status: number; ok: false }> {
+		const token = await getAuthToken();
+		if (!token) {
+			return { error: "Not authenticated", status: 401, ok: false };
+		}
+
+		const url = `${API_BASE_URL}${path}`;
+		const res = await fetch(url, {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${token}`,
+				...options?.headers,
+			},
+			body: formData,
+			signal: options?.signal,
+		});
+
+		if (!res.ok) {
+			let error = `Request failed with status ${res.status}`;
+			try {
+				const json = await res.json();
+				error = (json as { error?: string }).error ?? error;
+			} catch {
+				// ignore parse errors
+			}
+			return { error, status: res.status, ok: false };
+		}
+
+		const data = (await res.json()) as T;
+		return { data, ok: true };
+	},
 };

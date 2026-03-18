@@ -31,4 +31,7 @@ export const authMiddleware = createMiddleware<{
   c.set("userId", session.userId);
 
   await next();
+
+  // Prevent browsers from caching authenticated responses
+  c.header("Cache-Control", "no-store");
 });

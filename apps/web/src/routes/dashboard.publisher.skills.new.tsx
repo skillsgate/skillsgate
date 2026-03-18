@@ -170,24 +170,12 @@ export default function NewSkillPage() {
 				formData.append("files", file);
 			}
 
-			const res = await fetch(`/api/skills/${skillId}/files`, {
-				method: "POST",
-				credentials: "include",
-				body: formData,
-			});
+			const res = await api.upload(`/api/skills/${skillId}/files`, formData);
 
 			if (res.ok) {
 				navigate(`/dashboard/publisher/skills/${skillId}`);
 			} else {
-				let error = "Upload failed";
-				try {
-					const json = await res.json();
-					error =
-						(json as { error?: string }).error ?? error;
-				} catch {
-					// ignore parse errors
-				}
-				setUploadError(error);
+				setUploadError(res.error);
 			}
 		} catch {
 			setUploadError("Network error. Please try again.");

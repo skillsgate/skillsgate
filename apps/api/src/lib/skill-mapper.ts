@@ -17,6 +17,7 @@ export interface CatalogSkillRow {
   source_type: string | null;
   publisher_id: string | null;
   source_id: string | null;
+  github_stars: number | null;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -51,6 +52,7 @@ export function mapSkill(row: CatalogSkillRow) {
     capabilities: parseJsonArray(row.capabilities),
     keywords: parseJsonArray(row.keywords),
     githubUrl,
+    githubStars: row.github_stars ?? null,
     installCommand: deriveInstallCommand(
       row.slug,
       row.source_type,

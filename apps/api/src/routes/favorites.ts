@@ -103,7 +103,7 @@ favoritesRoute.get("/favorites", async (c) => {
        s.id, s.slug, s.name, s.description, s.summary,
        s.categories, s.capabilities, s.keywords,
        s.github_repo, s.github_path, s.source_type,
-       s.publisher_id, s.source_id,
+       s.publisher_id, s.source_id, s.github_stars,
        f.created_at AS favorited_at
      FROM favorites f
      JOIN skills s ON s.id = f.skill_id

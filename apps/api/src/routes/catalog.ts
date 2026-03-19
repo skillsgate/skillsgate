@@ -30,6 +30,7 @@ interface CatalogResponse {
     capabilities: string[];
     keywords: string[];
     githubUrl: string;
+    githubStars: number | null;
     installCommand: string | null;
     urlPath: string;
   }[];
@@ -84,22 +85,13 @@ catalogRoute.get("/skills", async (c) => {
        SELECT DISTINCT ON (COALESCE(github_repo, id), name)
               id, slug, name, description, summary, categories, capabilities, keywords,
               github_repo, github_path, source_type, publisher_id, source_id,
-              created_at
+              github_stars, created_at
        FROM skills
        WHERE visibility = 'public'
        ORDER BY COALESCE(github_repo, id), name, created_at DESC
      ) deduped
      ORDER BY
-       CASE
-         WHEN github_repo LIKE 'anthropics/skills%' THEN 1
-         WHEN github_repo LIKE 'vercel-labs/%' THEN 2
-         WHEN github_repo LIKE 'remotion-dev/skills%' THEN 3
-         WHEN github_repo LIKE 'microsoft/github-copilot-for-azure%' THEN 4
-         WHEN github_repo LIKE 'browser-use/browser-use%' THEN 5
-         WHEN github_repo LIKE 'better-auth/skills%' THEN 6
-         WHEN github_repo LIKE 'google-labs-code/%' THEN 7
-         ELSE 100
-       END,
+       COALESCE(github_stars, 0) DESC,
        md5(id || CURRENT_DATE::text),
        created_at DESC
      LIMIT $1 OFFSET $2`,
@@ -177,7 +169,7 @@ catalogRoute.get("/skills/search", async (c) => {
        SELECT DISTINCT ON (COALESCE(github_repo, id), name)
               id, slug, name, description, summary, categories, capabilities, keywords,
               github_repo, github_path, source_type, publisher_id, source_id,
-              created_at
+              github_stars, created_at
        FROM skills
        WHERE visibility = 'public' AND (
          name ILIKE $1 OR slug ILIKE $1 OR description ILIKE $1
@@ -189,6 +181,7 @@ catalogRoute.get("/skills/search", async (c) => {
      ) deduped
      ORDER BY
        CASE WHEN name ILIKE $2 OR slug ILIKE $2 THEN 0 ELSE 1 END,
+       COALESCE(github_stars, 0) DESC,
        created_at DESC
      LIMIT $3 OFFSET $4`,
     likePattern,
@@ -248,7 +241,7 @@ catalogRoute.get("/skills/detail", async (c) => {
     // Lookup by skill id
     const rows: CatalogSkillDetail[] = await (db.$queryRawUnsafe as any)(
       `SELECT id, slug, name, description, summary, categories, capabilities, keywords,
-              github_repo, github_path, source_type, publisher_id, source_id, created_at, updated_at
+              github_repo, github_path, source_type, publisher_id, source_id, github_stars, created_at, updated_at
        FROM skills
        WHERE id = $1 AND visibility = 'public'
        LIMIT 1`,
@@ -269,7 +262,7 @@ catalogRoute.get("/skills/detail", async (c) => {
         // Match: github_repo = 'owner/repo' AND github_path contains 'skill-name'
         rows = await (db.$queryRawUnsafe as any)(
           `SELECT id, slug, name, description, summary, categories, capabilities, keywords,
-                  github_repo, github_path, source_type, publisher_id, source_id, created_at, updated_at
+                  github_repo, github_path, source_type, publisher_id, source_id, github_stars, created_at, updated_at
            FROM skills
            WHERE github_repo = $1 AND github_path LIKE $2 AND visibility = 'public'
            ORDER BY created_at DESC
@@ -281,7 +274,7 @@ catalogRoute.get("/skills/detail", async (c) => {
         // Just owner/repo — find skill at repo root
         rows = await (db.$queryRawUnsafe as any)(
           `SELECT id, slug, name, description, summary, categories, capabilities, keywords,
-                  github_repo, github_path, source_type, publisher_id, source_id, created_at, updated_at
+                  github_repo, github_path, source_type, publisher_id, source_id, github_stars, created_at, updated_at
            FROM skills
            WHERE github_repo = $1 AND visibility = 'public'
            ORDER BY created_at DESC
@@ -381,6 +374,7 @@ catalogRoute.get("/skills/detail", async (c) => {
       keywords: parseJsonArray(row.keywords),
       githubUrl,
       githubRepo,
+      githubStars: row.github_stars ?? null,
       installCommand: deriveInstallCommand(
         row.slug,
         row.source_type,

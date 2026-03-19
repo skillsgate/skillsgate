@@ -19,6 +19,7 @@ export const DEFAULT_WEIGHTS: RerankerWeights = {
 };
 
 const MAX_BONUS = 0.05;
+const MAX_POPULARITY_BONUS = 0.03;
 
 // ─── Tokenizer ──────────────────────────────────────────────────────
 
@@ -143,6 +144,20 @@ export function textMatchScore(
   return matched / queryTokens.length;
 }
 
+// ─── Popularity Bonus ────────────────────────────────────────────────
+
+/**
+ * Compute a query-independent popularity bonus based on GitHub stars.
+ * Uses a log10 scale so that differences between 10 and 100 stars matter
+ * as much as 10k vs 100k. Capped at MAX_POPULARITY_BONUS (0.03).
+ */
+export function popularityBonus(githubStars: number | null): number {
+  const stars = githubStars || 0;
+  if (stars <= 0) return 0;
+  const raw = Math.log10(stars + 1) / Math.log10(200000 + 1);
+  return Math.min(raw * MAX_POPULARITY_BONUS, MAX_POPULARITY_BONUS);
+}
+
 // ─── Core Re-Ranking ────────────────────────────────────────────────
 
 /**
@@ -187,16 +202,17 @@ export function rerankResults(
       const meta = skillMap.get(candidate.skillId);
       if (!meta) return candidate;
 
-      const bonus = computeMetadataBonus(
+      const metaBonus = computeMetadataBonus(
         normalizedQuery,
         queryTokens,
         meta,
         weights
       );
+      const popBonus = popularityBonus(meta.githubStars);
 
       return {
         skillId: candidate.skillId,
-        bestScore: candidate.bestScore + bonus,
+        bestScore: candidate.bestScore + metaBonus + popBonus,
       };
     })
     .sort((a, b) => b.bestScore - a.bestScore);

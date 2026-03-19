@@ -19,11 +19,19 @@ type SkillDetail = {
 	keywords: string[];
 	githubUrl: string;
 	githubRepo: string;
+	githubStars: number | null;
 	installCommand: string | null;
 	urlPath: string;
 	createdAt: string;
 	updatedAt: string;
 };
+
+function formatStars(stars: number): string {
+	if (stars >= 1000) {
+		return `${(stars / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+	}
+	return String(stars);
+}
 
 type SkillDetailResponse = {
 	skill: SkillDetail;
@@ -260,6 +268,14 @@ export default function SkillDetailPage() {
 								<span className="text-[11px] font-mono text-muted tracking-wide">
 									SKILL.md
 								</span>
+								{skill.githubStars != null && skill.githubStars > 0 && (
+									<span className="flex items-center gap-1 text-[11px] font-mono text-muted/60">
+										<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-amber-400/70">
+											<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+										</svg>
+										{formatStars(skill.githubStars)}
+									</span>
+								)}
 							</div>
 							<h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground mb-3">
 								{skill.name}

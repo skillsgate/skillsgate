@@ -63,6 +63,7 @@ model Skill {
 
   @@index([githubRepo, githubPath], map: "idx_skills_github")
   @@index([downloads(sort: Desc)], map: "idx_skills_downloads")
+  @@index([githubStars(sort: Desc)], map: "idx_skills_github_stars")
   @@index([createdAt(sort: Desc)], map: "idx_skills_created")
   @@index([publisherId], map: "idx_skills_publisher")
   @@index([orgId], map: "idx_skills_org")

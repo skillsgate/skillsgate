@@ -18,6 +18,7 @@ export interface SearchResult {
   capabilities: string[];
   keywords: string[];
   githubUrl: string;
+  githubStars: number | null;
   installCommand: string | null;
   urlPath: string;
   score: number;
@@ -41,6 +42,7 @@ export interface CachedSkillMeta {
   sourceType: string | null;
   publisherId: string | null;
   sourceId: string | null;
+  githubStars: number | null;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -121,6 +123,7 @@ async function hydrateSkills(
         sourceType: true,
         publisherId: true,
         sourceId: true,
+        githubStars: true,
       },
     });
 
@@ -139,6 +142,7 @@ async function hydrateSkills(
         sourceType: skill.sourceType,
         publisherId: skill.publisherId,
         sourceId: skill.sourceId,
+        githubStars: skill.githubStars ?? null,
       };
       skillMap.set(skill.id, meta);
 
@@ -279,6 +283,7 @@ export async function searchSkills(
       capabilities: skill?.capabilities ?? [],
       keywords: skill?.keywords ?? [],
       githubUrl,
+      githubStars: skill?.githubStars ?? null,
       installCommand: deriveInstallCommand(slug, sourceType, publisherUsername, githubRepo, githubPath),
       urlPath: deriveUrlPath(skill?.sourceId ?? null, skillId),
       score: Math.round(bestScore * 1000) / 1000,

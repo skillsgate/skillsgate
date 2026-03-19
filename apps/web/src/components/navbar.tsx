@@ -1,12 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ThemeToggle } from "./theme-toggle";
 import { AuthButton } from "./auth-button";
 
 export function Navbar() {
 	const [scrolled, setScrolled] = useState(false);
+	const [hidden, setHidden] = useState(false);
+	const lastY = useRef(0);
 
 	useEffect(() => {
-		const onScroll = () => setScrolled(window.scrollY > 20);
+		const onScroll = () => {
+			const y = window.scrollY;
+			setScrolled(y > 20);
+			setHidden(y > 80 && y > lastY.current);
+			lastY.current = y;
+		};
 		window.addEventListener("scroll", onScroll, { passive: true });
 		return () => window.removeEventListener("scroll", onScroll);
 	}, []);
@@ -14,6 +21,8 @@ export function Navbar() {
 	return (
 		<nav
 			className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+				hidden ? "-translate-y-full" : "translate-y-0"
+			} ${
 				scrolled
 					? "bg-nav-bg backdrop-blur-xl border-b border-nav-border"
 					: "bg-transparent"

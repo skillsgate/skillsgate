@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { api } from "~/lib/api";
 import { ConfirmationDialog } from "~/components/confirmation-dialog";
 
@@ -87,6 +87,11 @@ export default function DashboardFavoritesPage() {
 		setRemoveTarget(null);
 	}
 
+	const sorted = useMemo(
+		() => [...favorites].sort((a, b) => (b.githubStars ?? 0) - (a.githubStars ?? 0)),
+		[favorites]
+	);
+
 	// ─── Loading state ────────────────────────────────────────────────
 
 	if (isLoading) {
@@ -152,7 +157,7 @@ export default function DashboardFavoritesPage() {
 			{favorites.length > 0 && (
 				<>
 					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-						{favorites.map((skill, i) => {
+						{sorted.map((skill, i) => {
 							const publisher = skill.githubUrl
 								? skill.githubUrl
 										.replace("https://github.com/", "")

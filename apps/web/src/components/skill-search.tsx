@@ -95,10 +95,12 @@ export function SkillSearch() {
 		setIsLoading(false);
 
 		if (res.ok) {
-			const mapped: SearchResult[] = res.data.skills.map((s) => ({
-				...s,
-				score: 0,
-			}));
+			const mapped: SearchResult[] = res.data.skills
+				.map((s) => ({
+					...s,
+					score: 0,
+				}))
+				.sort((a, b) => (b.githubStars ?? 0) - (a.githubStars ?? 0));
 			setResults(mapped);
 			setNoResults(mapped.length === 0);
 		} else if (res.status === 429) {

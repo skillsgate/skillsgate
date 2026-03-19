@@ -155,7 +155,12 @@ function useCatalog() {
 		setIsLoadingMore(false);
 	}, [fetchSkills, skills.length]);
 
-	return { skills, total, hasMore, isLoading, isLoadingMore, loadMore };
+	const sorted = useMemo(
+		() => [...skills].sort((a, b) => (b.githubStars ?? 0) - (a.githubStars ?? 0)),
+		[skills]
+	);
+
+	return { skills: sorted, total, hasMore, isLoading, isLoadingMore, loadMore };
 }
 
 function CatalogGrid({ catalog }: { catalog: ReturnType<typeof useCatalog> }) {

@@ -281,7 +281,7 @@ export default function SkillDetailPage() {
 						{data.skill.visibility.charAt(0).toUpperCase() +
 							data.skill.visibility.slice(1)}{" "}
 						skill
-						{" "}
+						{" · "}
 						<span className="text-muted/50">
 							Created {formatDate(data.skill.createdAt)}
 						</span>

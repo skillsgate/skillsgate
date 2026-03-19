@@ -3,7 +3,7 @@ import type { MetaFunction } from "react-router";
 import { Navbar } from "~/components/navbar";
 
 export const meta: MetaFunction = () => [
-	{ title: "Docs - SkillsGate" },
+	{ title: "Docs — SkillsGate" },
 	{
 		name: "description",
 		content:

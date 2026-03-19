@@ -31,7 +31,7 @@ function getOauthErrorMessage(error: string | null): string | null {
 	if (!error) return null;
 	if (error === "denied") return "GitHub access was denied.";
 	if (error === "invalid_state") {
-		return "Reconnect session expired or was blocked. Please try again.";
+		return "Session expired or was blocked. Please try again.";
 	}
 	if (error === "invalid") {
 		return "GitHub callback was missing required parameters. Please try again.";

@@ -115,7 +115,7 @@ const FAQ_ITEMS = [
 	},
 	{
 		q: "Are these skills safe to use?",
-		a: "Run `skillsgate scan <source>` to analyze any skill before installing. It uses your own AI coding tool (Claude Code, Codex, etc.) to detect prompt injection, malicious code, and suspicious behavior. Scan results are crowd-sourced: after scanning, you can share findings with the community so others benefit too. Publishers also have trust tiers (Verified, Established, New).",
+		a: "Run `skillsgate scan <source>` to analyze any skill before installing. It uses your own AI coding tool (Claude Code, Codex, etc.) to detect prompt injection, malicious code, and suspicious behavior. Scan results are crowdsourced: after scanning, you can share findings with the community so others benefit too. Publishers also have trust tiers (Verified, Established, New).",
 	},
 	{
 		q: "Is SkillsGate free?",
@@ -601,7 +601,7 @@ export default function Home() {
 							</div>
 							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">12 MCP tools</h3>
 							<p className="text-[12px] text-muted leading-relaxed">
-								Search, add, remove, update, sync, publish, scan, and more. All available to your AI agent
+								Search, add, remove, update, sync, publish, scan, and more. All available to your AI agent.
 							</p>
 						</div>
 						<div className="bg-card-bg border border-card-border rounded-xl p-6 text-center">
@@ -614,7 +614,7 @@ export default function Home() {
 							</div>
 							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">17+ agents supported</h3>
 							<p className="text-[12px] text-muted leading-relaxed">
-								Claude Code, Cursor, Windsurf, Copilot, Codex CLI, Cline, and many more
+								Claude Code, Cursor, Windsurf, Copilot, Codex CLI, Cline, and many more.
 							</p>
 						</div>
 						<div className="bg-card-bg border border-card-border rounded-xl p-6 text-center">
@@ -626,7 +626,7 @@ export default function Home() {
 							</div>
 							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">CLI + MCP in one package</h3>
 							<p className="text-[12px] text-muted leading-relaxed">
-								Use from the terminal or let your AI agent invoke tools directly via the Model Context Protocol
+								Use from the terminal or let your AI agent invoke tools directly via the Model Context Protocol.
 							</p>
 						</div>
 					</div>
@@ -689,7 +689,7 @@ export default function Home() {
 							</div>
 							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">8 threat categories</h3>
 							<p className="text-[12px] text-muted leading-relaxed">
-								Prompt injection, data exfiltration, credential harvesting, malicious commands, and more
+								Prompt injection, data exfiltration, credential harvesting, malicious commands, and more.
 							</p>
 						</div>
 						<div className="bg-card-bg border border-card-border rounded-xl p-6 text-center">
@@ -701,9 +701,9 @@ export default function Home() {
 									<path d="M16 3.13a4 4 0 0 1 0 7.75" />
 								</svg>
 							</div>
-							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">Crowd-sourced trust</h3>
+							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">Crowdsourced trust</h3>
 							<p className="text-[12px] text-muted leading-relaxed">
-								Share scan results with the community. See what others found before you install
+								Share scan results with the community. See what others found before you install.
 							</p>
 						</div>
 						<div className="bg-card-bg border border-card-border rounded-xl p-6 text-center">
@@ -716,7 +716,7 @@ export default function Home() {
 							</div>
 							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">5 coding agents supported</h3>
 							<p className="text-[12px] text-muted leading-relaxed">
-								Claude Code, Codex CLI, OpenCode, Goose, and Aider. Use whichever you have installed
+								Claude Code, Codex CLI, OpenCode, Goose, and Aider. Use whichever you have installed.
 							</p>
 						</div>
 					</div>

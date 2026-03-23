@@ -29,23 +29,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
 
+      # Use npm install (not npm ci) to ensure platform-specific optional deps install correctly
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
-      - name: Build shared UI package
-        run: |
-          echo "Shared UI package uses source exports (no build step needed)"
+      - name: Rebuild native modules for Electron
+        run: npx electron-rebuild --module-dir node_modules/better-sqlite3
+        working-directory: apps/desktop
 
       - name: Build and package desktop app
         run: npm run package:${{ matrix.platform }} -w @skillsgate/desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS code signing (set these secrets in GitHub repo settings)
           CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-          # macOS notarization
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}

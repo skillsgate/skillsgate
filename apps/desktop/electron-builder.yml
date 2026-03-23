@@ -18,9 +18,9 @@ mac:
   category: public.app-category.developer-tools
   target:
     - target: dmg
-      arch: [universal]
+      arch: [arm64, x64]
     - target: zip
-      arch: [universal]
+      arch: [arm64, x64]
   entitlements: resources/entitlements.mac.plist
   entitlementsInherit: resources/entitlements.mac.plist
 

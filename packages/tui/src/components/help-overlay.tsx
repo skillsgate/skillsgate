@@ -9,7 +9,7 @@ const SHORTCUTS_LEFT: ShortcutEntry[] = [
   { key: "j/k", description: "Navigate list up/down" },
   { key: "g", description: "Jump to first item" },
   { key: "G", description: "Jump to last item" },
-  { key: "Enter", description: "Open skill detail" },
+  { key: "v", description: "View skill detail" },
   { key: "/", description: "Focus search input" },
   { key: "Tab", description: "Cycle focus: agents > search > list" },
   { key: "Esc", description: "Clear search / go back" },

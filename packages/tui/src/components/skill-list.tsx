@@ -54,7 +54,7 @@ export function SkillList({ skills }: SkillListProps) {
     }
 
     // Enter to open full skill detail view (navigates away)
-    if (key.name === "return" && skills[selectedIndex]) {
+    if (key.name === "v" && skills[selectedIndex]) {
       dispatch({ type: "SELECT_SKILL", skill: skills[selectedIndex] })
     }
 

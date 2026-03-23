@@ -62,7 +62,7 @@ export function FavoritesView() {
     }
 
     // Enter to view full detail
-    if (key.name === "return" && favorites[selectedIndex]) {
+    if (key.name === "v" && favorites[selectedIndex]) {
       const skill = favorites[selectedIndex]
       dispatch({
         type: "SELECT_SKILL",

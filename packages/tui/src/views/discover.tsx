@@ -25,7 +25,6 @@ export function DiscoverView() {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [installTarget, setInstallTarget] = useState<CatalogSkill | null>(null)
   const [previewSkill, setPreviewSkill] = useState<CatalogSkill | null>(null)
-  const [justSubmitted, setJustSubmitted] = useState(false)
 
   const token = state.auth?.token ?? null
   const isAuthenticated = !!state.auth
@@ -50,8 +49,8 @@ export function DiscoverView() {
     if (state.focusedPane === "search") return
     if (installTarget) return
     // Guard: skip Enter if search was just submitted (prevents opening first skill)
-    if (key.name === "return" && justSubmitted) {
-      setJustSubmitted(false)
+    
+      
       return
     }
 
@@ -78,8 +77,8 @@ export function DiscoverView() {
       setSelectedIndex(Math.max(0, results.length - 1))
     }
 
-    // Enter to open full detail view
-    if (key.name === "return" && results[selectedIndex]) {
+    // v to open full detail view
+    if (key.name === "v" && results[selectedIndex]) {
       const skill = results[selectedIndex]
       dispatch({
         type: "SELECT_SKILL",
@@ -153,7 +152,6 @@ export function DiscoverView() {
           onSubmit={(value: string) => {
             setQuery(value)
             setSelectedIndex(0)
-            setJustSubmitted(true)
             // Stay in search pane -- user presses Tab to move to results
           }}
         />
@@ -374,7 +372,7 @@ function DiscoverDetailPanel({ skill }: DiscoverDetailPanelProps) {
         ) : null}
 
         <text>{" "}</text>
-        <text fg={colors.textDim}>Enter=full detail  i=install  Tab=switch pane</text>
+        <text fg={colors.textDim}>v=full detail  i=install  Tab=switch pane</text>
       </box>
     </scrollbox>
   )

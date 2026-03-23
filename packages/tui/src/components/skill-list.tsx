@@ -92,7 +92,7 @@ export function SkillList({ skills }: SkillListProps) {
       setSelectedIndex(Math.max(0, skills.length - 1))
     }
 
-    // Enter to open full skill detail view (navigates away)
+    // v to open full skill detail view (navigates away)
     if (key.name === "v" && skills[selectedIndex]) {
       dispatch({ type: "SELECT_SKILL", skill: skills[selectedIndex] })
     }

@@ -183,7 +183,7 @@ function DetailPanel({ skill }: DetailPanelProps) {
         <text>{" "}</text>
 
         {/* Shortcut hints */}
-        <text fg={colors.textDim}>Enter=full detail  d=remove  u=update  Tab=switch pane</text>
+        <text fg={colors.textDim}>v=view detail  d=remove  u=update  Tab=switch pane</text>
         <text fg={colors.border}>---</text>
 
         {/* SKILL.md content */}

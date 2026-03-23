@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import fs from "node:fs"
 import path from "node:path"
-import { spawnSync, exec } from "node:child_process"
+import { exec } from "node:child_process"
 import { useKeyboard } from "@opentui/react"
 import { useStore, useDispatch } from "../store/context.js"
 import { useSkillActions } from "../data/use-skill-actions.js"
@@ -58,7 +58,9 @@ export function SkillDetailView() {
   const skill = state.selectedSkill
 
   const [content, setContent] = useState("")
+  const [rawContent, setRawContent] = useState("") // full file content for editing
   const [contentLoading, setContentLoading] = useState(false)
+  const [editMode, setEditMode] = useState(false)
   const [pendingAction, setPendingAction] = useState<DetailPendingAction>(null)
   const [removeMode, setRemoveMode] = useState<RemoveMode>(null)
 
@@ -68,6 +70,7 @@ export function SkillDetailView() {
     // Local skill: read from disk
     if (skill.filePath) {
       const raw = readSkillContent(skill.filePath)
+      setRawContent(raw)
       setContent(stripFrontmatter(raw))
       return
     }
@@ -137,29 +140,36 @@ export function SkillDetailView() {
       return
     }
 
-    // e to edit skill in $EDITOR (only for locally installed skills)
+    // e to toggle edit mode (only for locally installed skills)
     if (key.name === "e" && skill?.filePath) {
-      const editor = process.env.VISUAL || process.env.EDITOR || "vi"
-
-      // Release the terminal from the TUI renderer so the editor can use it.
-      // We replicate the cleanup from __skillsgateTuiCleanExit but skip
-      // process.exit so the editor can spawn first.
-      try {
-        process.stdout.write("\x1B[?1049l") // switch back to main screen buffer
-        process.stdout.write("\x1B[?25h")   // show cursor
-        process.stdout.write("\x1Bc")       // full terminal reset (RIS)
-      } catch {
-        // best effort terminal cleanup
+      if (editMode) {
+        // Save and exit edit mode
+        try {
+          fs.writeFileSync(skill.filePath, rawContent, "utf-8")
+          setContent(stripFrontmatter(rawContent))
+          dispatch({
+            type: "SHOW_NOTIFICATION",
+            notification: { type: "success", message: `Saved ${skill.name}` },
+          })
+        } catch {
+          dispatch({
+            type: "SHOW_NOTIFICATION",
+            notification: { type: "error", message: "Failed to save" },
+          })
+        }
+        setEditMode(false)
+      } else {
+        // Enter edit mode
+        setEditMode(true)
       }
+      return
+    }
 
-      spawnSync(editor, [skill.filePath], {
-        stdio: "inherit",
-      })
-
-      // Exit after editing -- user restarts TUI to see changes
-      console.log(`\nEdited: ${skill.filePath}`)
-      console.log("Restart the TUI to see your changes.")
-      process.exit(0)
+    // Esc in edit mode cancels without saving
+    if (key.name === "escape" && editMode) {
+      setRawContent(readSkillContent(skill?.filePath ?? ""))
+      setEditMode(false)
+      return
     }
 
     // o to open folder (local skills) or source URL (catalog/github skills)
@@ -322,7 +332,25 @@ export function SkillDetailView() {
 
   return (
     <box style={{ flexDirection: "row", width: "100%", flexGrow: 1 }}>
-      {/* Left side: Markdown content (70%) */}
+      {/* Left side: Content (70%) - view or edit mode */}
+      {editMode ? (
+        <box style={{ width: "70%", flexGrow: 1, flexDirection: "column" }}>
+          <box style={{ height: 1, paddingLeft: 1, backgroundColor: colors.bgAlt }}>
+            <text fg={colors.warning}>EDITING: {skill.name}  (e=save  Esc=cancel)</text>
+          </box>
+          <textarea
+            focused={true}
+            value={rawContent}
+            onChange={(value: string) => setRawContent(value)}
+            style={{
+              width: "100%",
+              flexGrow: 1,
+              backgroundColor: colors.bg,
+              fg: colors.text,
+            }}
+          />
+        </box>
+      ) : (
       <scrollbox
         focused={false}
         style={{
@@ -395,6 +423,7 @@ export function SkillDetailView() {
           })}
         </box>
       </scrollbox>
+      )}
 
       {/* Right side: Metadata panel (30%) */}
       <box
@@ -471,7 +500,7 @@ export function SkillDetailView() {
         <text fg={colors.border}>---</text>
         <text fg={colors.textDim}>q/Esc  Go back</text>
         {isLocal && (
-          <text fg={colors.textDim}>e      Edit in $EDITOR</text>
+          <text fg={colors.textDim}>e      {editMode ? "Save changes" : "Edit skill"}</text>
         )}
         {isLocal ? (
           <text fg={colors.textDim}>o      Open folder</text>

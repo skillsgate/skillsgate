@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "description": "SkillsGate desktop app for managing AI agent skills",
   "author": "Sultan Valiyev <valiyevsultan@gmail.com>",
+  "homepage": "https://skillsgate.ai",
   "private": true,
   "main": "out/main/index.js",
   "scripts": {
-    "postinstall": "electron-rebuild --module-dir ../../node_modules/better-sqlite3",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",

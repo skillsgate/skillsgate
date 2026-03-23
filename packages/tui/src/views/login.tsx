@@ -36,7 +36,17 @@ export function LoginView() {
     }
 
     if (step === "prompt") {
-      if (key.name === "y") {
+      // "r" to re-login (when already authenticated)
+      if (key.name === "r" && auth) {
+        // Clear old auth, then start fresh login
+        logout()
+        dispatch({
+          type: "SHOW_NOTIFICATION",
+          notification: { type: "info", message: "Signed out. Starting fresh login..." },
+        })
+      }
+
+      if (key.name === "y" || (key.name === "r" && auth)) {
         // Open browser
         try {
           const { exec } = require("node:child_process")
@@ -78,15 +88,20 @@ export function LoginView() {
     }
   }, [login, dispatch])
 
-  // Already logged in
-  if (auth) {
+  // Already logged in -- offer re-login
+  if (auth && step === "prompt") {
     return (
       <box style={{ flexDirection: "column", padding: 2 }}>
         <text fg={colors.success}>
-          Already logged in as <strong>{auth.user.name}</strong> ({auth.user.email})
+          Logged in as <strong>{auth.user.name}</strong> ({auth.user.email})
         </text>
         <text>{" "}</text>
-        <text fg={colors.textDim}>Press Esc to go back</text>
+        <text fg={colors.text}>
+          If AI search isn't working, your session may have expired.
+        </text>
+        <text fg={colors.text}>
+          Press <span fg={colors.primary}>r</span> to re-login with a fresh token, or <span fg={colors.textDim}>Esc</span> to go back.
+        </text>
       </box>
     )
   }

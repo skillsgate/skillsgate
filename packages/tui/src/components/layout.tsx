@@ -143,16 +143,9 @@ export function Layout() {
       return
     }
 
-    // "l" to navigate to login view (when not authenticated and not typing in search)
+    // "l" to navigate to login view (always -- allows re-login if token expired)
     if (key.name === "l" && state.focusedPane !== "search" && state.activeView !== "detail" && state.activeView !== "login") {
-      if (!state.auth) {
-        dispatch({ type: "NAVIGATE", view: "login" })
-      } else {
-        dispatch({
-          type: "SHOW_NOTIFICATION",
-          notification: { type: "info", message: `Logged in as ${state.auth.user.name}` },
-        })
-      }
+      dispatch({ type: "NAVIGATE", view: "login" })
       return
     }
 

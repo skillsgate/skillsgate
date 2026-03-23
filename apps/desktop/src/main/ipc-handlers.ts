@@ -1038,11 +1038,15 @@ export function registerIpcHandlers(): void {
 
   // Write skill content back to disk
   ipcMain.handle("skill:write-content", async (_, filePath: string, content: string) => {
-    await fs.writeFile(filePath, content, "utf-8")
+    try {
+      await fs.writeFile(filePath, content, "utf-8")
+    } catch (err) {
+      throw new Error(`Failed to save: ${err instanceof Error ? err.message : String(err)}`)
+    }
   })
 
   // Open skill folder in Finder/Explorer
-  ipcMain.handle("skill:open-in-finder", async (_, filePath: string) => {
+  ipcMain.handle("skill:open-in-finder", (_, filePath: string) => {
     shell.showItemInFolder(filePath)
   })
 
@@ -1052,7 +1056,11 @@ export function registerIpcHandlers(): void {
     const agent = agentRegistry[agentName]
     if (!agent) throw new Error(`Unknown agent: ${agentName}`)
     const skillPath = path.join(agent.globalSkillsDir, safeName)
-    await fs.rm(skillPath, { recursive: true, force: true })
+    try {
+      await fs.rm(skillPath, { recursive: true, force: true })
+    } catch (err) {
+      throw new Error(`Failed to remove: ${err instanceof Error ? err.message : String(err)}`)
+    }
   })
 }
 

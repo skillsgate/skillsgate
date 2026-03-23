@@ -1,0 +1,265 @@
+@import "tailwindcss";
+
+/* ─── Light mode (default) ─── */
+:root {
+	--background: #fafaf9;
+	--foreground: #1c1917;
+	--muted: #78716c;
+	--accent: #a8a29e;
+	--border: #e7e5e4;
+	--surface: #ffffff;
+	--surface-hover: #f5f5f4;
+	--glow: rgba(28, 25, 23, 0.03);
+	--code-bg: #f5f5f4;
+	--card-bg: #ffffff;
+	--card-border: #e7e5e4;
+	--nav-bg: rgba(250, 250, 249, 0.85);
+	--nav-border: rgba(231, 229, 228, 0.6);
+	--font-sora: "Sora", system-ui, sans-serif;
+	--font-geist-mono: "Geist Mono", ui-monospace, monospace;
+}
+
+/* ─── Dark mode ─── */
+.dark {
+	--background: #0a0a0b;
+	--foreground: #e7e5e4;
+	--muted: #78716c;
+	--accent: #a8a29e;
+	--border: #292524;
+	--surface: #141413;
+	--surface-hover: #1c1b1a;
+	--glow: rgba(231, 229, 228, 0.04);
+	--code-bg: #141413;
+	--card-bg: #141413;
+	--card-border: #292524;
+	--nav-bg: rgba(10, 10, 11, 0.85);
+	--nav-border: rgba(41, 37, 36, 0.6);
+}
+
+@theme inline {
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-muted: var(--muted);
+	--color-accent: var(--accent);
+	--color-border: var(--border);
+	--color-surface: var(--surface);
+	--color-surface-hover: var(--surface-hover);
+	--color-code-bg: var(--code-bg);
+	--color-card-bg: var(--card-bg);
+	--color-card-border: var(--card-border);
+	--color-nav-bg: var(--nav-bg);
+	--color-nav-border: var(--nav-border);
+	--font-sans: var(--font-sora);
+	--font-mono: var(--font-geist-mono);
+}
+
+html {
+	scroll-behavior: smooth;
+}
+
+body {
+	margin: 0;
+	background: var(--background);
+	color: var(--foreground);
+	font-family: var(--font-sans), system-ui, sans-serif;
+	overflow-x: hidden;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+/* Noise grain overlay */
+body::before {
+	content: "";
+	position: fixed;
+	inset: 0;
+	z-index: 9999;
+	pointer-events: none;
+	opacity: 0.025;
+	background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+	background-repeat: repeat;
+	background-size: 256px 256px;
+}
+
+/* ─── Animations ─── */
+@keyframes fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+@keyframes slide-down {
+	from {
+		opacity: 0;
+		transform: translateY(-8px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes slide-in-right {
+	from {
+		opacity: 0;
+		transform: translateX(24px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+.animate-fade-in {
+	animation: fade-in 1s ease both;
+}
+
+.animate-slide-down {
+	animation: slide-down 0.3s ease both;
+}
+
+.animate-slide-in-right {
+	animation: slide-in-right 0.2s ease both;
+}
+
+/* ─── Markdown prose styles (skill detail page) ─── */
+.skill-prose {
+	line-height: 1.75;
+	color: var(--muted);
+}
+.skill-prose h1,
+.skill-prose h2,
+.skill-prose h3,
+.skill-prose h4 {
+	color: var(--foreground);
+	font-weight: 600;
+	margin-top: 2em;
+	margin-bottom: 0.75em;
+}
+.skill-prose h1 {
+	font-size: 1.5rem;
+}
+.skill-prose h2 {
+	font-size: 1.25rem;
+	border-bottom: 1px solid var(--border);
+	padding-bottom: 0.5em;
+}
+.skill-prose h3 {
+	font-size: 1.1rem;
+}
+.skill-prose p {
+	margin-bottom: 1em;
+}
+.skill-prose a {
+	color: var(--accent);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+.skill-prose a:hover {
+	color: var(--foreground);
+}
+.skill-prose code {
+	font-family: var(--font-geist-mono);
+	font-size: 0.85em;
+	background: var(--code-bg);
+	padding: 0.15em 0.4em;
+	border-radius: 4px;
+	border: 1px solid var(--border);
+}
+.skill-prose pre {
+	background: var(--code-bg);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 1em 1.25em;
+	overflow-x: auto;
+	margin: 1.5em 0;
+}
+.skill-prose pre code {
+	background: none;
+	border: none;
+	padding: 0;
+	font-size: 0.8rem;
+	line-height: 1.6;
+}
+.skill-prose ul,
+.skill-prose ol {
+	padding-left: 1.5em;
+	margin-bottom: 1em;
+}
+.skill-prose li {
+	margin-bottom: 0.35em;
+}
+.skill-prose ul {
+	list-style-type: disc;
+}
+.skill-prose ol {
+	list-style-type: decimal;
+}
+.skill-prose blockquote {
+	border-left: 3px solid var(--border);
+	padding-left: 1em;
+	color: var(--muted);
+	font-style: italic;
+	margin: 1.5em 0;
+}
+.skill-prose table {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 1.5em 0;
+}
+.skill-prose th,
+.skill-prose td {
+	border: 1px solid var(--border);
+	padding: 0.5em 0.75em;
+	text-align: left;
+	font-size: 0.875rem;
+}
+.skill-prose th {
+	background: var(--surface-hover);
+	color: var(--foreground);
+	font-weight: 600;
+}
+.skill-prose hr {
+	border: none;
+	border-top: 1px solid var(--border);
+	margin: 2em 0;
+}
+.skill-prose img {
+	max-width: 100%;
+	border-radius: 8px;
+}
+
+/* ─── Scrollbar styling ─── */
+::-webkit-scrollbar {
+	width: 6px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: var(--border);
+	border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: var(--muted);
+}
+
+/* ─── Hidden scrollbar (sidebar) ─── */
+.overflow-y-auto {
+	scrollbar-width: none;
+}
+.overflow-y-auto::-webkit-scrollbar {
+	display: none;
+}
+
+/* ─── Smooth theme transition ─── */
+html.transitioning,
+html.transitioning *,
+html.transitioning *::before,
+html.transitioning *::after {
+	transition: background-color 0.3s ease,
+	            color 0.3s ease,
+	            border-color 0.3s ease,
+	            box-shadow 0.3s ease !important;
+}

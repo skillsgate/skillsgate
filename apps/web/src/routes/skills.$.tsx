@@ -1,10 +1,13 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "react-router";
 import { Navbar } from "~/components/navbar";
-import { publicApi } from "~/lib/api";
 import { marked } from "marked";
-import { FavoritesProvider } from "~/hooks/use-favorites";
-import { FavoriteButtonWide } from "~/components/favorite-button";
+import {
+	FavoritesProvider,
+	FavoriteButtonWide,
+	usePublicApiClient,
+	formatStars,
+} from "@skillsgate/ui";
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -25,13 +28,6 @@ type SkillDetail = {
 	createdAt: string;
 	updatedAt: string;
 };
-
-function formatStars(stars: number): string {
-	if (stars >= 1000) {
-		return `${(stars / 1000).toFixed(1).replace(/\.0$/, "")}k`;
-	}
-	return String(stars);
-}
 
 type SkillDetailResponse = {
 	skill: SkillDetail;
@@ -68,6 +64,7 @@ function sanitizeHtml(html: string): string {
 // ─── Page Component ─────────────────────────────────────────────────
 
 export default function SkillDetailPage() {
+	const publicApi = usePublicApiClient();
 	const params = useParams();
 	const path = params["*"]; // e.g. "anthropics/skills/react-best-practices" or "uuid-here"
 	const [skill, setSkill] = useState<SkillDetail | null>(null);

@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router";
-import { api } from "~/lib/api";
-import { UserSearch } from "~/components/user-search";
-import { ConfirmationDialog } from "~/components/confirmation-dialog";
+import { UserSearch, ConfirmationDialog, useApiClient } from "@skillsgate/ui";
 
 /* ─── Types matching API contract ─── */
 
@@ -134,6 +132,7 @@ function getRoleBadge(role: string) {
 /* ─── Component ─── */
 
 export default function OrgManagementPage() {
+	const api = useApiClient();
 	const { orgId } = useParams();
 	const [members, setMembers] = useState<OrgMember[]>(getMockMembers);
 	const [skills] = useState<OrgSkill[]>(getMockSkills);

@@ -1,0 +1,38 @@
+{
+  "name": "@skillsgate/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "main": "out/main/index.js",
+  "scripts": {
+    "postinstall": "electron-rebuild --module-dir ../../node_modules/better-sqlite3",
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "package": "electron-vite build && electron-builder --config electron-builder.yml",
+    "package:mac": "electron-vite build && electron-builder --config electron-builder.yml --mac",
+    "package:win": "electron-vite build && electron-builder --config electron-builder.yml --win",
+    "package:linux": "electron-vite build && electron-builder --config electron-builder.yml --linux"
+  },
+  "dependencies": {
+    "@skillsgate/ui": "*",
+    "better-sqlite3": "^12.8.0",
+    "gray-matter": "^4.0.3",
+    "marked": "^17",
+    "react": "^19",
+    "react-dom": "^19",
+    "react-router-dom": "^7"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^4",
+    "electron": "^35",
+    "electron-builder": "^26",
+    "electron-vite": "^3",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vite": "^6"
+  }
+}

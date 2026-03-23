@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { api } from "~/lib/api";
-import { ConfirmationDialog } from "~/components/confirmation-dialog";
+import { ConfirmationDialog, useApiClient } from "@skillsgate/ui";
 
 /* ─── Types matching API contract ─── */
 
@@ -31,15 +30,6 @@ type DashboardSkillsData = {
 
 const EMPTY_DATA: DashboardSkillsData = { shared: [], orgs: [], catalogs: [] };
 
-async function fetchDashboardSkills(): Promise<DashboardSkillsData> {
-	try {
-		const res = await api.get<DashboardSkillsData>("/api/dashboard/skills");
-		if (!res.ok) return EMPTY_DATA;
-		return res.data;
-	} catch {
-		return EMPTY_DATA;
-	}
-}
 
 /* ─── Helper ─── */
 
@@ -60,17 +50,27 @@ function formatRelativeDate(isoDate: string): string {
 /* ─── Component ─── */
 
 export default function DashboardSkillsPage() {
+	const api = useApiClient();
 	const [data, setData] = useState<DashboardSkillsData>(EMPTY_DATA);
 	const [loading, setLoading] = useState(true);
 	const [leaveTarget, setLeaveTarget] = useState<SharedSkill | null>(null);
 	const [isLeaving, setIsLeaving] = useState(false);
 
 	useEffect(() => {
+		async function fetchDashboardSkills(): Promise<DashboardSkillsData> {
+			try {
+				const res = await api.get<DashboardSkillsData>("/api/dashboard/skills");
+				if (!res.ok) return EMPTY_DATA;
+				return res.data;
+			} catch {
+				return EMPTY_DATA;
+			}
+		}
 		fetchDashboardSkills().then((d) => {
 			setData(d);
 			setLoading(false);
 		});
-	}, []);
+	}, [api]);
 
 	async function handleLeave() {
 		if (!leaveTarget) return;

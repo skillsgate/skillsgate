@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+/*
+ * Base theme tokens for SkillsGate Desktop.
+ * Dark mode is the default; light mode overrides below.
+ */
+:root {
+  --color-bg: #09090b;
+  --color-bg-secondary: #111113;
+  --color-bg-tertiary: #1a1a1e;
+  --color-surface: #18181b;
+  --color-border: #27272a;
+  --color-foreground: #fafafa;
+  --color-foreground-secondary: #a1a1aa;
+  --color-muted: #71717a;
+  --color-accent: #6366f1;
+  --color-accent-hover: #818cf8;
+  --color-danger: #ef4444;
+}
+
+html:not(.dark) {
+  --color-bg: #ffffff;
+  --color-bg-secondary: #f9fafb;
+  --color-bg-tertiary: #f3f4f6;
+  --color-surface: #f4f4f5;
+  --color-border: #e4e4e7;
+  --color-foreground: #09090b;
+  --color-foreground-secondary: #52525b;
+  --color-muted: #a1a1aa;
+  --color-accent: #6366f1;
+  --color-accent-hover: #4f46e5;
+  --color-danger: #dc2626;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+    Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar styling for the app */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted);
+}

@@ -1,0 +1,30 @@
+{
+  "name": "@skillsgate/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview"
+  },
+  "dependencies": {
+    "@skillsgate/ui": "*",
+    "react": "^19",
+    "react-dom": "^19",
+    "react-router-dom": "^7",
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "electron": "^35",
+    "electron-vite": "^3",
+    "electron-builder": "^26",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^4",
+    "tailwindcss": "^4",
+    "@tailwindcss/vite": "^4",
+    "typescript": "^5",
+    "vite": "^6"
+  }
+}

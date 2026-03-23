@@ -30,15 +30,19 @@ export function SearchInput({
         paddingLeft: 1,
         paddingRight: 1,
       }}
-      title={isFocused ? "Filter skills" : "Press / to search"}
+      title={isFocused ? "Filter skills" : "/ to search"}
     >
-      <input
-        placeholder={isFocused ? placeholder : `${placeholder} (press / to focus)`}
-        focused={isFocused && !state.showHelp}
-        onInput={(value: string) => {
-          dispatch({ type: filterAction, [filterAction === "SET_INSTALLED_FILTER" ? "filter" : "query"]: value } as any)
-        }}
-      />
+      {isFocused ? (
+        <input
+          placeholder={placeholder}
+          focused={!state.showHelp}
+          onInput={(value: string) => {
+            dispatch({ type: filterAction, [filterAction === "SET_INSTALLED_FILTER" ? "filter" : "query"]: value } as any)
+          }}
+        />
+      ) : (
+        <text fg={colors.textDim}>Press / to search...</text>
+      )}
     </box>
   )
 }

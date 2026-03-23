@@ -132,7 +132,7 @@ export function DiscoverView() {
   return (
     <box style={{ flexDirection: "column", width: "100%", flexGrow: 1 }}>
       {/* Search input */}
-      {/* Search input */}
+      {/* Search input -- only render <input> when focused to prevent click-to-type desync */}
       <box
         style={{
           height: 3,
@@ -142,23 +142,26 @@ export function DiscoverView() {
           paddingLeft: 1,
           paddingRight: 1,
         }}
-        title={searchMode === "semantic" ? "AI Search" : "Keyword Search"}
+        title={state.focusedPane === "search"
+          ? (searchMode === "semantic" ? "AI Search" : "Keyword Search")
+          : "/ to search"}
       >
-        <input
-          placeholder={
-            state.focusedPane === "search"
-              ? (searchMode === "semantic"
-                  ? 'AI search -- try "audit website performance" (Enter to search)'
-                  : "Search by keyword... (Enter to search)")
-              : "Press / to search"
-          }
-          focused={state.activeView === "discover" && state.focusedPane === "search" && !state.showHelp}
-          onSubmit={(value: string) => {
-            setQuery(value)
-            setSelectedIndex(0)
-            // Stay in search pane -- user presses Tab to move to results
-          }}
-        />
+        {state.focusedPane === "search" ? (
+          <input
+            placeholder={
+              searchMode === "semantic"
+                ? 'AI search -- try "audit website performance" (Enter to search)'
+                : "Search by keyword... (Enter to search)"
+            }
+            focused={state.activeView === "discover" && !state.showHelp}
+            onSubmit={(value: string) => {
+              setQuery(value)
+              setSelectedIndex(0)
+            }}
+          />
+        ) : (
+          <text fg={colors.textDim}>Press / to search...</text>
+        )}
       </box>
 
       {/* Status line: mode toggle + results + remaining */}

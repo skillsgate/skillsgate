@@ -57,7 +57,8 @@ export function Layout() {
       else process.exit(0)
     }
 
-    // When search input is focused, only handle Escape and Tab -- let all other keys pass through to the input
+    // When search input is focused, only handle Escape, Tab, and Ctrl shortcuts
+    // All other keys pass through to the input component
     if (state.focusedPane === "search") {
       if (key.name === "escape") {
         dispatch({ type: "SET_FOCUSED_PANE", pane: "list" })
@@ -67,7 +68,6 @@ export function Layout() {
         dispatch({ type: "CYCLE_FOCUS" })
         return
       }
-      // All other keys go to the input component -- do NOT intercept
       return
     }
 

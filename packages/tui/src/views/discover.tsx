@@ -140,13 +140,14 @@ export function DiscoverView() {
         <input
           placeholder={
             searchMode === "semantic"
-              ? 'AI search -- try "audit website performance"...'
-              : "Search skills by keyword..."
+              ? 'AI search -- try "audit website performance" (Enter to search)'
+              : "Search by keyword... (Enter to search)"
           }
           focused={state.activeView === "discover" && state.focusedPane === "search" && !state.showHelp}
-          onInput={(value: string) => {
+          onSubmit={(value: string) => {
             setQuery(value)
             setSelectedIndex(0)
+            dispatch({ type: "SET_FOCUSED_PANE", pane: "list" })
           }}
         />
       </box>

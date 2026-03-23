@@ -40,11 +40,14 @@ jobs:
       - name: Rebuild native modules for Electron
         run: npx electron-rebuild -v 35.2.1 -m node_modules/better-sqlite3
 
+      - name: Remove bun.lock to prevent electron-builder from using bun
+        run: rm -f bun.lock
+        shell: bash
+
       - name: Build and package desktop app
         run: npm run package:${{ matrix.platform }} -w @skillsgate/desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Skip macOS code signing when no certificate is configured
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
       - name: Upload artifacts

@@ -64,7 +64,8 @@ jobs:
           VERSION=${GITHUB_REF_NAME#tui-v}
           for pkg in tui-darwin-arm64 tui-linux-x64 tui-win32-x64; do
             mkdir -p "dist/$pkg"
-            cp artifacts/$pkg/skillsgate-tui* "dist/$pkg/" 2>/dev/null || cp artifacts/$pkg/* "dist/$pkg/"
+            ls artifacts/$pkg/
+            cp -r artifacts/$pkg/* "dist/$pkg/"
             chmod +x "dist/$pkg/skillsgate-tui"* 2>/dev/null || true
             case "$pkg" in
               tui-darwin-arm64) OS=darwin; CPU=arm64 ;;

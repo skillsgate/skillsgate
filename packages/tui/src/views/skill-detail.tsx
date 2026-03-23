@@ -324,7 +324,7 @@ export function SkillDetailView() {
     <box style={{ flexDirection: "row", width: "100%", flexGrow: 1 }}>
       {/* Left side: Markdown content (70%) */}
       <scrollbox
-        focused={state.activeView === "detail" && !state.showHelp}
+        focused={false}
         style={{
           width: "70%",
           flexGrow: 1,

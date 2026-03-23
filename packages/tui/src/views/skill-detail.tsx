@@ -47,14 +47,42 @@ export function SkillDetailView() {
   const skill = state.selectedSkill
 
   const [content, setContent] = useState("")
+  const [contentLoading, setContentLoading] = useState(false)
   const [pendingAction, setPendingAction] = useState<DetailPendingAction>(null)
 
   useEffect(() => {
-    if (skill?.filePath) {
+    if (!skill) return
+
+    // Local skill: read from disk
+    if (skill.filePath) {
       const raw = readSkillContent(skill.filePath)
       setContent(stripFrontmatter(raw))
+      return
     }
-  }, [skill?.filePath])
+
+    // Catalog skill: fetch content from API
+    const githubUrl = skill.metadata?.githubUrl as string | undefined
+    const urlPath = skill.metadata?.urlPath as string | undefined
+    if (githubUrl || urlPath) {
+      setContentLoading(true)
+      const detailPath = urlPath
+        ? `/api/v1/skills/detail?path=${encodeURIComponent(urlPath)}`
+        : `/api/v1/skills/detail?path=${encodeURIComponent(skill.name)}`
+      fetch(`https://api.skillsgate.ai${detailPath}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.content) {
+            setContent(stripFrontmatter(data.content))
+          } else {
+            setContent(skill.description || "(No content available)")
+          }
+        })
+        .catch(() => setContent(skill.description || "(Could not load content)"))
+        .finally(() => setContentLoading(false))
+    } else {
+      setContent(skill.description || "(No content available)")
+    }
+  }, [skill?.name, skill?.filePath])
 
   // Detail view keyboard handling
   useKeyboard((key) => {
@@ -143,12 +171,13 @@ export function SkillDetailView() {
       </text>
     )
   })
+  const isInstalled = skill.agents.length > 0
   const installedAt = skill.lock?.installedAt
     ? new Date(skill.lock.installedAt).toLocaleDateString()
-    : "unknown"
+    : null
   const updatedAt = skill.lock?.updatedAt
     ? new Date(skill.lock.updatedAt).toLocaleDateString()
-    : "unknown"
+    : null
 
   return (
     <box style={{ flexDirection: "row", width: "100%", flexGrow: 1 }}>
@@ -170,7 +199,10 @@ export function SkillDetailView() {
         }}
       >
         <box style={{ paddingLeft: 1, paddingRight: 1, paddingTop: 1, flexDirection: "column" }}>
-          {content.split("\n").map((line, i) => {
+          {contentLoading && (
+            <text fg={colors.textDim}>Loading content...</text>
+          )}
+          {!contentLoading && content.split("\n").map((line, i) => {
             // Style headings differently
             if (line.startsWith("### ")) {
               return (
@@ -260,21 +292,39 @@ export function SkillDetailView() {
           </>
         ) : null}
 
-        {/* Agents */}
-        <text fg={colors.textDim}>Agents</text>
-        <box style={{ flexDirection: "row", paddingLeft: 2 }}>
-          {agentBadgeElements}
-        </box>
+        {/* Status */}
+        <text fg={colors.textDim}>Status</text>
+        <text fg={isInstalled ? colors.success : colors.textDim}>
+          {"  "}{isInstalled ? "Installed" : "Not installed"}
+        </text>
         <text>{" "}</text>
 
-        {/* Dates */}
-        <text fg={colors.textDim}>Installed</text>
-        <text fg={colors.text}>  {installedAt}</text>
-        <text>{" "}</text>
+        {/* Agents (only if installed) */}
+        {isInstalled && agentBadgeElements.length > 0 && (
+          <>
+            <text fg={colors.textDim}>Agents</text>
+            <box style={{ flexDirection: "row", paddingLeft: 2 }}>
+              {agentBadgeElements}
+            </box>
+            <text>{" "}</text>
+          </>
+        )}
 
-        <text fg={colors.textDim}>Last updated</text>
-        <text fg={colors.text}>  {updatedAt}</text>
-        <text>{" "}</text>
+        {/* Dates (only if installed) */}
+        {installedAt && (
+          <>
+            <text fg={colors.textDim}>Installed</text>
+            <text fg={colors.text}>  {installedAt}</text>
+            <text>{" "}</text>
+          </>
+        )}
+        {updatedAt && (
+          <>
+            <text fg={colors.textDim}>Last updated</text>
+            <text fg={colors.text}>  {updatedAt}</text>
+            <text>{" "}</text>
+          </>
+        )}
 
         {/* Shortcut hints */}
         <text fg={colors.border}>---</text>

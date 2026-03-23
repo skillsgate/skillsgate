@@ -391,6 +391,7 @@ function catalogSkillToEnriched(skill: CatalogSkill): import("../store/types.js"
       keywords: skill.keywords,
       githubUrl: skill.githubUrl,
       installCommand: skill.installCommand,
+      urlPath: skill.urlPath,
     },
     lock: skill.githubUrl
       ? {

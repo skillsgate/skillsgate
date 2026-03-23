@@ -81,7 +81,7 @@ export function useInstalledSkills() {
 
         dispatch({ type: "SET_INSTALLED_SKILLS", skills })
 
-        // Update agent skill counts
+        // Update agent skill counts (without removing agents that have 0 skills)
         const agentCounts = new Map<AgentType, number>()
         for (const skill of skills) {
           for (const agentName of skill.agents) {
@@ -89,16 +89,7 @@ export function useInstalledSkills() {
           }
         }
 
-        // Re-detect agents with counts
-        const detectedAgents = Object.values(agents)
-          .filter((a) => agentCounts.has(a.name) || false)
-          .map((a) => ({
-            name: a.name,
-            displayName: a.displayName,
-            skillCount: agentCounts.get(a.name) ?? 0,
-          }))
-
-        dispatch({ type: "SET_DETECTED_AGENTS", agents: detectedAgents })
+        dispatch({ type: "UPDATE_AGENT_COUNTS", counts: Object.fromEntries(agentCounts) })
       } catch {
         if (!cancelled) {
           dispatch({ type: "SET_INSTALLED_SKILLS", skills: [] })

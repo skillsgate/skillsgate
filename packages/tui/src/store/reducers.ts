@@ -46,6 +46,15 @@ export function appReducer(state: AppState, action: Action): AppState {
     case "SET_DETECTED_AGENTS":
       return { ...state, detectedAgents: action.agents }
 
+    case "UPDATE_AGENT_COUNTS":
+      return {
+        ...state,
+        detectedAgents: state.detectedAgents.map(a => ({
+          ...a,
+          skillCount: action.counts[a.name] ?? 0,
+        })),
+      }
+
     case "SET_AGENT_FILTER":
       return { ...state, selectedAgentFilter: action.filter }
 

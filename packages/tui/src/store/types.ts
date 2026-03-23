@@ -102,6 +102,7 @@ export type Action =
   | { type: "GO_BACK" }
   | { type: "SET_AUTH"; auth: AuthState | null }
   | { type: "SET_DETECTED_AGENTS"; agents: DetectedAgent[] }
+  | { type: "UPDATE_AGENT_COUNTS"; counts: Record<string, number> }
   | { type: "SET_AGENT_FILTER"; filter: string }
   | { type: "SET_INSTALLED_SKILLS"; skills: EnrichedSkill[] }
   | { type: "SET_INSTALLED_LOADING"; loading: boolean }

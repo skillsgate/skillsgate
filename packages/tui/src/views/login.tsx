@@ -24,7 +24,21 @@ export function LoginView() {
 
   const authUrl = `${API_BASE_URL}/cli/auth`
 
-  // Handle y/n for "open browser?" prompt
+  function openBrowser() {
+    try {
+      const { exec } = require("node:child_process")
+      const cmd = process.platform === "darwin" ? "open" : "xdg-open"
+      exec(`${cmd} "${authUrl}"`)
+      dispatch({
+        type: "SHOW_NOTIFICATION",
+        notification: { type: "info", message: "Opening browser..." },
+      })
+    } catch {
+      // Best effort
+    }
+  }
+
+  // Handle keyboard input
   useKeyboard((key) => {
     if (state.activeView !== "login") return
     if (state.showHelp) return
@@ -36,32 +50,36 @@ export function LoginView() {
     }
 
     if (step === "prompt") {
-      // "r" to re-login (when already authenticated)
+      // "r" to re-login (clear old auth, open browser, go to code step)
       if (key.name === "r" && auth) {
-        // Clear old auth, then start fresh login
+        logout()
+        openBrowser()
+        setStep("code")
+        return
+      }
+
+      // "o" to logout only (no re-login)
+      if (key.name === "o" && auth) {
         logout()
         dispatch({
           type: "SHOW_NOTIFICATION",
-          notification: { type: "info", message: "Signed out. Starting fresh login..." },
+          notification: { type: "success", message: "Signed out" },
         })
+        dispatch({ type: "GO_BACK" })
+        return
       }
 
-      if (key.name === "y" || (key.name === "r" && auth)) {
-        // Open browser
-        try {
-          const { exec } = require("node:child_process")
-          const cmd = process.platform === "darwin" ? "open" : "xdg-open"
-          exec(`${cmd} "${authUrl}"`)
-          dispatch({
-            type: "SHOW_NOTIFICATION",
-            notification: { type: "info", message: "Opening browser..." },
-          })
-        } catch {
-          // Best effort - user can open manually
-        }
+      // "y" to open browser and proceed to code input
+      if (key.name === "y") {
+        openBrowser()
         setStep("code")
-      } else if (key.name === "n") {
+        return
+      }
+
+      // "n" to skip browser, go straight to code input
+      if (key.name === "n") {
         setStep("code")
+        return
       }
     }
   })
@@ -88,7 +106,7 @@ export function LoginView() {
     }
   }, [login, dispatch])
 
-  // Already logged in -- offer re-login
+  // Already logged in -- offer re-login or logout
   if (auth && step === "prompt") {
     return (
       <box style={{ flexDirection: "column", padding: 2 }}>
@@ -99,9 +117,13 @@ export function LoginView() {
         <text fg={colors.text}>
           If AI search isn't working, your session may have expired.
         </text>
-        <text fg={colors.text}>
-          Press <span fg={colors.primary}>r</span> to re-login with a fresh token, or <span fg={colors.textDim}>Esc</span> to go back.
-        </text>
+        <text>{" "}</text>
+        <text fg={colors.primary}>r</text>
+        <text fg={colors.text}>  Re-login with a fresh token</text>
+        <text fg={colors.primary}>o</text>
+        <text fg={colors.text}>  Sign out</text>
+        <text fg={colors.textDim}>Esc</text>
+        <text fg={colors.text}>  Go back</text>
       </box>
     )
   }

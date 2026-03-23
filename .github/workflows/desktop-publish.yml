@@ -34,7 +34,7 @@ jobs:
       - name: Install dependencies
         run: |
           rm -f package-lock.json
-          npm install --no-package-lock
+          npm install --no-package-lock --legacy-peer-deps
         shell: bash
 
       - name: Rebuild native modules for Electron

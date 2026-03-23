@@ -10,22 +10,19 @@ const renderer = await createCliRenderer({
 const root = createRoot(renderer)
 root.render(<App />)
 
-// Clean exit: restore terminal on Ctrl+C and Ctrl+Q
-function cleanExit() {
-  renderer.destroy()
-  // Ensure terminal is fully restored after OpenTUI cleanup
+// Make cleanExit available globally so layout.tsx can call it
+;(globalThis as any).__skillsgateTuiCleanExit = function cleanExit() {
+  try {
+    renderer.destroy()
+  } catch {
+    // ignore destroy errors
+  }
+  // Ensure terminal is fully restored
   process.stdout.write("\x1B[?1049l") // switch to main screen
   process.stdout.write("\x1B[?25h")   // show cursor
-  process.stdout.write("\x1Bc")        // full reset (RIS)
+  process.stdout.write("\x1Bc")       // full reset (RIS)
   process.exit(0)
 }
 
-process.on("SIGINT", cleanExit)
-process.on("SIGTERM", cleanExit)
-
-// Also handle Ctrl+Q from within the app
-renderer.on("keypress", (event: any) => {
-  if ((event.ctrl && event.name === "c") || (event.ctrl && event.name === "q")) {
-    cleanExit()
-  }
-})
+process.on("SIGINT", (globalThis as any).__skillsgateTuiCleanExit)
+process.on("SIGTERM", (globalThis as any).__skillsgateTuiCleanExit)

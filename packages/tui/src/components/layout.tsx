@@ -37,6 +37,27 @@ export function Layout() {
 
   // Global keyboard shortcuts
   useKeyboard((key) => {
+    // Ctrl+Q always works -- clean exit
+    if (key.name === "q" && key.ctrl) {
+      const exit = (globalThis as any).__skillsgateTuiCleanExit
+      if (exit) exit()
+      else process.exit(0)
+    }
+
+    // When search input is focused, only handle Escape and Tab -- let all other keys pass through to the input
+    if (state.focusedPane === "search") {
+      if (key.name === "escape") {
+        dispatch({ type: "SET_FOCUSED_PANE", pane: "list" })
+        return
+      }
+      if (key.name === "tab" && !key.shift) {
+        dispatch({ type: "CYCLE_FOCUS" })
+        return
+      }
+      // All other keys go to the input component -- do NOT intercept
+      return
+    }
+
     // Help overlay toggle
     if (key.name === "?" || (key.shift && key.name === "/")) {
       dispatch({ type: "TOGGLE_HELP" })
@@ -52,11 +73,8 @@ export function Layout() {
     // When help is shown, block other shortcuts
     if (state.showHelp) return
 
-    // Quit
-    if (key.name === "q" && key.ctrl) process.exit(0)
-
-    // Tab switching (only when not in detail view and not focused on search input)
-    if (state.activeView !== "detail" && state.focusedPane !== "search") {
+    // Tab switching (only when not in detail view)
+    if (state.activeView !== "detail") {
       if (key.name === "1") dispatch({ type: "NAVIGATE", view: "home" })
       if (key.name === "2") dispatch({ type: "NAVIGATE", view: "discover" })
       if (key.name === "3") dispatch({ type: "NAVIGATE", view: "favorites" })
@@ -69,7 +87,7 @@ export function Layout() {
     }
 
     // "/" to focus search from anywhere
-    if (key.name === "/" && state.focusedPane !== "search" && state.activeView !== "detail") {
+    if (key.name === "/" && state.activeView !== "detail") {
       dispatch({ type: "SET_FOCUSED_PANE", pane: "search" })
       return
     }

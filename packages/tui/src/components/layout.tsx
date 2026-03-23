@@ -71,6 +71,14 @@ export function Layout() {
       return
     }
 
+    // When on login view, only handle Escape -- let input keys pass through
+    if (state.activeView === "login") {
+      if (key.name === "escape") {
+        dispatch({ type: "GO_BACK" })
+      }
+      return
+    }
+
     // Help overlay toggle
     if (key.name === "?" || (key.shift && key.name === "/")) {
       dispatch({ type: "TOGGLE_HELP" })

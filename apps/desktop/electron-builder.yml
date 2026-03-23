@@ -37,6 +37,7 @@ linux:
     - AppImage
     - deb
   category: Development
+  artifactName: "SkillsGate-${version}-${arch}.${ext}"
 
 publish:
   provider: github

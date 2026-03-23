@@ -147,7 +147,8 @@ export function DiscoverView() {
           onSubmit={(value: string) => {
             setQuery(value)
             setSelectedIndex(0)
-            dispatch({ type: "SET_FOCUSED_PANE", pane: "list" })
+            // Stay in search pane -- user presses Tab to move to results
+            // This prevents Enter from also triggering "open skill" in the list
           }}
         />
       </box>

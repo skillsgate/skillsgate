@@ -140,35 +140,9 @@ export function SkillDetailView() {
       return
     }
 
-    // e to toggle edit mode (only for locally installed skills)
+    // e to toggle between rendered view and raw source (only for local skills)
     if (key.name === "e" && skill?.filePath) {
-      if (editMode) {
-        // Save and exit edit mode
-        try {
-          fs.writeFileSync(skill.filePath, rawContent, "utf-8")
-          setContent(stripFrontmatter(rawContent))
-          dispatch({
-            type: "SHOW_NOTIFICATION",
-            notification: { type: "success", message: `Saved ${skill.name}` },
-          })
-        } catch {
-          dispatch({
-            type: "SHOW_NOTIFICATION",
-            notification: { type: "error", message: "Failed to save" },
-          })
-        }
-        setEditMode(false)
-      } else {
-        // Enter edit mode
-        setEditMode(true)
-      }
-      return
-    }
-
-    // Esc in edit mode cancels without saving
-    if (key.name === "escape" && editMode) {
-      setRawContent(readSkillContent(skill?.filePath ?? ""))
-      setEditMode(false)
+      setEditMode(!editMode)
       return
     }
 
@@ -336,18 +310,24 @@ export function SkillDetailView() {
       {editMode ? (
         <box style={{ width: "70%", flexGrow: 1, flexDirection: "column" }}>
           <box style={{ height: 1, paddingLeft: 1, backgroundColor: colors.bgAlt }}>
-            <text fg={colors.warning}>EDITING: {skill.name}  (e=save  Esc=cancel)</text>
+            <text fg={colors.warning}>RAW: {skill.filePath}  (o=open folder  Esc=back to view)</text>
           </box>
-          <textarea
-            focused={true}
-            content={rawContent}
-            onContentChanged={(value: string) => setRawContent(value)}
-            placeholder="Loading..."
-            backgroundColor={colors.bg}
-            textColor={colors.text}
-            focusedBackgroundColor={colors.bg}
-            focusedTextColor={colors.text}
-          />
+          <scrollbox
+            focused={false}
+            style={{
+              width: "100%",
+              flexGrow: 1,
+              rootOptions: { backgroundColor: colors.bg },
+              viewportOptions: { backgroundColor: colors.bg },
+              contentOptions: { backgroundColor: colors.bg },
+            }}
+          >
+            <box style={{ paddingLeft: 1, paddingRight: 1, paddingTop: 1, flexDirection: "column" }}>
+              {rawContent.split("\n").map((line, i) => (
+                <text key={i} fg={colors.text}>{line || " "}</text>
+              ))}
+            </box>
+          </scrollbox>
         </box>
       ) : (
       <scrollbox
@@ -499,7 +479,7 @@ export function SkillDetailView() {
         <text fg={colors.border}>---</text>
         <text fg={colors.textDim}>q/Esc  Go back</text>
         {isLocal && (
-          <text fg={colors.textDim}>e      {editMode ? "Save changes" : "Edit skill"}</text>
+          <text fg={colors.textDim}>e      {editMode ? "Back to view" : "View raw source"}</text>
         )}
         {isLocal ? (
           <text fg={colors.textDim}>o      Open folder</text>

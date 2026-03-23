@@ -260,8 +260,8 @@ export default function Home() {
 		<div ref={containerRef} className="min-h-screen">
 			<Navbar />
 
-			{/* ═══ HERO ═══ */}
-			<section className="relative pt-32 pb-20 md:pt-44 md:pb-32 px-6">
+			{/* ═══ APPS SHOWCASE (primary) ═══ */}
+			<section className="relative pt-32 pb-20 md:pt-44 md:pb-28 px-6 overflow-hidden">
 				{/* Subtle radial glow */}
 				<div
 					className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] opacity-60"
@@ -271,174 +271,117 @@ export default function Home() {
 					}}
 				/>
 
-				<div className="relative max-w-4xl mx-auto text-center">
-					{/* Overline */}
-					<p
-						className="animate-fade-up text-[11px] md:text-[12px] font-mono tracking-[0.2em] uppercase text-muted mb-6"
-						style={{ animationDelay: "0.1s" }}
-					>
-						The open marketplace for AI agent skills
-					</p>
-
-					{/* Headline */}
-					<h1
-						className="animate-fade-up text-[clamp(2.25rem,6vw,4.5rem)] font-semibold leading-[1.08] tracking-tight text-foreground"
-						style={{ animationDelay: "0.2s" }}
-					>
-						Find the right skill
-						<br />
-						<span className="text-muted">for any agent</span>
-					</h1>
-
-					{/* Subheadline */}
-					<p
-						className="animate-fade-up mt-6 md:mt-8 text-[15px] md:text-[17px] leading-relaxed text-muted max-w-xl mx-auto"
-						style={{ animationDelay: "0.35s" }}
-					>
-						80,000+ skills indexed and semantic-searchable. Your AI agent
-						finds exactly what it needs. Works with Claude Code, Cursor,
-						Windsurf, and more.
-					</p>
-
-					{/* Search bar */}
-					<div
-						className="animate-fade-up mt-10 md:mt-12 max-w-lg mx-auto"
-						style={{ animationDelay: "0.5s" }}
-					>
-						<SkillSearch />
-					</div>
-
-					{/* Quick install hint */}
-					<div
-						className="animate-fade-up mt-6 flex items-center justify-center gap-4"
-						style={{ animationDelay: "0.6s" }}
-					>
-						<code className="text-[12px] font-mono text-muted bg-code-bg px-3 py-1.5 rounded-md border border-border">
-							$ npx skillsgate search "react best practices"
-						</code>
-					</div>
-
-					{/* Stats row */}
-					<div
-						className="animate-fade-up mt-12 flex items-center justify-center gap-12 md:gap-16"
-						style={{ animationDelay: "0.7s" }}
-					>
-						<div className="text-center">
-							<div className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">
-								80,000+
-							</div>
-							<div className="text-[11px] font-mono tracking-wider uppercase text-muted mt-1">
-								Skills indexed
-							</div>
-						</div>
-						<div className="w-px h-8 bg-border" />
-						<div className="text-center">
-							<div className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">
-								17
-							</div>
-							<div className="text-[11px] font-mono tracking-wider uppercase text-muted mt-1">
-								Agents
-							</div>
-						</div>
-					</div>
-				</div>
-			</section>
-
-			{/* ═══ APPS SHOWCASE ═══ */}
-			<section className="py-20 md:py-28 border-t border-border overflow-hidden">
-				<div className="max-w-6xl mx-auto px-6">
-					<div className="reveal text-center mb-14 md:mb-20">
-						<p className="text-[11px] font-mono tracking-[0.2em] uppercase text-muted mb-3">
-							Your skills, organized
+				<div className="relative max-w-6xl mx-auto">
+					<div className="text-center mb-14 md:mb-20">
+						<p
+							className="animate-fade-up text-[11px] md:text-[12px] font-mono tracking-[0.2em] uppercase text-muted mb-6"
+							style={{ animationDelay: "0.1s" }}
+						>
+							Your AI agent skills, finally organized
 						</p>
-						<h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">
-							Desktop app and terminal UI
-						</h2>
-						<p className="mt-4 text-[15px] text-muted max-w-xl mx-auto leading-relaxed">
-							Browse, search, edit, and manage all your installed skills in one place.
-							Available as a desktop app and a keyboard-driven terminal interface.
+						<h1
+							className="animate-fade-up text-[clamp(2.25rem,6vw,4.5rem)] font-semibold leading-[1.08] tracking-tight text-foreground"
+							style={{ animationDelay: "0.2s" }}
+						>
+							One app for every
+							<br />
+							<span className="text-muted">agent skill</span>
+						</h1>
+						<p
+							className="animate-fade-up mt-6 md:mt-8 text-[15px] md:text-[17px] leading-relaxed text-muted max-w-xl mx-auto"
+							style={{ animationDelay: "0.35s" }}
+						>
+							Browse, search, edit, and manage all your installed skills across
+							18 AI coding agents. Desktop app, terminal UI, and CLI.
 						</p>
-					</div>
 
-					{/* Desktop app screenshot */}
-					<div className="reveal mb-16">
-						<div className="relative">
-							<div
-								className="pointer-events-none absolute -inset-8 opacity-30"
-								style={{
-									background: "radial-gradient(ellipse at center, var(--glow) 0%, transparent 70%)",
-								}}
-							/>
-							<div className="relative bg-card-bg border border-card-border rounded-xl overflow-hidden shadow-2xl shadow-black/20">
-								<div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-surface">
-									<div className="flex gap-1.5">
-										<div className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]" />
-										<div className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]" />
-										<div className="w-2.5 h-2.5 rounded-full bg-[#28c840]" />
-									</div>
-									<span className="text-[11px] font-mono text-muted/40 ml-2">SkillsGate</span>
-								</div>
-								<img
-									src="/skillsgate-darkmode.png"
-									alt="SkillsGate Desktop App"
-									className="w-full hidden dark:block"
-									loading="lazy"
-								/>
-								<img
-									src="/skillsgate-darkmode.png"
-									alt="SkillsGate Desktop App"
-									className="w-full dark:hidden"
-									loading="lazy"
-								/>
-							</div>
-						</div>
-
-						{/* Desktop download buttons */}
-						<div className="flex flex-wrap items-center justify-center gap-3 mt-8">
+						{/* Download buttons */}
+						<div
+							className="animate-fade-up flex flex-wrap items-center justify-center gap-3 mt-10"
+							style={{ animationDelay: "0.5s" }}
+						>
 							<a
 								href="https://github.com/skillsgate/skillsgate/releases/latest"
-								className="inline-flex items-center gap-2 px-5 py-2.5 text-[13px] font-medium bg-foreground text-background rounded-lg hover:opacity-90 transition-opacity no-underline"
+								className="inline-flex items-center gap-2 px-6 py-3 text-[14px] font-medium bg-foreground text-background rounded-lg hover:opacity-90 transition-opacity no-underline"
 							>
 								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
 									<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
 									<polyline points="7 10 12 15 17 10" />
 									<line x1="12" y1="15" x2="12" y2="3" />
 								</svg>
-								Download for Mac
+								Download Desktop App
 							</a>
-							<a
-								href="https://github.com/skillsgate/skillsgate/releases/latest"
-								className="inline-flex items-center gap-2 px-5 py-2.5 text-[13px] font-medium text-muted border border-border rounded-lg hover:text-foreground hover:border-accent/40 transition-colors no-underline"
-							>
-								Windows & Linux
-							</a>
+							<code className="text-[12px] font-mono text-muted bg-code-bg px-4 py-3 rounded-lg border border-border">
+								npm install -g @skillsgate/tui
+							</code>
+						</div>
+
+						{/* Stats */}
+						<div
+							className="animate-fade-up mt-10 flex items-center justify-center gap-12 md:gap-16"
+							style={{ animationDelay: "0.6s" }}
+						>
+							<div className="text-center">
+								<div className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">80,000+</div>
+								<div className="text-[11px] font-mono tracking-wider uppercase text-muted mt-1">Skills indexed</div>
+							</div>
+							<div className="w-px h-8 bg-border" />
+							<div className="text-center">
+								<div className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">18</div>
+								<div className="text-[11px] font-mono tracking-wider uppercase text-muted mt-1">Agents</div>
+							</div>
+							<div className="w-px h-8 bg-border" />
+							<div className="text-center">
+								<div className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">3</div>
+								<div className="text-[11px] font-mono tracking-wider uppercase text-muted mt-1">Interfaces</div>
+							</div>
+						</div>
+					</div>
+
+					{/* Desktop screenshot */}
+					<div className="animate-fade-up relative" style={{ animationDelay: "0.7s" }}>
+						<div
+							className="pointer-events-none absolute -inset-8 opacity-30"
+							style={{
+								background: "radial-gradient(ellipse at center, var(--glow) 0%, transparent 70%)",
+							}}
+						/>
+						<div className="relative bg-card-bg border border-card-border rounded-xl overflow-hidden shadow-2xl shadow-black/20">
+							<div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-surface">
+								<div className="flex gap-1.5">
+									<div className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]" />
+									<div className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]" />
+									<div className="w-2.5 h-2.5 rounded-full bg-[#28c840]" />
+								</div>
+								<span className="text-[11px] font-mono text-muted/40 ml-2">SkillsGate</span>
+							</div>
+							<img
+								src="/skillsgate-darkmode.png"
+								alt="SkillsGate Desktop App"
+								className="w-full"
+								loading="eager"
+							/>
 						</div>
 					</div>
 
 					{/* TUI section */}
-					<div className="reveal grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-						{/* TUI description */}
+					<div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center mt-20">
 						<div>
 							<div className="flex items-center gap-2 mb-4">
 								<div className="w-2 h-2 rounded-full bg-accent/40" />
-								<span className="text-[10px] font-mono tracking-[0.2em] uppercase text-muted">
-									Terminal UI
-								</span>
+								<span className="text-[10px] font-mono tracking-[0.2em] uppercase text-muted">Terminal UI</span>
 							</div>
 							<h3 className="text-xl md:text-2xl font-semibold tracking-tight text-foreground mb-4">
 								For keyboard-driven workflows
 							</h3>
 							<p className="text-[14px] text-muted leading-relaxed mb-6">
 								Navigate with j/k, search with /, install with i, edit with e.
-								Everything you need without leaving the terminal. Supports keyword and
-								AI-powered semantic search.
+								Everything you need without leaving the terminal. Supports keyword and AI-powered semantic search.
 							</p>
 							<code className="inline-block text-[12px] font-mono text-muted bg-code-bg px-3 py-1.5 rounded-md border border-border">
 								$ npm install -g @skillsgate/tui
 							</code>
 						</div>
-
-						{/* TUI screenshot */}
 						<div className="relative">
 							<div className="bg-card-bg border border-card-border rounded-xl overflow-hidden shadow-xl shadow-black/10">
 								<div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-surface">
@@ -449,18 +392,13 @@ export default function Home() {
 									</div>
 									<span className="text-[11px] font-mono text-muted/40 ml-2">Terminal</span>
 								</div>
-								<img
-									src="/tui-screenshot.png"
-									alt="SkillsGate TUI"
-									className="w-full"
-									loading="lazy"
-								/>
+								<img src="/tui-screenshot.png" alt="SkillsGate TUI" className="w-full" loading="lazy" />
 							</div>
 						</div>
 					</div>
 
-					{/* App features grid */}
-					<div className="reveal grid grid-cols-1 md:grid-cols-3 gap-4 mt-14">
+					{/* Feature cards */}
+					<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-14">
 						<div className="bg-card-bg border border-card-border rounded-xl p-6">
 							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">Per-agent management</h3>
 							<p className="text-[12px] text-muted leading-relaxed">
@@ -470,7 +408,7 @@ export default function Home() {
 						<div className="bg-card-bg border border-card-border rounded-xl p-6">
 							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">Remote servers</h3>
 							<p className="text-[12px] text-muted leading-relaxed">
-								Connect to other machines via SSH to browse and sync skills. Manage skills across your fleet from one interface.
+								Connect to other machines via SSH to browse and sync skills. Manage skills across your fleet.
 							</p>
 						</div>
 						<div className="bg-card-bg border border-card-border rounded-xl p-6">
@@ -482,6 +420,34 @@ export default function Home() {
 					</div>
 				</div>
 			</section>
+
+			{/* ═══ SEMANTIC SEARCH ═══ */}
+			<section className="relative py-20 md:py-28 border-t border-border px-6">
+				<div className="relative max-w-4xl mx-auto text-center">
+					<p className="reveal text-[11px] font-mono tracking-[0.2em] uppercase text-muted mb-3">
+						Search
+					</p>
+					<h2 className="reveal text-2xl md:text-3xl font-semibold tracking-tight text-foreground mb-3">
+						Find the right skill
+						<br className="hidden sm:block" />
+						<span className="text-muted">for any agent</span>
+					</h2>
+					<p className="reveal mt-4 text-[15px] text-muted max-w-xl mx-auto leading-relaxed mb-10">
+						AI-powered semantic search across 80,000+ skills. Describe what you need in natural language.
+					</p>
+
+					<div className="reveal max-w-lg mx-auto">
+						<SkillSearch />
+					</div>
+
+					<div className="reveal mt-6 flex items-center justify-center">
+						<code className="text-[12px] font-mono text-muted bg-code-bg px-3 py-1.5 rounded-md border border-border">
+							$ npx skillsgate search "react best practices"
+						</code>
+					</div>
+				</div>
+			</section>
+
 
 			{/* ═══ AGENT LOGOS ═══ */}
 			<section className="py-12 border-t border-border">

@@ -8,15 +8,22 @@ import { HelpOverlay } from "./help-overlay.js"
 import { HomeView } from "../views/home.js"
 import { SkillDetailView } from "../views/skill-detail.js"
 import { DiscoverView } from "../views/discover.js"
+import { FavoritesView } from "../views/favorites.js"
 import { LoginView } from "../views/login.js"
 import { colors } from "../utils/colors.js"
 import type { ViewName } from "../store/types.js"
 
-const TAB_OPTIONS = [
-  { name: "Installed", description: "Locally installed skills", value: "home" },
-  { name: "Discover", description: "Search the registry", value: "discover" },
-  { name: "Favorites", description: "Your starred skills", value: "favorites" },
-]
+function getTabOptions(favCount: number) {
+  return [
+    { name: "Installed", description: "Locally installed skills", value: "home" },
+    { name: "Discover", description: "Search the registry", value: "discover" },
+    {
+      name: favCount > 0 ? `Favorites (${favCount})` : "Favorites",
+      description: "Your starred skills",
+      value: "favorites",
+    },
+  ]
+}
 
 export function Layout() {
   const state = useStore()
@@ -102,6 +109,8 @@ export function Layout() {
     }
   })
 
+  const TAB_OPTIONS = getTabOptions(state.favorites.length)
+
   const activeTabIndex = TAB_OPTIONS.findIndex(
     (t) => t.value === state.activeView
   )
@@ -157,11 +166,7 @@ export function Layout() {
           <>
             {state.activeView === "home" && <HomeView />}
             {state.activeView === "discover" && <DiscoverView />}
-            {state.activeView === "favorites" && (
-              <box style={{ padding: 1 }}>
-                <text fg={colors.textDim}>Favorites view - coming soon</text>
-              </box>
-            )}
+            {state.activeView === "favorites" && <FavoritesView />}
             {state.activeView === "login" && <LoginView />}
             {state.activeView === "detail" && state.selectedSkill && (
               <SkillDetailView />

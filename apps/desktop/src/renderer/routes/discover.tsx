@@ -607,25 +607,21 @@ export function Discover() {
 
   const handleSearchChange = useCallback((value: string) => {
     setSearchQuery(value)
-
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current)
-    }
-
+    // Only update the input value -- actual search triggers on Enter
     if (!value.trim()) {
       setOffset(0)
       fetchCatalog(0)
-      return
     }
+  }, [])
 
-    debounceRef.current = setTimeout(() => {
-      if (searchMode === "semantic" && token) {
-        fetchSemanticSearch(value.trim())
-      } else {
-        fetchSearch(value.trim())
-      }
-    }, 300)
-  }, [searchMode, token])
+  const handleSearchSubmit = useCallback(() => {
+    if (!searchQuery.trim()) return
+    if (searchMode === "semantic" && token) {
+      fetchSemanticSearch(searchQuery.trim())
+    } else {
+      fetchSearch(searchQuery.trim())
+    }
+  }, [searchQuery, searchMode, token])
 
   function handleLoadMore() {
     if (searchQuery.trim()) {
@@ -668,7 +664,7 @@ export function Discover() {
         <div className="flex items-center gap-3 mb-3">
           <div className="flex items-center rounded-lg border border-border bg-surface overflow-hidden text-[12px]">
             <button
-              onClick={() => { setSearchMode("keyword"); if (searchQuery.trim()) { fetchSearch(searchQuery.trim()) } }}
+              onClick={() => { setSearchMode("keyword") }}
               className={`px-3 py-1.5 transition-colors ${searchMode === "keyword" ? "bg-surface-hover text-foreground font-medium" : "text-muted hover:text-foreground"}`}
             >
               Keyword
@@ -677,7 +673,6 @@ export function Discover() {
               onClick={() => {
                 if (!isAuthenticated) return
                 setSearchMode("semantic")
-                if (searchQuery.trim()) { fetchSemanticSearch(searchQuery.trim()) }
               }}
               className={`px-3 py-1.5 transition-colors ${searchMode === "semantic" ? "bg-surface-hover text-foreground font-medium" : "text-muted hover:text-foreground"} ${!isAuthenticated ? "opacity-40 cursor-not-allowed" : ""}`}
               title={!isAuthenticated ? "Sign in to use AI search" : "AI-powered semantic search"}
@@ -703,9 +698,10 @@ export function Discover() {
           </div>
           <input
             type="text"
-            placeholder={searchMode === "semantic" ? 'AI search -- try "audit website performance"...' : "Search skills by name, keyword, or category..."}
+            placeholder={searchMode === "semantic" ? 'AI search -- try "audit website performance" (Enter to search)' : "Search by name, keyword, or category... (Enter to search)"}
             value={searchQuery}
             onChange={(e) => handleSearchChange(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSearchSubmit() }}
             className="w-full pl-9 pr-10 py-2.5 rounded-lg bg-surface border border-border text-[13px] text-foreground placeholder:text-muted focus:outline-none focus:border-accent/40 transition-colors"
           />
           {(searching || loading) && (

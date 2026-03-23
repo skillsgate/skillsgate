@@ -41,11 +41,8 @@ jobs:
         run: npm run package:${{ matrix.platform }} -w @skillsgate/desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Skip macOS code signing when no certificate is configured
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

@@ -91,7 +91,7 @@ jobs:
         run: |
           VERSION=${GITHUB_REF_NAME#tui-v}
           cd packages/tui
-          npm version $VERSION --no-git-tag-version
+          npm version $VERSION --no-git-tag-version --allow-same-version
           npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,0 +1,3 @@
+[install]
+# Treat this package as standalone - do not walk up to the monorepo root
+scopes = {}

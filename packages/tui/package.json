@@ -1,0 +1,21 @@
+{
+  "name": "@skillsgate/tui",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "skillsgate-tui": "src/index.tsx"
+  },
+  "scripts": {
+    "dev": "bun --watch run src/index.tsx",
+    "start": "bun run src/index.tsx"
+  },
+  "dependencies": {
+    "@opentui/core": "0.1.90",
+    "@opentui/react": "0.1.90",
+    "gray-matter": "^4.0.3"
+  },
+  "peerDependencies": {
+    "react": ">=19.0.0"
+  }
+}

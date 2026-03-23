@@ -324,10 +324,26 @@ function DetailPanel({ skill, onClose, installedNames, onInstall }: DetailPanelP
   }, [installedNames, skill.name])
 
   async function handleInstall() {
-    if (!skill.installCommand) return
-    // Extract the source from "npx skillsgate install <source>"
-    const parts = skill.installCommand.split(" ")
-    const source = parts[parts.length - 1]
+    // Extract source from install command like "skillsgate add vercel/next.js --skill foo -y"
+    // or fall back to githubUrl
+    let source = ""
+    if (skill.installCommand) {
+      const parts = skill.installCommand.split(/\s+/)
+      const addIdx = parts.indexOf("add")
+      if (addIdx !== -1 && parts[addIdx + 1]) {
+        source = parts[addIdx + 1]
+      }
+    }
+    if (!source && skill.githubUrl) {
+      // Extract owner/repo from GitHub URL
+      try {
+        const url = new URL(skill.githubUrl)
+        const segments = url.pathname.split("/").filter(Boolean)
+        if (segments.length >= 2) {
+          source = `${segments[0]}/${segments[1]}`
+        }
+      } catch {}
+    }
     if (!source) return
 
     setInstalling(true)

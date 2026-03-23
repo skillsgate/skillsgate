@@ -44,7 +44,7 @@ export function useFavorites(): UseFavoritesResult {
 
     async function fetchFavorites() {
       try {
-        const res = await fetch(`${API_BASE}/api/v1/favorites`, {
+        const res = await fetch(`${API_BASE}/api/favorites`, {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
@@ -91,7 +91,7 @@ export function useFavorites(): UseFavoritesResult {
     try {
       if (isFavorited) {
         // Remove favorite
-        const res = await fetch(`${API_BASE}/api/v1/favorites/${skillId}`, {
+        const res = await fetch(`${API_BASE}/api/favorites/${skillId}`, {
           method: "DELETE",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -109,7 +109,7 @@ export function useFavorites(): UseFavoritesResult {
         })
       } else {
         // Add favorite
-        const res = await fetch(`${API_BASE}/api/v1/favorites`, {
+        const res = await fetch(`${API_BASE}/api/favorites`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

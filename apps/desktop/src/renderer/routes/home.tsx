@@ -85,20 +85,16 @@ function SearchIcon({ size = 16 }: { size?: number }) {
   )
 }
 
-function ToolIcon() {
+function SkillsGateIcon() {
   return (
-    <svg
-      width="48"
-      height="48"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="text-muted"
-    >
-      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+    <svg width="48" height="48" viewBox="0 0 64 64" className="text-muted">
+      <g transform="translate(8, 8)">
+        <path d="M16 2 L4 2 C2 2 1 4 1 6 L1 42 C1 44 2 46 4 46 L16 46" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M32 2 L44 2 C46 2 47 4 47 6 L47 42 C47 44 46 46 44 46 L32 46" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+        <circle cx="24" cy="14" r="3.5" fill="currentColor"/>
+        <circle cx="24" cy="24" r="3.5" fill="currentColor"/>
+        <circle cx="24" cy="34" r="3.5" fill="currentColor"/>
+      </g>
     </svg>
   )
 }
@@ -345,7 +341,7 @@ function MiddlePanel({
           <div className="flex flex-col items-center justify-center py-12 text-center px-4">
             {skills.length === 0 ? (
               <>
-                <ToolIcon />
+                <SkillsGateIcon />
                 <p className="text-muted text-[12px] mt-3">
                   No skills installed yet.
                 </p>
@@ -409,7 +405,7 @@ function RightPanel({ skill, content, contentLoading }: RightPanelProps) {
     return (
       <div className="flex-1 flex items-center justify-center bg-background">
         <div className="text-center">
-          <ToolIcon />
+          <SkillsGateIcon />
           <p className="text-muted text-sm mt-3">
             Select a skill to view details
           </p>

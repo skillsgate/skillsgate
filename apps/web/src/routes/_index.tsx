@@ -344,6 +344,145 @@ export default function Home() {
 				</div>
 			</section>
 
+			{/* ═══ APPS SHOWCASE ═══ */}
+			<section className="py-20 md:py-28 border-t border-border overflow-hidden">
+				<div className="max-w-6xl mx-auto px-6">
+					<div className="reveal text-center mb-14 md:mb-20">
+						<p className="text-[11px] font-mono tracking-[0.2em] uppercase text-muted mb-3">
+							Your skills, organized
+						</p>
+						<h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">
+							Desktop app and terminal UI
+						</h2>
+						<p className="mt-4 text-[15px] text-muted max-w-xl mx-auto leading-relaxed">
+							Browse, search, edit, and manage all your installed skills in one place.
+							Available as a desktop app and a keyboard-driven terminal interface.
+						</p>
+					</div>
+
+					{/* Desktop app screenshot */}
+					<div className="reveal mb-16">
+						<div className="relative">
+							<div
+								className="pointer-events-none absolute -inset-8 opacity-30"
+								style={{
+									background: "radial-gradient(ellipse at center, var(--glow) 0%, transparent 70%)",
+								}}
+							/>
+							<div className="relative bg-card-bg border border-card-border rounded-xl overflow-hidden shadow-2xl shadow-black/20">
+								<div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-surface">
+									<div className="flex gap-1.5">
+										<div className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]" />
+										<div className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]" />
+										<div className="w-2.5 h-2.5 rounded-full bg-[#28c840]" />
+									</div>
+									<span className="text-[11px] font-mono text-muted/40 ml-2">SkillsGate</span>
+								</div>
+								<img
+									src="/skillsgate-darkmode.png"
+									alt="SkillsGate Desktop App"
+									className="w-full hidden dark:block"
+									loading="lazy"
+								/>
+								<img
+									src="/skillsgate-darkmode.png"
+									alt="SkillsGate Desktop App"
+									className="w-full dark:hidden"
+									loading="lazy"
+								/>
+							</div>
+						</div>
+
+						{/* Desktop download buttons */}
+						<div className="flex flex-wrap items-center justify-center gap-3 mt-8">
+							<a
+								href="https://github.com/skillsgate/skillsgate/releases/latest"
+								className="inline-flex items-center gap-2 px-5 py-2.5 text-[13px] font-medium bg-foreground text-background rounded-lg hover:opacity-90 transition-opacity no-underline"
+							>
+								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+									<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+									<polyline points="7 10 12 15 17 10" />
+									<line x1="12" y1="15" x2="12" y2="3" />
+								</svg>
+								Download for Mac
+							</a>
+							<a
+								href="https://github.com/skillsgate/skillsgate/releases/latest"
+								className="inline-flex items-center gap-2 px-5 py-2.5 text-[13px] font-medium text-muted border border-border rounded-lg hover:text-foreground hover:border-accent/40 transition-colors no-underline"
+							>
+								Windows & Linux
+							</a>
+						</div>
+					</div>
+
+					{/* TUI section */}
+					<div className="reveal grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+						{/* TUI description */}
+						<div>
+							<div className="flex items-center gap-2 mb-4">
+								<div className="w-2 h-2 rounded-full bg-accent/40" />
+								<span className="text-[10px] font-mono tracking-[0.2em] uppercase text-muted">
+									Terminal UI
+								</span>
+							</div>
+							<h3 className="text-xl md:text-2xl font-semibold tracking-tight text-foreground mb-4">
+								For keyboard-driven workflows
+							</h3>
+							<p className="text-[14px] text-muted leading-relaxed mb-6">
+								Navigate with j/k, search with /, install with i, edit with e.
+								Everything you need without leaving the terminal. Supports keyword and
+								AI-powered semantic search.
+							</p>
+							<code className="inline-block text-[12px] font-mono text-muted bg-code-bg px-3 py-1.5 rounded-md border border-border">
+								$ npm install -g @skillsgate/tui
+							</code>
+						</div>
+
+						{/* TUI screenshot */}
+						<div className="relative">
+							<div className="bg-card-bg border border-card-border rounded-xl overflow-hidden shadow-xl shadow-black/10">
+								<div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-surface">
+									<div className="flex gap-1.5">
+										<div className="w-2.5 h-2.5 rounded-full bg-muted/20" />
+										<div className="w-2.5 h-2.5 rounded-full bg-muted/20" />
+										<div className="w-2.5 h-2.5 rounded-full bg-muted/20" />
+									</div>
+									<span className="text-[11px] font-mono text-muted/40 ml-2">Terminal</span>
+								</div>
+								<img
+									src="/tui-screenshot.png"
+									alt="SkillsGate TUI"
+									className="w-full"
+									loading="lazy"
+								/>
+							</div>
+						</div>
+					</div>
+
+					{/* App features grid */}
+					<div className="reveal grid grid-cols-1 md:grid-cols-3 gap-4 mt-14">
+						<div className="bg-card-bg border border-card-border rounded-xl p-6">
+							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">Per-agent management</h3>
+							<p className="text-[12px] text-muted leading-relaxed">
+								Remove a skill from Cursor but keep it in Claude Code. Full control over which agents use which skills.
+							</p>
+						</div>
+						<div className="bg-card-bg border border-card-border rounded-xl p-6">
+							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">Remote servers</h3>
+							<p className="text-[12px] text-muted leading-relaxed">
+								Connect to other machines via SSH to browse and sync skills. Manage skills across your fleet from one interface.
+							</p>
+						</div>
+						<div className="bg-card-bg border border-card-border rounded-xl p-6">
+							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">Settings sync</h3>
+							<p className="text-[12px] text-muted leading-relaxed">
+								Desktop and TUI share preferences and auth via a local SQLite database. Sign in once, use everywhere.
+							</p>
+						</div>
+					</div>
+				</div>
+			</section>
+
 			{/* ═══ AGENT LOGOS ═══ */}
 			<section className="py-12 border-t border-border">
 				<div className="max-w-5xl mx-auto px-6">

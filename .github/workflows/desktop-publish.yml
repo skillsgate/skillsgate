@@ -32,7 +32,10 @@ jobs:
 
       # Use npm install (not npm ci) to ensure platform-specific optional deps install correctly
       - name: Install dependencies
-        run: npm install
+        run: |
+          rm -f package-lock.json
+          npm install --no-package-lock
+        shell: bash
 
       - name: Rebuild native modules for Electron
         run: npx electron-rebuild -v 35.2.1 -m node_modules/better-sqlite3

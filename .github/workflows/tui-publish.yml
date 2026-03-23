@@ -14,9 +14,6 @@ jobs:
           - os: macos-14
             target: bun-darwin-arm64
             pkg: tui-darwin-arm64
-          - os: macos-latest
-            target: bun-darwin-x64
-            pkg: tui-darwin-x64
           - os: ubuntu-latest
             target: bun-linux-x64
             pkg: tui-linux-x64
@@ -65,7 +62,7 @@ jobs:
       - name: Prepare and publish platform packages
         run: |
           VERSION=${GITHUB_REF_NAME#tui-v}
-          for pkg in tui-darwin-arm64 tui-darwin-x64 tui-linux-x64 tui-win32-x64; do
+          for pkg in tui-darwin-arm64 tui-linux-x64 tui-win32-x64; do
             mkdir -p "dist/$pkg"
             cp "artifacts/$pkg/skillsgate-tui"* "dist/$pkg/"
             chmod +x "dist/$pkg/skillsgate-tui"* 2>/dev/null || true

@@ -48,6 +48,14 @@ Discover, install, and publish skills for Claude Code, Cursor, Windsurf, GitHub 
 
 Three-column skill browser with search, favorites, remote servers, and a built-in editor. Auto-updates via GitHub Releases.
 
+> **macOS users:** The app is not yet code-signed with an Apple Developer certificate. After installing, run the following command once to allow it to open:
+>
+> ```bash
+> sudo codesign --force --deep --sign - /Applications/SkillsGate.app
+> ```
+>
+> Then open the app normally. This is a one-time step -- future auto-updates will work without it. We're working on getting proper code signing set up.
+
 ### CLI
 
 ```bash

@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "preview": "electron-vite preview"
+    "preview": "electron-vite preview",
+    "package": "electron-vite build && electron-builder --config electron-builder.yml",
+    "package:mac": "electron-vite build && electron-builder --config electron-builder.yml --mac",
+    "package:win": "electron-vite build && electron-builder --config electron-builder.yml --win",
+    "package:linux": "electron-vite build && electron-builder --config electron-builder.yml --linux"
   },
   "dependencies": {
     "@skillsgate/ui": "*",

@@ -1,0 +1,39 @@
+appId: ai.skillsgate.desktop
+productName: SkillsGate
+directories:
+  output: release
+  buildResources: resources
+files:
+  - out/**/*
+  - "!node_modules"
+extraMetadata:
+  main: out/main/index.js
+
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+      arch: [universal]
+    - target: zip
+      arch: [universal]
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
+
+win:
+  target: nsis
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Development
+
+publish:
+  provider: github
+  owner: skillsgate
+  repo: skillsgate

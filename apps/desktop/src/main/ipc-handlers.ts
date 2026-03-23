@@ -251,28 +251,46 @@ interface ExchangeResponse {
   user: { id: string; name: string; email: string; image?: string }
 }
 
-async function loadAuth(): Promise<StoredAuth | null> {
+// Auth stored in shared SQLite (syncs with TUI)
+const AUTH_TOKEN_KEY = "auth.token"
+const AUTH_USER_KEY = "auth.user"
+
+function loadAuth(): StoredAuth | null {
   try {
-    const raw = await fs.readFile(AUTH_FILE_PATH, "utf-8")
-    const data = JSON.parse(raw) as StoredAuth
-    if (!data.user || !data.token) return null
-    return data
+    const token = settingsStore?.get<string | null>(AUTH_TOKEN_KEY, null)
+    const user = settingsStore?.get<StoredAuth["user"] | null>(AUTH_USER_KEY, null)
+    if (token && user) return { token, user }
+
+    // Fallback: try legacy file-based auth and migrate
+    try {
+      const raw = require("fs").readFileSync(AUTH_FILE_PATH, "utf-8")
+      const data = JSON.parse(raw) as StoredAuth
+      if (data.user && data.token) {
+        // Migrate to SQLite
+        settingsStore?.set(AUTH_TOKEN_KEY, data.token)
+        settingsStore?.set(AUTH_USER_KEY, data.user)
+        return data
+      }
+    } catch {}
+
+    return null
   } catch {
     return null
   }
 }
 
-async function saveAuth(data: StoredAuth): Promise<void> {
-  await fs.mkdir(AUTH_DIR, { recursive: true })
-  await fs.writeFile(AUTH_FILE_PATH, JSON.stringify(data, null, 2), "utf-8")
+function saveAuthToDb(data: StoredAuth): void {
+  settingsStore?.set(AUTH_TOKEN_KEY, data.token)
+  settingsStore?.set(AUTH_USER_KEY, data.user)
+  // Also write legacy file for CLI compatibility
+  require("fs").mkdirSync(AUTH_DIR, { recursive: true })
+  require("fs").writeFileSync(AUTH_FILE_PATH, JSON.stringify(data, null, 2), "utf-8")
 }
 
-async function clearAuth(): Promise<void> {
-  try {
-    await fs.unlink(AUTH_FILE_PATH)
-  } catch {
-    // File doesn't exist
-  }
+function clearAuthFromDb(): void {
+  settingsStore?.set(AUTH_TOKEN_KEY, null)
+  settingsStore?.set(AUTH_USER_KEY, null)
+  try { require("fs").unlinkSync(AUTH_FILE_PATH) } catch {}
 }
 
 // ---------------------------------------------------------------------------
@@ -939,13 +957,13 @@ export function registerIpcHandlers(): void {
       token: result.access_token,
       user: result.user,
     }
-    await saveAuth(stored)
+    saveAuthToDb(stored)
     return stored
   })
 
   // Logout
   ipcMain.handle("auth:logout", async () => {
-    await clearAuth()
+    clearAuthFromDb()
   })
 
   // Open a URL in the default browser

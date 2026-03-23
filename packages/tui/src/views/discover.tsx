@@ -29,6 +29,13 @@ export function DiscoverView() {
   const token = state.auth?.token ?? null
   const isAuthenticated = !!state.auth
 
+  // Auto-focus search input when Discover view mounts
+  useEffect(() => {
+    if (state.activeView === "discover") {
+      dispatch({ type: "SET_FOCUSED_PANE", pane: "search" })
+    }
+  }, [state.activeView])
+
   const { results, loading, error, total, hasMore, loadMore, remainingSearches } =
     useSearch(query, searchMode, token)
   const { installSkill } = useSkillActions()

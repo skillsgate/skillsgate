@@ -149,8 +149,8 @@ export function Layout() {
       return
     }
 
-    // "r" to refresh installed skills (when not typing in search)
-    if (key.name === "r" && state.focusedPane !== "search" && state.activeView !== "detail") {
+    // "r" to refresh installed skills (when not typing in search, not on login view)
+    if (key.name === "r" && state.focusedPane !== "search" && state.activeView !== "detail" && state.activeView !== "login") {
       dispatch({ type: "REFRESH_SKILLS" })
       return
     }

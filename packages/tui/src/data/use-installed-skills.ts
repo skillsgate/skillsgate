@@ -38,7 +38,8 @@ export function useInstalledSkills() {
           try {
             const entries = await fs.readdir(skillsDir, { withFileTypes: true })
             for (const entry of entries) {
-              if (!entry.isDirectory()) continue
+              // Include both real directories and symlinks (skills are often symlinked)
+              if (!entry.isDirectory() && !entry.isSymbolicLink()) continue
 
               const skillMdPath = path.join(skillsDir, entry.name, SKILL_MD)
               try {

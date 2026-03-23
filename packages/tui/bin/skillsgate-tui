@@ -1,0 +1,28 @@
+#!/usr/bin/env node
+const { execFileSync } = require("child_process");
+const path = require("path");
+const os = require("os");
+
+const platform = os.platform();
+const arch = os.arch();
+
+// Map to npm package names
+const platformMap = {
+  darwin: { arm64: "tui-darwin-arm64", x64: "tui-darwin-x64" },
+  linux: { arm64: "tui-linux-arm64", x64: "tui-linux-x64" },
+  win32: { x64: "tui-win32-x64" },
+};
+
+const pkg = platformMap[platform]?.[arch];
+if (!pkg) {
+  console.error(`Unsupported platform: ${platform}-${arch}`);
+  process.exit(1);
+}
+
+try {
+  const binPath = require.resolve(`@skillsgate/${pkg}/skillsgate-tui`);
+  execFileSync(binPath, process.argv.slice(2), { stdio: "inherit" });
+} catch {
+  console.error("Platform binary not found. Try reinstalling: npm install -g @skillsgate/tui");
+  process.exit(1);
+}

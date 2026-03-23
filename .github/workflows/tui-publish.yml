@@ -1,0 +1,97 @@
+name: Publish TUI to npm
+
+on:
+  push:
+    tags:
+      - "tui-v*"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            target: bun-darwin-arm64
+            pkg: tui-darwin-arm64
+          - os: macos-13
+            target: bun-darwin-x64
+            pkg: tui-darwin-x64
+          - os: ubuntu-latest
+            target: bun-linux-x64
+            pkg: tui-linux-x64
+          - os: windows-latest
+            target: bun-windows-x64
+            pkg: tui-win32-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install
+        working-directory: packages/tui
+      - name: Compile standalone binary
+        run: bun build src/index.tsx --compile --target=${{ matrix.target }} --outfile=skillsgate-tui
+        working-directory: packages/tui
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.pkg }}
+          path: packages/tui/skillsgate-tui*
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+      - name: Prepare and publish platform packages
+        run: |
+          VERSION=${GITHUB_REF_NAME#tui-v}
+          for pkg in tui-darwin-arm64 tui-darwin-x64 tui-linux-x64 tui-win32-x64; do
+            mkdir -p "dist/$pkg"
+            cp "artifacts/$pkg/skillsgate-tui"* "dist/$pkg/"
+            chmod +x "dist/$pkg/skillsgate-tui"* 2>/dev/null || true
+            # Determine os and cpu from package name
+            case "$pkg" in
+              tui-darwin-arm64) OS=darwin; CPU=arm64 ;;
+              tui-darwin-x64)  OS=darwin; CPU=x64 ;;
+              tui-linux-x64)   OS=linux;  CPU=x64 ;;
+              tui-linux-arm64) OS=linux;  CPU=arm64 ;;
+              tui-win32-x64)   OS=win32;  CPU=x64 ;;
+            esac
+            cat > "dist/$pkg/package.json" <<PKGJSON
+          {
+            "name": "@skillsgate/$pkg",
+            "version": "$VERSION",
+            "os": ["$OS"],
+            "cpu": ["$CPU"],
+            "bin": { "skillsgate-tui": "./skillsgate-tui" }
+          }
+          PKGJSON
+            cd "dist/$pkg" && npm publish --access public --provenance && cd ../..
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish main package
+        run: |
+          VERSION=${GITHUB_REF_NAME#tui-v}
+          cd packages/tui
+          npm version $VERSION --no-git-tag-version
+          npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true

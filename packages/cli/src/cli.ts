@@ -111,6 +111,17 @@ async function main(): Promise<void> {
       await runSetup(restArgs);
       break;
 
+    case "tui": {
+      const { execFileSync } = await import("node:child_process");
+      try {
+        execFileSync("skillsgate-tui", [], { stdio: "inherit" });
+      } catch {
+        console.error(pc.red("TUI not found. Install with: npm install -g @skillsgate/tui"));
+        process.exit(1);
+      }
+      break;
+    }
+
     case "--version":
     case "-v":
       console.log(`skillsgate v${VERSION}`);
@@ -163,6 +174,7 @@ function printHelp(): void {
   console.log(`    whoami             Show current user`);
   console.log(`    mcp                Run as MCP server (stdio transport)`);
   console.log(`    setup              Configure MCP for AI tools`);
+  console.log(`    tui                Launch terminal UI (requires @skillsgate/tui)`);
   console.log();
   console.log(`  ${BOLD("Examples:")}`);
   console.log(`    skillsgate add @username/audit-website ${DIM("# install from SkillsGate")}`);

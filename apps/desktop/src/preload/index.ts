@@ -13,6 +13,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   readSkillContent: (skillPath: string) =>
     ipcRenderer.invoke("skill:read-content", skillPath),
 
+  // Auth
+  authLoad: () => ipcRenderer.invoke("auth:load"),
+  authExchange: (code: string) => ipcRenderer.invoke("auth:exchange", code),
+  authLogout: () => ipcRenderer.invoke("auth:logout"),
+  authOpenBrowser: (url: string) => ipcRenderer.invoke("auth:open-browser", url),
+
   // Events
   onSkillsUpdated: (callback: (skills: unknown[]) => void) => {
     ipcRenderer.on("skills:updated", (_event, skills) => callback(skills))

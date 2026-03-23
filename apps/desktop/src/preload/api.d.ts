@@ -27,6 +27,18 @@ declare global {
     error?: string
   }
 
+  interface StoredAuthUser {
+    id: string
+    name: string
+    email: string
+    image?: string
+  }
+
+  interface StoredAuth {
+    token: string
+    user: StoredAuthUser
+  }
+
   interface ElectronAPI {
     detectAgents: () => Promise<DetectedAgent[]>
     listInstalled: () => Promise<InstalledSkill[]>
@@ -38,6 +50,13 @@ declare global {
     removeSkill: (name: string) => Promise<void>
     updateSkill: (name: string) => Promise<void>
     readSkillContent: (path: string) => Promise<string>
+
+    // Auth
+    authLoad: () => Promise<StoredAuth | null>
+    authExchange: (code: string) => Promise<StoredAuth>
+    authLogout: () => Promise<void>
+    authOpenBrowser: (url: string) => Promise<void>
+
     onSkillsUpdated: (
       callback: (skills: InstalledSkill[]) => void,
     ) => () => void

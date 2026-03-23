@@ -1,4 +1,4 @@
-import { ipcMain } from "electron"
+import { ipcMain, shell } from "electron"
 import os from "node:os"
 import path from "node:path"
 import fs from "node:fs/promises"
@@ -221,6 +221,53 @@ async function readSkillLock(): Promise<SkillLockFile> {
 async function writeSkillLock(lock: SkillLockFile): Promise<void> {
   await fs.mkdir(path.dirname(LOCK_FILE_PATH), { recursive: true })
   await fs.writeFile(LOCK_FILE_PATH, JSON.stringify(lock, null, 2), "utf-8")
+}
+
+// ---------------------------------------------------------------------------
+// Auth (mirrors packages/cli/src/utils/auth-store.ts and constants.ts)
+// ---------------------------------------------------------------------------
+
+const API_BASE_URL = process.env.SKILLSGATE_API_URL ?? "https://skillsgate.ai"
+const AUTH_DIR = path.join(home, ".skillsgate")
+const AUTH_FILE_PATH = path.join(home, ".skillsgate", "auth.json")
+
+interface StoredAuth {
+  token: string
+  user: {
+    id: string
+    name: string
+    email: string
+    image?: string
+  }
+}
+
+interface ExchangeResponse {
+  access_token: string
+  user: { id: string; name: string; email: string; image?: string }
+}
+
+async function loadAuth(): Promise<StoredAuth | null> {
+  try {
+    const raw = await fs.readFile(AUTH_FILE_PATH, "utf-8")
+    const data = JSON.parse(raw) as StoredAuth
+    if (!data.user || !data.token) return null
+    return data
+  } catch {
+    return null
+  }
+}
+
+async function saveAuth(data: StoredAuth): Promise<void> {
+  await fs.mkdir(AUTH_DIR, { recursive: true })
+  await fs.writeFile(AUTH_FILE_PATH, JSON.stringify(data, null, 2), "utf-8")
+}
+
+async function clearAuth(): Promise<void> {
+  try {
+    await fs.unlink(AUTH_FILE_PATH)
+  } catch {
+    // File doesn't exist
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -840,6 +887,55 @@ export function registerIpcHandlers(): void {
     if (tmpDir) {
       await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
     }
+  })
+
+  // -------------------------------------------------------------------------
+  // Auth handlers
+  // -------------------------------------------------------------------------
+
+  // Load stored auth (shared with CLI)
+  ipcMain.handle("auth:load", async () => {
+    return loadAuth()
+  })
+
+  // Exchange a device code for an access token
+  ipcMain.handle("auth:exchange", async (_event, code: string) => {
+    const res = await fetch(`${API_BASE_URL}/api/auth/device/exchange`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    })
+
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string }
+      const errorMsg =
+        data?.error === "rate_limited"
+          ? "Too many attempts. Wait a minute and try again."
+          : data?.error === "invalid_code"
+            ? "Invalid code. Check and try again."
+            : data?.error === "expired"
+              ? "Code has expired. Get a new one."
+              : "Verification failed. Please try again."
+      throw new Error(errorMsg)
+    }
+
+    const result = (await res.json()) as ExchangeResponse
+    const stored: StoredAuth = {
+      token: result.access_token,
+      user: result.user,
+    }
+    await saveAuth(stored)
+    return stored
+  })
+
+  // Logout
+  ipcMain.handle("auth:logout", async () => {
+    await clearAuth()
+  })
+
+  // Open a URL in the default browser
+  ipcMain.handle("auth:open-browser", async (_event, url: string) => {
+    await shell.openExternal(url)
   })
 }
 

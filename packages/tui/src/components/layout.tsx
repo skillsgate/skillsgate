@@ -191,6 +191,7 @@ export function Layout() {
       <tab-select
         options={TAB_OPTIONS}
         focused={state.activeView !== "detail" && !state.showHelp}
+        selectedIndex={activeTabIndex >= 0 ? activeTabIndex : 0}
         selectedBackgroundColor={colors.tabActive}
         selectedTextColor={colors.tabText}
         textColor={colors.textDim}

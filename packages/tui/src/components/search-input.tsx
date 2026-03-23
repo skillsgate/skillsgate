@@ -41,7 +41,7 @@ export function SearchInput({
           }}
         />
       ) : (
-        <text fg={colors.textDim}>Press / to search...</text>
+        <text fg={colors.textDim}>/ to search, Tab to cycle panes</text>
       )}
     </box>
   )

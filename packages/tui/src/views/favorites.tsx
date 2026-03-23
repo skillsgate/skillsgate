@@ -61,7 +61,7 @@ export function FavoritesView() {
       setSelectedIndex(Math.max(0, favorites.length - 1))
     }
 
-    // Enter to view full detail
+    // v to view full detail
     if (key.name === "v" && favorites[selectedIndex]) {
       const skill = favorites[selectedIndex]
       dispatch({
@@ -320,7 +320,7 @@ function FavoriteDetailPanel({ skill, isInstalled }: FavoriteDetailPanelProps) {
         ) : null}
 
         <text>{" "}</text>
-        <text fg={colors.textDim}>Enter=full detail  x=unfavorite  i=install</text>
+        <text fg={colors.textDim}>v=full detail  x=unfavorite  i=install</text>
       </box>
     </scrollbox>
   )

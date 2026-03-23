@@ -25,6 +25,7 @@ import type { Skill, AgentConfig, ParsedSource } from "../../../cli/src/types.js
 interface UseSkillActionsResult {
   installSkill: (skill: EnrichedSkill) => Promise<void>
   removeSkill: (skill: EnrichedSkill) => Promise<void>
+  removeSkillFromOneAgent: (skill: EnrichedSkill, agentName: string) => Promise<void>
   updateSkill: (skill: EnrichedSkill) => Promise<void>
 }
 
@@ -199,6 +200,55 @@ export function useSkillActions(): UseSkillActionsResult {
   }, [dispatch])
 
   /**
+   * Remove a skill from a single agent only (delete its symlink).
+   * If this was the last agent, also removes the canonical copy and lock entry.
+   */
+  const removeSkillFromOneAgent = useCallback(async (skill: EnrichedSkill, agentName: string) => {
+    const agent = agents[agentName]
+    if (!agent) {
+      dispatch({
+        type: "SHOW_NOTIFICATION",
+        notification: { type: "error", message: `Unknown agent: ${agentName}` },
+      })
+      return
+    }
+
+    dispatch({
+      type: "SHOW_NOTIFICATION",
+      notification: { type: "info", message: `Removing "${skill.name}" from ${agent.displayName}...` },
+    })
+
+    try {
+      const safeName = sanitizeName(skill.name)
+      await removeSkillFromAgent(safeName, agent, "global")
+
+      // If this was the last agent, also remove canonical + lock
+      const remainingAgents = skill.agents.filter(a => a !== agentName)
+      if (remainingAgents.length === 0) {
+        await removeCanonicalSkill(skill.name)
+        await removeSkillFromLock(safeName)
+      }
+
+      dispatch({ type: "REFRESH_SKILLS" })
+      dispatch({
+        type: "SHOW_NOTIFICATION",
+        notification: {
+          type: "success",
+          message: remainingAgents.length > 0
+            ? `Removed "${skill.name}" from ${agent.displayName}`
+            : `Removed "${skill.name}" completely`,
+        },
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      dispatch({
+        type: "SHOW_NOTIFICATION",
+        notification: { type: "error", message: `Remove failed: ${msg}` },
+      })
+    }
+  }, [dispatch])
+
+  /**
    * Update a skill by re-fetching from its source.
    * For GitHub skills: checks tree SHA for changes before re-installing.
    * For SkillsGate skills: always re-downloads.
@@ -248,7 +298,7 @@ export function useSkillActions(): UseSkillActionsResult {
     }
   }, [dispatch, installSkill])
 
-  return { installSkill, removeSkill, updateSkill }
+  return { installSkill, removeSkill, removeSkillFromOneAgent, updateSkill }
 }
 
 // ---------- Helpers ----------

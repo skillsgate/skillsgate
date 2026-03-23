@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react"
 import fs from "node:fs"
+import path from "node:path"
+import { spawnSync, exec } from "node:child_process"
 import { useKeyboard } from "@opentui/react"
 import { useStore, useDispatch } from "../store/context.js"
 import { useSkillActions } from "../data/use-skill-actions.js"
 import { ConfirmDialog } from "../components/confirm-dialog.js"
 import { colors, agentBadges as badgeMap } from "../utils/colors.js"
+import { agents } from "../../../cli/src/core/agents.js"
 
 /**
  * Reads the full SKILL.md content for display.
@@ -38,17 +41,26 @@ function stripFrontmatter(content: string): string {
   return lines.slice(endIndex + 1).join("\n").trimStart()
 }
 
+/**
+ * Returns the display name for an agent key (e.g. "claude-code" -> "Claude Code").
+ */
+function agentDisplayName(agentName: string): string {
+  return agents[agentName]?.displayName ?? agentName
+}
+
 type DetailPendingAction = "remove" | "install" | null
+type RemoveMode = null | "confirm" | "select-agent"
 
 export function SkillDetailView() {
   const state = useStore()
   const dispatch = useDispatch()
-  const { installSkill, removeSkill } = useSkillActions()
+  const { installSkill, removeSkill, removeSkillFromOneAgent } = useSkillActions()
   const skill = state.selectedSkill
 
   const [content, setContent] = useState("")
   const [contentLoading, setContentLoading] = useState(false)
   const [pendingAction, setPendingAction] = useState<DetailPendingAction>(null)
+  const [removeMode, setRemoveMode] = useState<RemoveMode>(null)
 
   useEffect(() => {
     if (!skill) return
@@ -88,6 +100,35 @@ export function SkillDetailView() {
   useKeyboard((key) => {
     if (state.activeView !== "detail") return
     if (state.showHelp) return
+
+    // Handle agent selection menu for per-agent delete
+    if (removeMode === "select-agent" && skill) {
+      if (key.name === "n" || key.name === "escape") {
+        setRemoveMode(null)
+        return
+      }
+      if (key.name === "a") {
+        // Remove from all agents
+        setRemoveMode(null)
+        setPendingAction("remove")
+        return
+      }
+      // Number keys 1-9 to select a specific agent
+      const num = parseInt(key.raw ?? "", 10)
+      if (num >= 1 && num <= skill.agents.length) {
+        const agentName = skill.agents[num - 1]
+        setRemoveMode(null)
+        removeSkillFromOneAgent(skill, agentName).then(() => {
+          // If that was the last agent, go back to list
+          if (skill.agents.length <= 1) {
+            dispatch({ type: "GO_BACK" })
+          }
+        })
+        return
+      }
+      return
+    }
+
     if (pendingAction) return // Block during confirm dialog
 
     // q or Esc to go back
@@ -96,31 +137,80 @@ export function SkillDetailView() {
       return
     }
 
-    // o to open source URL in browser
-    if (key.name === "o" && skill?.lock?.sourceType === "github") {
-      const url = skill.lock.originalUrl
-      if (url) {
+    // e to edit skill in $EDITOR (only for locally installed skills)
+    if (key.name === "e" && skill?.filePath) {
+      const editor = process.env.VISUAL || process.env.EDITOR || "vi"
+
+      // Release the terminal from the TUI renderer so the editor can use it.
+      // We replicate the cleanup from __skillsgateTuiCleanExit but skip
+      // process.exit so the editor can spawn first.
+      try {
+        process.stdout.write("\x1B[?1049l") // switch back to main screen buffer
+        process.stdout.write("\x1B[?25h")   // show cursor
+        process.stdout.write("\x1Bc")       // full terminal reset (RIS)
+      } catch {
+        // best effort terminal cleanup
+      }
+
+      spawnSync(editor, [skill.filePath], {
+        stdio: "inherit",
+      })
+
+      // Exit after editing -- user restarts TUI to see changes
+      console.log(`\nEdited: ${skill.filePath}`)
+      console.log("Restart the TUI to see your changes.")
+      process.exit(0)
+    }
+
+    // o to open folder (local skills) or source URL (catalog/github skills)
+    if (key.name === "o" && skill) {
+      const cmd = process.platform === "darwin" ? "open" : "xdg-open"
+
+      if (skill.filePath) {
+        // Local skill: open the containing folder
+        const dir = path.dirname(skill.filePath)
         try {
-          const { exec } = require("node:child_process")
-          const cmd = process.platform === "darwin" ? "open" : "xdg-open"
-          exec(`${cmd} "${url}"`)
+          exec(`${cmd} "${dir}"`)
           dispatch({
             type: "SHOW_NOTIFICATION",
-            notification: { type: "info", message: `Opening ${url}` },
+            notification: { type: "info", message: `Opening ${dir}` },
           })
         } catch {
           dispatch({
             type: "SHOW_NOTIFICATION",
-            notification: { type: "error", message: "Failed to open URL" },
+            notification: { type: "error", message: "Failed to open folder" },
           })
+        }
+      } else if (skill.lock?.sourceType === "github") {
+        // Catalog/GitHub skill: open the source URL
+        const url = skill.lock.originalUrl
+        if (url) {
+          try {
+            exec(`${cmd} "${url}"`)
+            dispatch({
+              type: "SHOW_NOTIFICATION",
+              notification: { type: "info", message: `Opening ${url}` },
+            })
+          } catch {
+            dispatch({
+              type: "SHOW_NOTIFICATION",
+              notification: { type: "error", message: "Failed to open URL" },
+            })
+          }
         }
       }
       return
     }
 
     // d to remove skill
-    if (key.name === "d" && skill) {
-      setPendingAction("remove")
+    if (key.name === "d" && skill && skill.agents.length > 0) {
+      if (skill.agents.length > 1) {
+        // Multiple agents: show selection menu
+        setRemoveMode("select-agent")
+      } else {
+        // Single agent: simple confirm
+        setPendingAction("remove")
+      }
       return
     }
 
@@ -130,6 +220,56 @@ export function SkillDetailView() {
       return
     }
   })
+
+  // Agent selection menu for per-agent delete
+  if (removeMode === "select-agent" && skill) {
+    return (
+      <box
+        style={{
+          width: "100%",
+          height: "100%",
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: colors.bg,
+        }}
+      >
+        <box
+          style={{
+            width: 60,
+            border: true,
+            borderColor: colors.primary,
+            backgroundColor: "#1a1a2e",
+            paddingLeft: 2,
+            paddingRight: 2,
+            paddingTop: 1,
+            paddingBottom: 1,
+            flexDirection: "column",
+          }}
+          title="Remove"
+        >
+          <text fg={colors.text}>
+            Remove "<span fg={colors.primary}>{skill.name}</span>" from:
+          </text>
+          <text>{" "}</text>
+          {skill.agents.map((agentName, i) => {
+            const badge = badgeMap[agentName]
+            return (
+              <text key={agentName} fg={colors.text}>
+                {"  "}<span fg={colors.primary}>{i + 1}</span>{"  "}<span fg={badge?.color ?? colors.agent}>{agentDisplayName(agentName)}</span>
+              </text>
+            )
+          })}
+          <text>{" "}</text>
+          <text fg={colors.text}>
+            {"  "}<span fg={colors.error}>a</span>{"  "}All agents (removes completely)
+          </text>
+          <text fg={colors.text}>
+            {"  "}<span fg={colors.textDim}>n</span>{"  "}Cancel
+          </text>
+        </box>
+      </box>
+    )
+  }
 
   // Confirm dialog for remove/install
   if (pendingAction && skill) {
@@ -172,6 +312,7 @@ export function SkillDetailView() {
     )
   })
   const isInstalled = skill.agents.length > 0
+  const isLocal = !!skill.filePath
   const installedAt = skill.lock?.installedAt
     ? new Date(skill.lock.installedAt).toLocaleDateString()
     : null
@@ -326,13 +467,18 @@ export function SkillDetailView() {
           </>
         )}
 
-        {/* Shortcut hints */}
+        {/* Shortcut hints -- contextual based on skill type */}
         <text fg={colors.border}>---</text>
         <text fg={colors.textDim}>q/Esc  Go back</text>
-        {sourceType === "github" && (
-          <text fg={colors.textDim}>o      Open URL</text>
+        {isLocal && (
+          <text fg={colors.textDim}>e      Edit in $EDITOR</text>
         )}
-        {skill.agents.length > 0 ? (
+        {isLocal ? (
+          <text fg={colors.textDim}>o      Open folder</text>
+        ) : sourceType === "github" ? (
+          <text fg={colors.textDim}>o      Open URL</text>
+        ) : null}
+        {isInstalled ? (
           <text fg={colors.textDim}>d      Remove skill</text>
         ) : (
           <text fg={colors.textDim}>i      Install skill</text>

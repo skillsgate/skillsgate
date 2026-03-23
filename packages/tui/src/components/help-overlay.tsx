@@ -35,7 +35,9 @@ const SHORTCUTS_RIGHT: ShortcutEntry[] = [
   { key: "", description: "" },
   { key: "-- Detail View --", description: "" },
   { key: "q/Esc", description: "Go back" },
-  { key: "o", description: "Open source URL" },
+  { key: "e", description: "Edit skill in $EDITOR" },
+  { key: "o", description: "Open folder / source URL" },
+  { key: "d", description: "Remove (per-agent if multiple)" },
 ]
 
 const KEY_COL_WIDTH = 18

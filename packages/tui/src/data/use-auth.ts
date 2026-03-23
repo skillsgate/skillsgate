@@ -1,56 +1,69 @@
 import { useEffect, useCallback } from "react"
 import { useStore, useDispatch } from "../store/context.js"
-import { loadAuth, saveAuth, clearAuth } from "../../../cli/src/utils/auth-store.js"
-import { API_BASE_URL } from "../../../cli/src/constants.js"
-import type { AuthState } from "../store/types.js"
-import type { StoredAuth } from "../../../cli/src/utils/auth-store.js"
+import { useDb } from "../db/context.js"
+
+const API_BASE_URL = process.env.SKILLSGATE_API_URL ?? "https://skillsgate.ai"
+
+// SQLite settings keys for auth
+const AUTH_TOKEN_KEY = "auth.token"
+const AUTH_USER_KEY = "auth.user"
+
+interface AuthUser {
+  id: string
+  name: string
+  email: string
+  image?: string
+}
 
 interface ExchangeResponse {
   access_token: string
-  user: { id: string; name: string; email: string; image?: string }
+  user: AuthUser
 }
 
 /**
- * Loads existing auth from keyring/file on mount and dispatches SET_AUTH.
- * Returns helpers to login (exchange code), logout, and check auth state.
+ * Auth hook using the shared SQLite database.
+ * Both TUI and Electron read/write auth to the same DB at ~/.skillsgate/skillsgate.db
+ * No keyring dependency -- works in both Bun and Node.
  */
 export function useAuth() {
   const state = useStore()
   const dispatch = useDispatch()
+  const { settings } = useDb()
 
-  // On mount, try to load existing auth from keyring/file
+  // On mount, load auth from SQLite
   useEffect(() => {
-    let cancelled = false
+    try {
+      const token = settings.get<string | null>(AUTH_TOKEN_KEY, null)
+      const user = settings.get<AuthUser | null>(AUTH_USER_KEY, null)
 
-    async function load() {
-      try {
-        const stored = await loadAuth()
-        if (cancelled) return
-
-        if (stored) {
-          dispatch({
-            type: "SET_AUTH",
-            auth: { token: stored.token, user: stored.user },
-          })
-        } else {
+      if (token && user) {
+        dispatch({
+          type: "SET_AUTH",
+          auth: { token, user },
+        })
+      } else {
+        // Try legacy file-based auth as fallback
+        loadLegacyAuth().then((legacy) => {
+          if (legacy) {
+            // Migrate to SQLite
+            settings.set(AUTH_TOKEN_KEY, legacy.token)
+            settings.set(AUTH_USER_KEY, legacy.user)
+            dispatch({
+              type: "SET_AUTH",
+              auth: { token: legacy.token, user: legacy.user },
+            })
+          } else {
+            dispatch({ type: "SET_AUTH", auth: null })
+          }
+        }).catch(() => {
           dispatch({ type: "SET_AUTH", auth: null })
-        }
-      } catch {
-        if (!cancelled) {
-          dispatch({ type: "SET_AUTH", auth: null })
-        }
+        })
       }
+    } catch {
+      dispatch({ type: "SET_AUTH", auth: null })
     }
-
-    load()
-    return () => { cancelled = true }
   }, [])
 
-  /**
-   * Exchange a device code for an auth token.
-   * On success, saves auth and dispatches SET_AUTH.
-   * Returns null on success, or an error message string on failure.
-   */
   const login = useCallback(async (code: string): Promise<string | null> => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/device/exchange`, {
@@ -61,14 +74,14 @@ export function useAuth() {
 
       if (res.ok) {
         const result = (await res.json()) as ExchangeResponse
-        const authData: StoredAuth = {
-          token: result.access_token,
-          user: result.user,
-        }
-        await saveAuth(authData)
+
+        // Save to SQLite (shared with Electron)
+        settings.set(AUTH_TOKEN_KEY, result.access_token)
+        settings.set(AUTH_USER_KEY, result.user)
+
         dispatch({
           type: "SET_AUTH",
-          auth: { token: authData.token, user: authData.user },
+          auth: { token: result.access_token, user: result.user },
         })
         return null
       }
@@ -86,23 +99,34 @@ export function useAuth() {
     } catch {
       return "Network error. Please check your connection and try again."
     }
-  }, [dispatch])
+  }, [dispatch, settings])
 
-  /**
-   * Clear stored auth and dispatch SET_AUTH(null).
-   */
   const logout = useCallback(async () => {
-    try {
-      await clearAuth()
-    } catch {
-      // Best effort
-    }
+    settings.set(AUTH_TOKEN_KEY, null)
+    settings.set(AUTH_USER_KEY, null)
     dispatch({ type: "SET_AUTH", auth: null })
-  }, [dispatch])
+  }, [dispatch, settings])
 
   return {
     auth: state.auth,
     login,
     logout,
   }
+}
+
+/**
+ * Try to load auth from the legacy CLI file (~/.skillsgate/auth.json + keyring).
+ * Used as a one-time migration to SQLite.
+ */
+async function loadLegacyAuth(): Promise<{ token: string; user: AuthUser } | null> {
+  try {
+    const { loadAuth } = await import("../../../cli/src/utils/auth-store.js")
+    const stored = await loadAuth()
+    if (stored?.token && stored?.user) {
+      return { token: stored.token, user: stored.user }
+    }
+  } catch {
+    // CLI auth-store not available or keyring failed
+  }
+  return null
 }

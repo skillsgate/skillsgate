@@ -48,11 +48,6 @@ export function DiscoverView() {
     if (state.showHelp) return
     if (state.focusedPane === "search") return
     if (installTarget) return
-    // Guard: skip Enter if search was just submitted (prevents opening first skill)
-    
-      
-      return
-    }
 
     // j/k or arrow keys
     if (key.name === "up" || (key.name === "k" && !key.ctrl)) {

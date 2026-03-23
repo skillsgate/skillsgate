@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { useKeyboard } from "@opentui/react"
 import { useStore, useDispatch } from "../store/context.js"
 import { useSearch } from "../data/use-search.js"
@@ -8,7 +8,9 @@ import type { CatalogSkill } from "../data/api-client.js"
 import { colors } from "../utils/colors.js"
 
 /**
- * Discover view: search the SkillsGate catalog and browse results.
+ * Discover view: two-column layout.
+ * LEFT  - Search input + results list (40%)
+ * RIGHT - Selected result detail (flexGrow)
  */
 export function DiscoverView() {
   const state = useStore()
@@ -16,9 +18,19 @@ export function DiscoverView() {
   const [query, setQuery] = useState("")
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [installTarget, setInstallTarget] = useState<CatalogSkill | null>(null)
+  const [previewSkill, setPreviewSkill] = useState<CatalogSkill | null>(null)
 
   const { results, loading, error, total, hasMore, loadMore } = useSearch(query)
   const { installSkill } = useSkillActions()
+
+  // Update preview when selection changes
+  useEffect(() => {
+    if (results[selectedIndex]) {
+      setPreviewSkill(results[selectedIndex])
+    } else {
+      setPreviewSkill(null)
+    }
+  }, [selectedIndex, results])
 
   // Keyboard navigation for the discover list
   useKeyboard((key) => {
@@ -50,7 +62,7 @@ export function DiscoverView() {
       setSelectedIndex(Math.max(0, results.length - 1))
     }
 
-    // Enter to view detail (basic info for catalog items)
+    // Enter to open full detail view
     if (key.name === "return" && results[selectedIndex]) {
       const skill = results[selectedIndex]
       dispatch({
@@ -127,105 +139,173 @@ export function DiscoverView() {
         </text>
       </box>
 
-      {/* Column headers */}
-      <box
-        style={{
-          height: 1,
-          width: "100%",
-          flexDirection: "row",
-          paddingLeft: 1,
-          paddingRight: 1,
-          backgroundColor: colors.bgAlt,
-        }}
-      >
-        <text fg={colors.textDim} style={{ width: 28 }}>
-          NAME
-        </text>
-        <text fg={colors.textDim} style={{ flexGrow: 1 }}>
-          DESCRIPTION
-        </text>
-        <text fg={colors.textDim} style={{ width: 24 }}>
-          CATEGORIES
-        </text>
-      </box>
-
-      {/* Results list */}
-      {results.length === 0 && !loading ? (
-        <box style={{ padding: 1 }}>
-          <text fg={colors.textDim}>
-            {query.trim()
-              ? "No skills found matching your query."
-              : "No skills available in the catalog."}
-          </text>
-        </box>
-      ) : (
-        <scrollbox
-          focused={state.activeView === "discover" && state.focusedPane === "list" && !state.showHelp}
+      {/* Two-column content: results list | detail */}
+      <box style={{ flexDirection: "row", flexGrow: 1, width: "100%" }}>
+        {/* LEFT: Results list */}
+        <box
           style={{
-            width: "100%",
-            flexGrow: 1,
-            rootOptions: { backgroundColor: colors.bg },
-            viewportOptions: { backgroundColor: colors.bg },
-            contentOptions: { backgroundColor: colors.bg },
-            scrollbarOptions: {
-              trackOptions: {
-                foregroundColor: colors.primary,
-                backgroundColor: colors.border,
-              },
-            },
+            width: "40%",
+            borderRight: true,
+            borderColor: state.focusedPane === "list" ? colors.primary : colors.border,
+            flexDirection: "column",
           }}
         >
-          {results.map((skill, i) => (
-            <DiscoverListItem
-              key={skill.id ?? `${skill.slug}-${i}`}
-              skill={skill}
-              selected={i === selectedIndex}
-            />
-          ))}
-          {hasMore && (
-            <box style={{ paddingLeft: 1, height: 1 }}>
+          {/* List header */}
+          <box style={{ height: 1, paddingLeft: 1, backgroundColor: colors.bgAlt }}>
+            <text fg={colors.textDim}>RESULTS</text>
+          </box>
+
+          {results.length === 0 && !loading ? (
+            <box style={{ padding: 1 }}>
               <text fg={colors.textDim}>
-                {loading ? "Loading more..." : "Scroll down to load more..."}
+                {query.trim()
+                  ? "No skills found matching your query."
+                  : "No skills available in the catalog."}
               </text>
             </box>
+          ) : (
+            <scrollbox
+              focused={state.activeView === "discover" && state.focusedPane === "list" && !state.showHelp}
+              style={{
+                width: "100%",
+                flexGrow: 1,
+                rootOptions: { backgroundColor: colors.bg },
+                viewportOptions: { backgroundColor: colors.bg },
+                contentOptions: { backgroundColor: colors.bg },
+                scrollbarOptions: {
+                  trackOptions: {
+                    foregroundColor: colors.primary,
+                    backgroundColor: colors.border,
+                  },
+                },
+              }}
+            >
+              {results.map((skill, i) => (
+                <box
+                  key={skill.id ?? `${skill.slug}-${i}`}
+                  style={{
+                    width: "100%",
+                    paddingLeft: 1,
+                    paddingRight: 1,
+                    flexDirection: "row",
+                    backgroundColor: i === selectedIndex ? colors.bgAlt : "transparent",
+                  }}
+                >
+                  <text fg={i === selectedIndex ? colors.primary : colors.text}>
+                    {skill.name}
+                  </text>
+                </box>
+              ))}
+              {hasMore && (
+                <box style={{ paddingLeft: 1, height: 1 }}>
+                  <text fg={colors.textDim}>
+                    {loading ? "Loading more..." : "Scroll down to load more..."}
+                  </text>
+                </box>
+              )}
+            </scrollbox>
           )}
-        </scrollbox>
-      )}
+        </box>
+
+        {/* RIGHT: Detail panel */}
+        <box style={{ flexGrow: 1, flexDirection: "column" }}>
+          {previewSkill ? (
+            <DiscoverDetailPanel skill={previewSkill} />
+          ) : (
+            <box style={{ padding: 1 }}>
+              <text fg={colors.textDim}>Select a skill to view details</text>
+            </box>
+          )}
+        </box>
+      </box>
     </box>
   )
 }
 
-// ---------- List item component ----------
+// ---------- Inline Detail Panel ----------
 
-interface DiscoverListItemProps {
+interface DiscoverDetailPanelProps {
   skill: CatalogSkill
-  selected: boolean
 }
 
-function DiscoverListItem({ skill, selected }: DiscoverListItemProps) {
-  const categories = skill.categories?.slice(0, 3).join(", ") ?? ""
-  const description = (skill.summary || skill.description || "").slice(0, 50)
+function DiscoverDetailPanel({ skill }: DiscoverDetailPanelProps) {
+  const description = skill.summary || skill.description || ""
+  const categories = skill.categories?.join(", ") ?? ""
+  const capabilities = skill.capabilities?.join(", ") ?? ""
+  const keywords = skill.keywords?.join(", ") ?? ""
 
   return (
-    <box
+    <scrollbox
+      focused={false}
       style={{
         width: "100%",
-        flexDirection: "row",
-        paddingLeft: 1,
-        paddingRight: 1,
-        backgroundColor: selected ? colors.bgAlt : "transparent",
+        flexGrow: 1,
+        rootOptions: { backgroundColor: colors.bg },
+        viewportOptions: { backgroundColor: colors.bg },
+        contentOptions: { backgroundColor: colors.bg },
+        scrollbarOptions: {
+          trackOptions: {
+            foregroundColor: colors.primary,
+            backgroundColor: colors.border,
+          },
+        },
       }}
     >
-      <text fg={colors.primary} style={{ width: 28 }}>
-        {skill.name}
-      </text>
-      <text fg={colors.textDim} style={{ flexGrow: 1 }}>
-        {description}
-      </text>
-      <text fg={colors.secondary} style={{ width: 24 }}>
-        {categories}
-      </text>
-    </box>
+      <box style={{ paddingLeft: 1, paddingRight: 1, flexDirection: "column" }}>
+        {/* Name */}
+        <text fg={colors.primary}>
+          <strong>{skill.name}</strong>
+        </text>
+
+        {/* Description */}
+        <text fg={colors.text}>{description}</text>
+        <text>{" "}</text>
+
+        {/* Categories */}
+        {categories ? (
+          <box style={{ flexDirection: "row", height: 1 }}>
+            <text fg={colors.textDim}>Categories: </text>
+            <text fg={colors.secondary}>{categories}</text>
+          </box>
+        ) : null}
+
+        {/* Capabilities */}
+        {capabilities ? (
+          <box style={{ flexDirection: "row", height: 1 }}>
+            <text fg={colors.textDim}>Capabilities: </text>
+            <text fg={colors.secondary}>{capabilities}</text>
+          </box>
+        ) : null}
+
+        {/* Keywords */}
+        {keywords ? (
+          <box style={{ flexDirection: "row", height: 1 }}>
+            <text fg={colors.textDim}>Keywords: </text>
+            <text fg={colors.secondary}>{keywords}</text>
+          </box>
+        ) : null}
+
+        {/* GitHub URL */}
+        {skill.githubUrl ? (
+          <box style={{ flexDirection: "row", height: 1 }}>
+            <text fg={colors.textDim}>GitHub: </text>
+            <text fg={colors.primary}>{skill.githubUrl}</text>
+          </box>
+        ) : null}
+
+        {/* Install command */}
+        {skill.installCommand ? (
+          <>
+            <text>{" "}</text>
+            <text fg={colors.textDim}>Install:</text>
+            <text fg={colors.success}>  {skill.installCommand}</text>
+          </>
+        ) : null}
+
+        <text>{" "}</text>
+        <text fg={colors.textDim}>Enter=full detail  i=install  Tab=switch pane</text>
+      </box>
+    </scrollbox>
   )
 }
 

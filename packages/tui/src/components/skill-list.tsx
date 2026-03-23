@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useKeyboard } from "@opentui/react"
 import { useStore, useDispatch } from "../store/context.js"
 import { useSkillActions } from "../data/use-skill-actions.js"
@@ -23,6 +23,13 @@ export function SkillList({ skills }: SkillListProps) {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
 
+  // Preview the selected skill in the right panel whenever selection changes
+  useEffect(() => {
+    if (skills[selectedIndex]) {
+      dispatch({ type: "PREVIEW_SKILL", skill: skills[selectedIndex] })
+    }
+  }, [selectedIndex, skills])
+
   // Only handle navigation when on a list-bearing view and list is focused
   useKeyboard((key) => {
     if (state.showHelp) return
@@ -46,7 +53,7 @@ export function SkillList({ skills }: SkillListProps) {
       setSelectedIndex(Math.max(0, skills.length - 1))
     }
 
-    // Enter to open skill detail
+    // Enter to open full skill detail view (navigates away)
     if (key.name === "return" && skills[selectedIndex]) {
       dispatch({ type: "SELECT_SKILL", skill: skills[selectedIndex] })
     }
@@ -103,30 +110,39 @@ export function SkillList({ skills }: SkillListProps) {
     )
   }
 
+  const isFocused = state.activeView === "home" && state.focusedPane === "list" && !state.showHelp
+
   return (
-    <scrollbox
-      focused={state.activeView === "home" && state.focusedPane === "list" && !state.showHelp}
-      style={{
-        width: "100%",
-        flexGrow: 1,
-        rootOptions: { backgroundColor: colors.bg },
-        viewportOptions: { backgroundColor: colors.bg },
-        contentOptions: { backgroundColor: colors.bg },
-        scrollbarOptions: {
-          trackOptions: {
-            foregroundColor: colors.primary,
-            backgroundColor: colors.border,
+    <box style={{ flexDirection: "column", flexGrow: 1 }}>
+      {/* List header */}
+      <box style={{ height: 1, paddingLeft: 1, backgroundColor: colors.bgAlt }}>
+        <text fg={colors.textDim}>SKILLS ({skills.length})</text>
+      </box>
+
+      <scrollbox
+        focused={isFocused}
+        style={{
+          width: "100%",
+          flexGrow: 1,
+          rootOptions: { backgroundColor: colors.bg },
+          viewportOptions: { backgroundColor: colors.bg },
+          contentOptions: { backgroundColor: colors.bg },
+          scrollbarOptions: {
+            trackOptions: {
+              foregroundColor: colors.primary,
+              backgroundColor: colors.border,
+            },
           },
-        },
-      }}
-    >
-      {skills.map((skill, i) => (
-        <SkillListItem
-          key={skill.name}
-          skill={skill}
-          selected={i === selectedIndex}
-        />
-      ))}
-    </scrollbox>
+        }}
+      >
+        {skills.map((skill, i) => (
+          <SkillListItem
+            key={skill.name}
+            skill={skill}
+            selected={i === selectedIndex}
+          />
+        ))}
+      </scrollbox>
+    </box>
   )
 }

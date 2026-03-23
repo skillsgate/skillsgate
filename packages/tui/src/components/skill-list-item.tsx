@@ -6,14 +6,16 @@ interface SkillListItemProps {
   selected?: boolean
 }
 
+/**
+ * Compact skill list item for the middle panel.
+ * Shows just the name and small agent dot indicators.
+ */
 export function SkillListItem({ skill, selected }: SkillListItemProps) {
-  const sourceLabel = skill.lock?.sourceType === "github"
-    ? "gh"
-    : skill.lock?.sourceType === "skillsgate"
-      ? "sg"
-      : skill.lock?.sourceType === "local"
-        ? "local"
-        : ""
+  // Build compact agent dots (single-char badges)
+  const agentDots = skill.agents.slice(0, 3).map((a) => {
+    const badge = badgeMap[a]
+    return { char: badge?.label?.[0] ?? "?", color: badge?.color ?? colors.agent }
+  })
 
   return (
     <box
@@ -26,33 +28,18 @@ export function SkillListItem({ skill, selected }: SkillListItemProps) {
       }}
     >
       {/* Skill name */}
-      <text fg={colors.primary} style={{ width: 28 }}>
+      <text fg={selected ? colors.primary : colors.text} style={{ flexGrow: 1 }}>
         {skill.name}
       </text>
 
-      {/* Description (truncated) */}
-      <text fg={colors.textDim} style={{ flexGrow: 1 }}>
-        {skill.description.slice(0, 50)}
-      </text>
-
-      {/* Agent badges - colored single/two-letter indicators */}
-      <box style={{ flexDirection: "row", width: 20 }}>
-        {skill.agents.map((a, i) => {
-          const badge = badgeMap[a]
-          return (
-            <text key={a} fg={badge?.color ?? colors.agent}>
-              {i > 0 ? " " : ""}{badge?.label ?? a.slice(0, 2).toUpperCase()}
-            </text>
-          )
-        })}
+      {/* Small agent dots on the right */}
+      <box style={{ flexDirection: "row" }}>
+        {agentDots.map((dot, i) => (
+          <text key={i} fg={dot.color}>
+            {dot.char}
+          </text>
+        ))}
       </box>
-
-      {/* Source */}
-      {sourceLabel ? (
-        <text fg={colors.secondary} style={{ width: 6 }}>
-          [{sourceLabel}]
-        </text>
-      ) : null}
     </box>
   )
 }

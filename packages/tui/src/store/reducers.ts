@@ -80,6 +80,9 @@ export function appReducer(state: AppState, action: Action): AppState {
         activeView: "detail",
       }
 
+    case "PREVIEW_SKILL":
+      return { ...state, selectedSkill: action.skill }
+
     case "CLEAR_SKILL":
       return { ...state, selectedSkill: null }
 

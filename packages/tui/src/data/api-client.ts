@@ -45,7 +45,7 @@ export async function fetchCatalog(
   limit: number = 20,
   offset: number = 0
 ): Promise<{ skills: CatalogSkill[]; total: number }> {
-  const url = `${API_BASE}/api/skills?limit=${limit}&offset=${offset}`
+  const url = `${API_BASE}/api/v1/skills?limit=${limit}&offset=${offset}`
 
   const response = await fetch(url, {
     headers: { "Content-Type": "application/json" },
@@ -69,7 +69,7 @@ export async function searchSkills(
   query: string,
   token?: string
 ): Promise<{ results: CatalogSkill[]; total: number }> {
-  const url = `${API_BASE}/api/skills/search?q=${encodeURIComponent(query)}`
+  const url = `${API_BASE}/api/v1/skills/search?q=${encodeURIComponent(query)}`
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",

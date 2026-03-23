@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useKeyboard } from "@opentui/react"
 import { useStore, useDispatch } from "../store/context.js"
 import { useFavorites } from "../data/use-favorites.js"
@@ -9,7 +9,10 @@ import type { CatalogSkill } from "../data/api-client.js"
 import type { EnrichedSkill } from "../store/types.js"
 
 /**
- * Favorites view: displays the user's favorited skills from the API.
+ * Favorites view: two-column layout.
+ * LEFT  - Favorites list (40%)
+ * RIGHT - Selected favorite detail (flexGrow)
+ *
  * Requires authentication. Shows a prompt to login if not authenticated.
  */
 export function FavoritesView() {
@@ -19,11 +22,21 @@ export function FavoritesView() {
   const { installSkill } = useSkillActions()
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [installTarget, setInstallTarget] = useState<CatalogSkill | null>(null)
+  const [previewSkill, setPreviewSkill] = useState<CatalogSkill | null>(null)
 
   // Build a set of installed skill names for the "installed" badge
   const installedNames = useMemo(() => {
     return new Set(state.installedSkills.map((s) => s.name.toLowerCase()))
   }, [state.installedSkills])
+
+  // Update preview when selection changes
+  useEffect(() => {
+    if (favorites[selectedIndex]) {
+      setPreviewSkill(favorites[selectedIndex])
+    } else {
+      setPreviewSkill(null)
+    }
+  }, [selectedIndex, favorites])
 
   // Keyboard navigation for the favorites list
   useKeyboard((key) => {
@@ -48,7 +61,7 @@ export function FavoritesView() {
       setSelectedIndex(Math.max(0, favorites.length - 1))
     }
 
-    // Enter to view detail
+    // Enter to view full detail
     if (key.name === "return" && favorites[selectedIndex]) {
       const skill = favorites[selectedIndex]
       dispatch({
@@ -145,104 +158,171 @@ export function FavoritesView() {
         </text>
       </box>
 
-      {/* Column headers */}
-      <box
-        style={{
-          height: 1,
-          width: "100%",
-          flexDirection: "row",
-          paddingLeft: 1,
-          paddingRight: 1,
-          backgroundColor: colors.bgAlt,
-        }}
-      >
-        <text fg={colors.textDim} style={{ width: 28 }}>
-          NAME
-        </text>
-        <text fg={colors.textDim} style={{ flexGrow: 1 }}>
-          DESCRIPTION
-        </text>
-        <text fg={colors.textDim} style={{ width: 12 }}>
-          STATUS
-        </text>
-        <text fg={colors.textDim} style={{ width: 6 }}>
-          SRC
-        </text>
-      </box>
-
-      {/* Favorites list */}
-      {favorites.length === 0 ? (
-        <box style={{ padding: 1 }}>
-          <text fg={colors.textDim}>
-            No favorites yet. Browse the Discover tab to find and favorite skills.
-          </text>
-        </box>
-      ) : (
-        <scrollbox
-          focused={state.activeView === "favorites" && !state.showHelp}
+      {/* Two-column content: list | detail */}
+      <box style={{ flexDirection: "row", flexGrow: 1, width: "100%" }}>
+        {/* LEFT: Favorites list */}
+        <box
           style={{
-            width: "100%",
-            flexGrow: 1,
-            rootOptions: { backgroundColor: colors.bg },
-            viewportOptions: { backgroundColor: colors.bg },
-            contentOptions: { backgroundColor: colors.bg },
-            scrollbarOptions: {
-              trackOptions: {
-                foregroundColor: colors.primary,
-                backgroundColor: colors.border,
-              },
-            },
+            width: "40%",
+            borderRight: true,
+            borderColor: colors.border,
+            flexDirection: "column",
           }}
         >
-          {favorites.map((skill, i) => (
-            <FavoriteListItem
-              key={skill.id ?? `${skill.slug}-${i}`}
-              skill={skill}
-              selected={i === selectedIndex}
-              isInstalled={installedNames.has(skill.name?.toLowerCase() ?? "")}
+          {/* List header */}
+          <box style={{ height: 1, paddingLeft: 1, backgroundColor: colors.bgAlt }}>
+            <text fg={colors.textDim}>FAVORITES</text>
+          </box>
+
+          {favorites.length === 0 ? (
+            <box style={{ padding: 1 }}>
+              <text fg={colors.textDim}>
+                No favorites yet. Browse the Discover tab to find and favorite skills.
+              </text>
+            </box>
+          ) : (
+            <scrollbox
+              focused={state.activeView === "favorites" && !state.showHelp}
+              style={{
+                width: "100%",
+                flexGrow: 1,
+                rootOptions: { backgroundColor: colors.bg },
+                viewportOptions: { backgroundColor: colors.bg },
+                contentOptions: { backgroundColor: colors.bg },
+                scrollbarOptions: {
+                  trackOptions: {
+                    foregroundColor: colors.primary,
+                    backgroundColor: colors.border,
+                  },
+                },
+              }}
+            >
+              {favorites.map((skill, i) => {
+                const isInstalled = installedNames.has(skill.name?.toLowerCase() ?? "")
+                return (
+                  <box
+                    key={skill.id ?? `${skill.slug}-${i}`}
+                    style={{
+                      width: "100%",
+                      paddingLeft: 1,
+                      paddingRight: 1,
+                      flexDirection: "row",
+                      backgroundColor: i === selectedIndex ? colors.bgAlt : "transparent",
+                    }}
+                  >
+                    <text fg={i === selectedIndex ? colors.primary : colors.text}>
+                      {skill.name}
+                    </text>
+                    {isInstalled ? (
+                      <text fg={colors.success}> *</text>
+                    ) : null}
+                  </box>
+                )
+              })}
+            </scrollbox>
+          )}
+        </box>
+
+        {/* RIGHT: Detail panel */}
+        <box style={{ flexGrow: 1, flexDirection: "column" }}>
+          {previewSkill ? (
+            <FavoriteDetailPanel
+              skill={previewSkill}
+              isInstalled={installedNames.has(previewSkill.name?.toLowerCase() ?? "")}
             />
-          ))}
-        </scrollbox>
-      )}
+          ) : (
+            <box style={{ padding: 1 }}>
+              <text fg={colors.textDim}>Select a favorite to view details</text>
+            </box>
+          )}
+        </box>
+      </box>
     </box>
   )
 }
 
-// ---------- List item component ----------
+// ---------- Inline Detail Panel ----------
 
-interface FavoriteListItemProps {
+interface FavoriteDetailPanelProps {
   skill: CatalogSkill
-  selected: boolean
   isInstalled: boolean
 }
 
-function FavoriteListItem({ skill, selected, isInstalled }: FavoriteListItemProps) {
-  const description = (skill.summary || skill.description || "").slice(0, 50)
-  const sourceLabel = skill.githubUrl ? "gh" : "sg"
+function FavoriteDetailPanel({ skill, isInstalled }: FavoriteDetailPanelProps) {
+  const description = skill.summary || skill.description || ""
+  const categories = skill.categories?.join(", ") ?? ""
+  const sourceLabel = skill.githubUrl ? "github" : "skillsgate"
 
   return (
-    <box
+    <scrollbox
+      focused={false}
       style={{
         width: "100%",
-        flexDirection: "row",
-        paddingLeft: 1,
-        paddingRight: 1,
-        backgroundColor: selected ? colors.bgAlt : "transparent",
+        flexGrow: 1,
+        rootOptions: { backgroundColor: colors.bg },
+        viewportOptions: { backgroundColor: colors.bg },
+        contentOptions: { backgroundColor: colors.bg },
+        scrollbarOptions: {
+          trackOptions: {
+            foregroundColor: colors.primary,
+            backgroundColor: colors.border,
+          },
+        },
       }}
     >
-      <text fg={colors.primary} style={{ width: 28 }}>
-        {skill.name}
-      </text>
-      <text fg={colors.textDim} style={{ flexGrow: 1 }}>
-        {description}
-      </text>
-      <text fg={isInstalled ? colors.success : colors.textDim} style={{ width: 12 }}>
-        {isInstalled ? "installed" : ""}
-      </text>
-      <text fg={colors.secondary} style={{ width: 6 }}>
-        [{sourceLabel}]
-      </text>
-    </box>
+      <box style={{ paddingLeft: 1, paddingRight: 1, flexDirection: "column" }}>
+        {/* Name */}
+        <text fg={colors.primary}>
+          <strong>{skill.name}</strong>
+        </text>
+
+        {/* Status */}
+        {isInstalled ? (
+          <text fg={colors.success}>Installed</text>
+        ) : (
+          <text fg={colors.textDim}>Not installed</text>
+        )}
+        <text>{" "}</text>
+
+        {/* Description */}
+        <text fg={colors.text}>{description}</text>
+        <text>{" "}</text>
+
+        {/* Source */}
+        <box style={{ flexDirection: "row", height: 1 }}>
+          <text fg={colors.textDim}>Source: </text>
+          <text fg={colors.secondary}>{sourceLabel}</text>
+        </box>
+
+        {/* Categories */}
+        {categories ? (
+          <box style={{ flexDirection: "row", height: 1 }}>
+            <text fg={colors.textDim}>Categories: </text>
+            <text fg={colors.secondary}>{categories}</text>
+          </box>
+        ) : null}
+
+        {/* GitHub URL */}
+        {skill.githubUrl ? (
+          <box style={{ flexDirection: "row", height: 1 }}>
+            <text fg={colors.textDim}>GitHub: </text>
+            <text fg={colors.primary}>{skill.githubUrl}</text>
+          </box>
+        ) : null}
+
+        {/* Install command */}
+        {skill.installCommand ? (
+          <>
+            <text>{" "}</text>
+            <text fg={colors.textDim}>Install:</text>
+            <text fg={colors.success}>  {skill.installCommand}</text>
+          </>
+        ) : null}
+
+        <text>{" "}</text>
+        <text fg={colors.textDim}>Enter=full detail  x=unfavorite  i=install</text>
+      </box>
+    </scrollbox>
   )
 }
 

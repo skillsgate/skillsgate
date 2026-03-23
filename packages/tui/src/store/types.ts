@@ -99,6 +99,7 @@ export type Action =
   | { type: "SET_FAVORITES"; favorites: unknown[] }
   | { type: "SET_FAVORITES_LOADING"; loading: boolean }
   | { type: "SELECT_SKILL"; skill: EnrichedSkill }
+  | { type: "PREVIEW_SKILL"; skill: EnrichedSkill }
   | { type: "CLEAR_SKILL" }
   | { type: "SHOW_NOTIFICATION"; notification: Notification }
   | { type: "CLEAR_NOTIFICATION" }

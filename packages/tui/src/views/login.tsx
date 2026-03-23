@@ -17,7 +17,7 @@ type LoginStep = "prompt" | "code" | "exchanging"
 export function LoginView() {
   const state = useStore()
   const dispatch = useDispatch()
-  const { auth, login } = useAuth()
+  const { auth, login, logout } = useAuth()
 
   const [step, setStep] = useState<LoginStep>("prompt")
   const [error, setError] = useState<string | null>(null)
@@ -51,7 +51,7 @@ export function LoginView() {
 
     if (step === "prompt") {
       // "r" to re-login (clear old auth, open browser, go to code step)
-      if (key.name === "r" && auth) {
+      if (key.name === "r") {
         logout()
         openBrowser()
         setStep("code")
@@ -59,7 +59,7 @@ export function LoginView() {
       }
 
       // "o" to logout only (no re-login)
-      if (key.name === "o" && auth) {
+      if (key.name === "o") {
         logout()
         dispatch({
           type: "SHOW_NOTIFICATION",

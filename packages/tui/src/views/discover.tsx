@@ -25,6 +25,7 @@ export function DiscoverView() {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [installTarget, setInstallTarget] = useState<CatalogSkill | null>(null)
   const [previewSkill, setPreviewSkill] = useState<CatalogSkill | null>(null)
+  const [justSubmitted, setJustSubmitted] = useState(false)
 
   const token = state.auth?.token ?? null
   const isAuthenticated = !!state.auth
@@ -47,7 +48,12 @@ export function DiscoverView() {
     if (state.activeView !== "discover") return
     if (state.showHelp) return
     if (state.focusedPane === "search") return
-    if (installTarget) return // Block navigation during confirm dialog
+    if (installTarget) return
+    // Guard: skip Enter if search was just submitted (prevents opening first skill)
+    if (key.name === "return" && justSubmitted) {
+      setJustSubmitted(false)
+      return
+    }
 
     // j/k or arrow keys
     if (key.name === "up" || (key.name === "k" && !key.ctrl)) {
@@ -147,8 +153,8 @@ export function DiscoverView() {
           onSubmit={(value: string) => {
             setQuery(value)
             setSelectedIndex(0)
+            setJustSubmitted(true)
             // Stay in search pane -- user presses Tab to move to results
-            // This prevents Enter from also triggering "open skill" in the list
           }}
         />
       </box>

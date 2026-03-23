@@ -14,7 +14,7 @@ jobs:
           - os: macos-14
             target: bun-darwin-arm64
             pkg: tui-darwin-arm64
-          - os: macos-13
+          - os: macos-latest
             target: bun-darwin-x64
             pkg: tui-darwin-x64
           - os: ubuntu-latest

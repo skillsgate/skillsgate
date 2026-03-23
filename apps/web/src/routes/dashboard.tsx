@@ -1,25 +1,24 @@
 import { useState, useEffect } from "react";
 import { Outlet, useLocation, useNavigate, Link } from "react-router";
-import { ThemeToggle } from "~/components/theme-toggle";
-import { AuthButton } from "~/components/auth-button";
-import { authClient } from "~/lib/auth-client";
+import { ThemeToggle, AuthButton, useAuth } from "@skillsgate/ui";
 
 export default function DashboardLayout() {
 	const location = useLocation();
 	const navigate = useNavigate();
+	const auth = useAuth();
 	const [authChecked, setAuthChecked] = useState(false);
 	const [isAuthenticated, setIsAuthenticated] = useState(false);
 
 	useEffect(() => {
-		authClient.getSession().then((res) => {
-			if (!res.data?.user) {
+		auth.isAuthenticated().then((authed) => {
+			if (!authed) {
 				navigate("/", { replace: true });
 			} else {
 				setIsAuthenticated(true);
 			}
 			setAuthChecked(true);
 		});
-	}, [navigate]);
+	}, [navigate, auth]);
 
 	if (!authChecked || !isAuthenticated) {
 		return (

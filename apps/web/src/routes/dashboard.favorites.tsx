@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { api } from "~/lib/api";
-import { ConfirmationDialog } from "~/components/confirmation-dialog";
+import { ConfirmationDialog, useApiClient, formatStars } from "@skillsgate/ui";
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -20,13 +19,6 @@ type FavoriteSkill = {
 	favoritedAt: string;
 };
 
-function formatStars(stars: number): string {
-	if (stars >= 1000) {
-		return `${(stars / 1000).toFixed(1).replace(/\.0$/, "")}k`;
-	}
-	return String(stars);
-}
-
 type FavoritesResponse = {
 	favorites: FavoriteSkill[];
 	meta: { total: number; limit: number; offset: number; hasMore: boolean };
@@ -35,6 +27,7 @@ type FavoritesResponse = {
 // ─── Component ──────────────────────────────────────────────────────
 
 export default function DashboardFavoritesPage() {
+	const api = useApiClient();
 	const [favorites, setFavorites] = useState<FavoriteSkill[]>([]);
 	const [total, setTotal] = useState(0);
 	const [hasMore, setHasMore] = useState(false);
@@ -56,7 +49,7 @@ export default function DashboardFavoritesPage() {
 			setTotal(res.data.meta.total);
 			setHasMore(res.data.meta.hasMore);
 		}
-	}, []);
+	}, [api]);
 
 	useEffect(() => {
 		fetchFavorites(0).finally(() => setIsLoading(false));

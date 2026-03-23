@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router";
-import { api } from "~/lib/api";
-import { UserSearch } from "~/components/user-search";
-import { ConfirmationDialog } from "~/components/confirmation-dialog";
+import { UserSearch, ConfirmationDialog, useApiClient } from "@skillsgate/ui";
 
 /* ─── Types matching API contract ─── */
 
@@ -75,6 +73,7 @@ function getVisibilityBadge(visibility: string) {
 /* ─── Component ─── */
 
 export default function SkillDetailPage() {
+	const api = useApiClient();
 	const { id } = useParams();
 	const navigate = useNavigate();
 

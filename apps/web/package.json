@@ -11,6 +11,7 @@
 		"cf-typegen": "wrangler types --env-interface CloudflareEnv ./cloudflare-env.d.ts"
 	},
 	"dependencies": {
+		"@skillsgate/ui": "*",
 		"@react-router/cloudflare": "^7",
 		"better-auth": "^1.4.19",
 		"isbot": "^5.1.0",

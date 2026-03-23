@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
-import { api } from "~/lib/api";
-import { ConfirmationDialog } from "~/components/confirmation-dialog";
+import { ConfirmationDialog, useApiClient } from "@skillsgate/ui";
 
 /* ─── Types matching API contract ─── */
 
@@ -69,6 +68,7 @@ function getSyncStatusBadge(status: ConnectedRepo["syncStatus"]) {
 /* ─── Component ─── */
 
 export default function PublisherReposPage() {
+	const api = useApiClient();
 	const [repos, setRepos] = useState<ConnectedRepo[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);

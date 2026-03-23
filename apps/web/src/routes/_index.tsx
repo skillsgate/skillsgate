@@ -1,37 +1,16 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Navbar } from "~/components/navbar";
-import { SkillSearch } from "~/components/skill-search";
 import { useReveal } from "~/components/use-reveal";
-import { publicApi } from "~/lib/api";
-import { FavoritesProvider, useFavorites } from "~/hooks/use-favorites";
-import { FavoriteButton } from "~/components/favorite-button";
-
-type CatalogSkill = {
-	skillId: string;
-	slug: string;
-	name: string;
-	description: string;
-	summary: string;
-	categories: string[];
-	capabilities: string[];
-	keywords: string[];
-	githubUrl: string;
-	githubStars: number | null;
-	installCommand: string | null;
-	urlPath: string;
-};
-
-function formatStars(stars: number): string {
-	if (stars >= 1000) {
-		return `${(stars / 1000).toFixed(1).replace(/\.0$/, "")}k`;
-	}
-	return String(stars);
-}
-
-type CatalogResponse = {
-	skills: CatalogSkill[];
-	meta: { total: number; limit: number; offset: number; hasMore: boolean };
-};
+import {
+	SkillSearch,
+	FavoritesProvider,
+	useFavorites,
+	FavoriteButton,
+	usePublicApiClient,
+	formatStars,
+	type CatalogSkill,
+	type CatalogResponse,
+} from "@skillsgate/ui";
 
 const FEATURES = [
 	{
@@ -124,6 +103,7 @@ const FAQ_ITEMS = [
 ];
 
 function useCatalog() {
+	const publicApi = usePublicApiClient();
 	const [skills, setSkills] = useState<CatalogSkill[]>([]);
 	const [total, setTotal] = useState(0);
 	const [hasMore, setHasMore] = useState(false);
@@ -143,7 +123,7 @@ function useCatalog() {
 			setTotal(res.data.meta.total);
 			setHasMore(res.data.meta.hasMore);
 		}
-	}, []);
+	}, [publicApi]);
 
 	useEffect(() => {
 		fetchSkills(0).finally(() => setIsLoading(false));

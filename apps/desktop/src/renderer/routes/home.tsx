@@ -2,41 +2,66 @@ import { useEffect, useState, useMemo, useCallback } from "react"
 import { marked } from "marked"
 import { electronAPI } from "../lib/electron-api"
 
-// Agent short code mapping for display badges
-const AGENT_SHORT_CODES: Record<string, string> = {
-  "Claude Code": "CC",
-  Cursor: "CU",
-  "GitHub Copilot": "GC",
-  Windsurf: "WS",
-  Cline: "CL",
-  Continue: "CN",
-  "Codex CLI": "CX",
-  Amp: "AM",
-  Goose: "GO",
-  Junie: "JU",
-  "Kilo Code": "KC",
-  OpenCode: "OC",
-  OpenClaw: "OW",
-  "Pear AI": "PA",
-  "Roo Code": "RC",
-  Trae: "TR",
-  Zed: "ZD",
-  "Universal (.agents/skills)": "UA",
+// Agent color mapping for dot badges
+const AGENT_COLORS: Record<string, string> = {
+  "claude-code": "#D97706",
+  cursor: "#2563EB",
+  "github-copilot": "#6366F1",
+  windsurf: "#0891B2",
+  cline: "#7C3AED",
+  continue: "#059669",
+  "codex-cli": "#DC2626",
+  amp: "#EA580C",
+  goose: "#4F46E5",
+  junie: "#B45309",
+  "kilo-code": "#0369A1",
+  opencode: "#0D9488",
+  openclaw: "#6D28D9",
+  "pear-ai": "#65A30D",
+  "roo-code": "#C026D3",
+  trae: "#0284C7",
+  zed: "#CA8A04",
+  universal: "#78716C",
 }
 
-function getShortCode(displayName: string, shortCode?: string): string {
-  if (shortCode) return shortCode
-  return AGENT_SHORT_CODES[displayName] || displayName.slice(0, 2).toUpperCase()
+// Map display names to registry keys for color lookup
+const DISPLAY_NAME_TO_KEY: Record<string, string> = {
+  "Claude Code": "claude-code",
+  Cursor: "cursor",
+  "GitHub Copilot": "github-copilot",
+  Windsurf: "windsurf",
+  Cline: "cline",
+  Continue: "continue",
+  "Codex CLI": "codex-cli",
+  Amp: "amp",
+  Goose: "goose",
+  Junie: "junie",
+  "Kilo Code": "kilo-code",
+  OpenCode: "opencode",
+  OpenClaw: "openclaw",
+  "Pear AI": "pear-ai",
+  "Roo Code": "roo-code",
+  Trae: "trae",
+  Zed: "zed",
+  "Universal (.agents/skills)": "universal",
 }
 
-function AgentBadge({ name, shortCode }: { name: string; shortCode?: string }) {
-  const code = getShortCode(name, shortCode)
+function getAgentColor(displayName: string): string {
+  const key = DISPLAY_NAME_TO_KEY[displayName] || displayName.toLowerCase().replace(/\s+/g, "-")
+  return AGENT_COLORS[key] || "#78716C"
+}
+
+function AgentDots({ agents }: { agents: string[] }) {
   return (
-    <span
-      title={name}
-      className="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-mono font-medium bg-surface-hover text-muted"
-    >
-      {code}
+    <span className="flex items-center gap-1">
+      {agents.map((agent) => (
+        <span
+          key={agent}
+          title={agent}
+          className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0"
+          style={{ backgroundColor: getAgentColor(agent) }}
+        />
+      ))}
     </span>
   )
 }
@@ -357,14 +382,8 @@ function MiddlePanel({
                 <span className="text-[12px] font-medium truncate flex-1 min-w-0">
                   {skill.name}
                 </span>
-                <span className="flex items-center gap-0.5 ml-2 flex-shrink-0">
-                  {skill.agents.map((agentName, i) => (
-                    <AgentBadge
-                      key={agentName}
-                      name={agentName}
-                      shortCode={skill.agentShortCodes?.[i]}
-                    />
-                  ))}
+                <span className="ml-2 flex-shrink-0">
+                  <AgentDots agents={skill.agents} />
                 </span>
               </button>
             ))}
@@ -412,13 +431,7 @@ function RightPanel({ skill, content, contentLoading }: RightPanelProps) {
             <p className="text-sm text-muted mb-3">{skill.description}</p>
           )}
           <div className="flex items-center gap-1.5">
-            {skill.agents.map((agentName, i) => (
-              <AgentBadge
-                key={agentName}
-                name={agentName}
-                shortCode={skill.agentShortCodes?.[i]}
-              />
-            ))}
+            <AgentDots agents={skill.agents} />
           </div>
           {skill.source && (
             <p className="text-[11px] text-muted font-mono mt-2">

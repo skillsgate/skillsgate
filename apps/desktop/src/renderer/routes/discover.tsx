@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { marked } from "marked"
 import { electronAPI } from "../lib/electron-api"
+import { useAuthStore } from "../lib/auth-store"
+
+type SearchMode = "keyword" | "semantic"
 
 // ---------------------------------------------------------------------------
 // API constants
@@ -35,6 +38,11 @@ interface CatalogResponse {
 interface KeywordSearchResponse {
   skills: CatalogSkill[]
   meta: { total: number; limit: number; offset: number; hasMore: boolean }
+}
+
+interface SemanticSearchResponse {
+  results: (CatalogSkill & { score: number })[]
+  meta: { query: string; total: number; limit: number; remainingSearches: number }
 }
 
 interface SkillDetail {
@@ -457,10 +465,15 @@ function DetailPanel({ skill, onClose, installedNames, onInstall }: DetailPanelP
 // ---------------------------------------------------------------------------
 
 export function Discover() {
+  const { token, user } = useAuthStore()
+  const isAuthenticated = !!token
+
   const [skills, setSkills] = useState<CatalogSkill[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [searching, setSearching] = useState(false)
+  const [searchMode, setSearchMode] = useState<SearchMode>("keyword")
+  const [remainingSearches, setRemainingSearches] = useState<number | null>(null)
   const [offset, setOffset] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const [total, setTotal] = useState(0)
@@ -548,6 +561,50 @@ export function Discover() {
     }
   }
 
+  async function fetchSemanticSearch(query: string) {
+    if (!token) return
+    if (abortRef.current) abortRef.current.abort()
+
+    const controller = new AbortController()
+    abortRef.current = controller
+    setSearching(true)
+    setError(null)
+
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/search`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ query, limit: 5 }),
+        signal: controller.signal,
+      })
+      if (res.status === 429) {
+        setError("Daily search limit reached. Switch to keyword search.")
+        setRemainingSearches(0)
+        return
+      }
+      if (res.status === 401) {
+        setError("Session expired. Please sign in again.")
+        return
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data: SemanticSearchResponse = await res.json()
+
+      setSkills(data.results)
+      setHasMore(false)
+      setTotal(data.meta.total)
+      setRemainingSearches(data.meta.remainingSearches)
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return
+      setError("Semantic search failed. Please try again.")
+      console.error("Semantic search error:", err)
+    } finally {
+      setSearching(false)
+    }
+  }
+
   const handleSearchChange = useCallback((value: string) => {
     setSearchQuery(value)
 
@@ -556,16 +613,19 @@ export function Discover() {
     }
 
     if (!value.trim()) {
-      // Reset to catalog
       setOffset(0)
       fetchCatalog(0)
       return
     }
 
     debounceRef.current = setTimeout(() => {
-      fetchSearch(value.trim())
+      if (searchMode === "semantic" && token) {
+        fetchSemanticSearch(value.trim())
+      } else {
+        fetchSearch(value.trim())
+      }
     }, 300)
-  }, [])
+  }, [searchMode, token])
 
   function handleLoadMore() {
     if (searchQuery.trim()) {
@@ -604,14 +664,46 @@ export function Discover() {
           )}
         </p>
 
-        {/* Search bar */}
+        {/* Search mode toggle + bar */}
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex items-center rounded-lg border border-border bg-surface overflow-hidden text-[12px]">
+            <button
+              onClick={() => { setSearchMode("keyword"); if (searchQuery.trim()) { fetchSearch(searchQuery.trim()) } }}
+              className={`px-3 py-1.5 transition-colors ${searchMode === "keyword" ? "bg-surface-hover text-foreground font-medium" : "text-muted hover:text-foreground"}`}
+            >
+              Keyword
+            </button>
+            <button
+              onClick={() => {
+                if (!isAuthenticated) return
+                setSearchMode("semantic")
+                if (searchQuery.trim()) { fetchSemanticSearch(searchQuery.trim()) }
+              }}
+              className={`px-3 py-1.5 transition-colors ${searchMode === "semantic" ? "bg-surface-hover text-foreground font-medium" : "text-muted hover:text-foreground"} ${!isAuthenticated ? "opacity-40 cursor-not-allowed" : ""}`}
+              title={!isAuthenticated ? "Sign in to use AI search" : "AI-powered semantic search"}
+            >
+              AI Search
+            </button>
+          </div>
+          {searchMode === "semantic" && remainingSearches !== null && (
+            <span className={`text-[11px] font-mono ${remainingSearches <= 5 ? "text-red-400" : "text-muted"}`}>
+              {remainingSearches} search{remainingSearches !== 1 ? "es" : ""} remaining today
+            </span>
+          )}
+          {!isAuthenticated && (
+            <span className="text-[11px] text-muted">
+              Sign in to unlock AI search
+            </span>
+          )}
+        </div>
+
         <div className="relative max-w-xl">
           <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
             <SearchIcon size={15} />
           </div>
           <input
             type="text"
-            placeholder="Search skills by name, keyword, or category..."
+            placeholder={searchMode === "semantic" ? 'AI search -- try "audit website performance"...' : "Search skills by name, keyword, or category..."}
             value={searchQuery}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full pl-9 pr-10 py-2.5 rounded-lg bg-surface border border-border text-[13px] text-foreground placeholder:text-muted focus:outline-none focus:border-accent/40 transition-colors"

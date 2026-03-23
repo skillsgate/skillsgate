@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from "electron"
+import { app, BrowserWindow, shell, nativeImage } from "electron"
 import path from "node:path"
 import { registerIpcHandlers } from "./ipc-handlers"
 import { SkillsFileWatcher } from "./file-watcher"
@@ -8,6 +8,10 @@ let mainWindow: BrowserWindow | null = null
 let fileWatcher: SkillsFileWatcher | null = null
 
 function createWindow(): void {
+  // Load app icon
+  const iconPath = path.join(__dirname, "../../resources/icon.png")
+  const icon = nativeImage.createFromPath(iconPath)
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -15,6 +19,7 @@ function createWindow(): void {
     minHeight: 600,
     show: false,
     title: "SkillsGate",
+    icon,
     webPreferences: {
       preload: path.join(__dirname, "../preload/index.js"),
       contextIsolation: true,

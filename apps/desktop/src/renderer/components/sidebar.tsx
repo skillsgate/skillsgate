@@ -182,20 +182,16 @@ export function Sidebar() {
   if (isHome) {
     return (
       <aside className="w-14 flex-shrink-0 flex flex-col items-center bg-surface border-r border-border">
-        {/* App icon */}
+        {/* App icon (SkillsGate logo) */}
         <div className="py-4">
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="text-accent"
-          >
-            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+          <svg width="24" height="24" viewBox="0 0 64 64" className="text-foreground">
+            <g transform="translate(8, 8)">
+              <path d="M16 2 L4 2 C2 2 1 4 1 6 L1 42 C1 44 2 46 4 46 L16 46" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M32 2 L44 2 C46 2 47 4 47 6 L47 42 C47 44 46 46 44 46 L32 46" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="24" cy="14" r="3.5" fill="currentColor"/>
+              <circle cx="24" cy="24" r="3.5" fill="currentColor"/>
+              <circle cx="24" cy="34" r="3.5" fill="currentColor"/>
+            </g>
           </svg>
         </div>
 
@@ -272,23 +268,19 @@ export function Sidebar() {
   // Full sidebar for non-Home views
   return (
     <aside className="w-60 flex-shrink-0 flex flex-col bg-surface border-r border-border">
-      {/* App header */}
+      {/* App header with SkillsGate logo */}
       <div className="px-4 py-5 border-b border-border">
-        <div className="flex items-center gap-2">
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="text-accent"
-          >
-            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+        <div className="flex items-center gap-2.5">
+          <svg width="22" height="22" viewBox="0 0 64 64" className="text-foreground flex-shrink-0">
+            <g transform="translate(8, 8)">
+              <path d="M16 2 L4 2 C2 2 1 4 1 6 L1 42 C1 44 2 46 4 46 L16 46" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M32 2 L44 2 C46 2 47 4 47 6 L47 42 C47 44 46 46 44 46 L32 46" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="24" cy="14" r="3.5" fill="currentColor"/>
+              <circle cx="24" cy="24" r="3.5" fill="currentColor"/>
+              <circle cx="24" cy="34" r="3.5" fill="currentColor"/>
+            </g>
           </svg>
-          <span className="text-base font-semibold text-foreground">
+          <span className="text-[17px] font-semibold tracking-tight text-foreground">
             SkillsGate
           </span>
         </div>

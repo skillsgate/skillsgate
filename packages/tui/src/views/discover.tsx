@@ -2,6 +2,8 @@ import { useState, useCallback } from "react"
 import { useKeyboard } from "@opentui/react"
 import { useStore, useDispatch } from "../store/context.js"
 import { useSearch } from "../data/use-search.js"
+import { useSkillActions } from "../data/use-skill-actions.js"
+import { ConfirmDialog } from "../components/confirm-dialog.js"
 import type { CatalogSkill } from "../data/api-client.js"
 import { colors } from "../utils/colors.js"
 
@@ -13,14 +15,17 @@ export function DiscoverView() {
   const dispatch = useDispatch()
   const [query, setQuery] = useState("")
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [installTarget, setInstallTarget] = useState<CatalogSkill | null>(null)
 
   const { results, loading, error, total, hasMore, loadMore } = useSearch(query)
+  const { installSkill } = useSkillActions()
 
   // Keyboard navigation for the discover list
   useKeyboard((key) => {
     if (state.activeView !== "discover") return
     if (state.showHelp) return
     if (state.focusedPane === "search") return
+    if (installTarget) return // Block navigation during confirm dialog
 
     // j/k or arrow keys
     if (key.name === "up" || (key.name === "k" && !key.ctrl)) {
@@ -55,18 +60,27 @@ export function DiscoverView() {
       return
     }
 
-    // i to install (placeholder)
+    // i to install
     if (key.name === "i" && results[selectedIndex]) {
-      dispatch({
-        type: "SHOW_NOTIFICATION",
-        notification: {
-          type: "info",
-          message: `Install "${results[selectedIndex].name}": coming soon. Use CLI: skillsgate add <source>`,
-        },
-      })
+      setInstallTarget(results[selectedIndex])
       return
     }
   })
+
+  // Confirm dialog for install
+  if (installTarget) {
+    return (
+      <ConfirmDialog
+        message={`Install "${installTarget.name}"?`}
+        onConfirm={async () => {
+          const skill = catalogSkillToEnriched(installTarget)
+          setInstallTarget(null)
+          await installSkill(skill)
+        }}
+        onCancel={() => setInstallTarget(null)}
+      />
+    )
+  }
 
   return (
     <box style={{ flexDirection: "column", width: "100%", flexGrow: 1 }}>

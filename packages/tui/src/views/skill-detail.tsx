@@ -2,6 +2,8 @@ import { useState, useEffect } from "react"
 import fs from "node:fs"
 import { useKeyboard } from "@opentui/react"
 import { useStore, useDispatch } from "../store/context.js"
+import { useSkillActions } from "../data/use-skill-actions.js"
+import { ConfirmDialog } from "../components/confirm-dialog.js"
 import { agents } from "../../../cli/src/core/agents.js"
 import { colors } from "../utils/colors.js"
 
@@ -37,12 +39,16 @@ function stripFrontmatter(content: string): string {
   return lines.slice(endIndex + 1).join("\n").trimStart()
 }
 
+type DetailPendingAction = "remove" | "install" | null
+
 export function SkillDetailView() {
   const state = useStore()
   const dispatch = useDispatch()
+  const { installSkill, removeSkill } = useSkillActions()
   const skill = state.selectedSkill
 
   const [content, setContent] = useState("")
+  const [pendingAction, setPendingAction] = useState<DetailPendingAction>(null)
 
   useEffect(() => {
     if (skill?.filePath) {
@@ -55,6 +61,7 @@ export function SkillDetailView() {
   useKeyboard((key) => {
     if (state.activeView !== "detail") return
     if (state.showHelp) return
+    if (pendingAction) return // Block during confirm dialog
 
     // q or Esc to go back
     if (key.name === "q" || key.name === "escape") {
@@ -67,7 +74,6 @@ export function SkillDetailView() {
       const url = skill.lock.originalUrl
       if (url) {
         try {
-          // Use Bun.spawn or child_process to open URL
           const { exec } = require("node:child_process")
           const cmd = process.platform === "darwin" ? "open" : "xdg-open"
           exec(`${cmd} "${url}"`)
@@ -85,24 +91,39 @@ export function SkillDetailView() {
       return
     }
 
-    // d to remove (placeholder)
-    if (key.name === "d") {
-      dispatch({
-        type: "SHOW_NOTIFICATION",
-        notification: { type: "info", message: "Remove skill: coming soon" },
-      })
+    // d to remove skill
+    if (key.name === "d" && skill) {
+      setPendingAction("remove")
       return
     }
 
-    // f to favorite (placeholder)
-    if (key.name === "f") {
-      dispatch({
-        type: "SHOW_NOTIFICATION",
-        notification: { type: "info", message: "Favorite: coming soon" },
-      })
+    // i to install (for catalog skills not yet installed)
+    if (key.name === "i" && skill && skill.agents.length === 0) {
+      setPendingAction("install")
       return
     }
   })
+
+  // Confirm dialog for remove/install
+  if (pendingAction && skill) {
+    const actionLabel = pendingAction === "remove" ? "Remove" : "Install"
+    return (
+      <ConfirmDialog
+        message={`${actionLabel} "${skill.name}"?`}
+        onConfirm={async () => {
+          const action = pendingAction
+          setPendingAction(null)
+          if (action === "remove") {
+            await removeSkill(skill)
+            dispatch({ type: "GO_BACK" })
+          } else if (action === "install") {
+            await installSkill(skill)
+          }
+        }}
+        onCancel={() => setPendingAction(null)}
+      />
+    )
+  }
 
   if (!skill) {
     return (
@@ -255,8 +276,11 @@ export function SkillDetailView() {
         {sourceType === "github" && (
           <text fg={colors.textDim}>o      Open URL</text>
         )}
-        <text fg={colors.textDim}>d      Remove skill</text>
-        <text fg={colors.textDim}>f      Favorite</text>
+        {skill.agents.length > 0 ? (
+          <text fg={colors.textDim}>d      Remove skill</text>
+        ) : (
+          <text fg={colors.textDim}>i      Install skill</text>
+        )}
       </box>
     </box>
   )

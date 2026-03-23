@@ -2,7 +2,8 @@ import { useState, useMemo } from "react"
 import { useKeyboard } from "@opentui/react"
 import { useStore, useDispatch } from "../store/context.js"
 import { useFavorites } from "../data/use-favorites.js"
-import { agents } from "../../../cli/src/core/agents.js"
+import { useSkillActions } from "../data/use-skill-actions.js"
+import { ConfirmDialog } from "../components/confirm-dialog.js"
 import { colors } from "../utils/colors.js"
 import type { CatalogSkill } from "../data/api-client.js"
 import type { EnrichedSkill } from "../store/types.js"
@@ -15,7 +16,9 @@ export function FavoritesView() {
   const state = useStore()
   const dispatch = useDispatch()
   const { favorites, loading, error, toggle } = useFavorites()
+  const { installSkill } = useSkillActions()
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [installTarget, setInstallTarget] = useState<CatalogSkill | null>(null)
 
   // Build a set of installed skill names for the "installed" badge
   const installedNames = useMemo(() => {
@@ -27,6 +30,7 @@ export function FavoritesView() {
     if (state.activeView !== "favorites") return
     if (state.showHelp) return
     if (!state.auth) return // No navigation when not logged in
+    if (installTarget) return // Block navigation during confirm dialog
 
     // j/k or arrow keys
     if (key.name === "up" || (key.name === "k" && !key.ctrl)) {
@@ -69,18 +73,27 @@ export function FavoritesView() {
       return
     }
 
-    // i to install (placeholder for now, will be implemented in Task 25)
+    // i to install
     if (key.name === "i" && favorites[selectedIndex]) {
-      dispatch({
-        type: "SHOW_NOTIFICATION",
-        notification: {
-          type: "info",
-          message: `Install "${favorites[selectedIndex].name}": coming soon. Use CLI: skillsgate add <source>`,
-        },
-      })
+      setInstallTarget(favorites[selectedIndex])
       return
     }
   })
+
+  // Confirm dialog for install
+  if (installTarget) {
+    return (
+      <ConfirmDialog
+        message={`Install "${installTarget.name}"?`}
+        onConfirm={async () => {
+          const skill = catalogSkillToEnriched(installTarget, installedNames)
+          setInstallTarget(null)
+          await installSkill(skill)
+        }}
+        onCancel={() => setInstallTarget(null)}
+      />
+    )
+  }
 
   // Not authenticated
   if (!state.auth) {

@@ -1,8 +1,10 @@
 import { app, BrowserWindow, shell } from "electron"
 import path from "node:path"
 import { registerIpcHandlers } from "./ipc-handlers"
+import { SkillsFileWatcher } from "./file-watcher"
 
 let mainWindow: BrowserWindow | null = null
+let fileWatcher: SkillsFileWatcher | null = null
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -28,6 +30,18 @@ function createWindow(): void {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
     return { action: "deny" }
+  })
+
+  // Start the file watcher once the window is created
+  fileWatcher = new SkillsFileWatcher(mainWindow)
+  fileWatcher.start().catch((err) => {
+    console.error("Failed to start file watcher:", err)
+  })
+
+  mainWindow.on("closed", () => {
+    fileWatcher?.stop()
+    fileWatcher = null
+    mainWindow = null
   })
 
   // Load the renderer

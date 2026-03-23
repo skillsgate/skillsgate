@@ -4,6 +4,7 @@ declare global {
   interface DetectedAgent {
     name: string
     displayName: string
+    shortCode: string
   }
 
   interface InstalledSkill {
@@ -11,6 +12,7 @@ declare global {
     description: string
     path: string
     agents: string[]
+    agentShortCodes: string[]
     source?: string
     sourceType?: string
     installedAt?: string

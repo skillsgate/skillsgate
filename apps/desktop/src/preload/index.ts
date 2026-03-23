@@ -12,6 +12,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   updateSkill: (name: string) => ipcRenderer.invoke("skills:update", name),
   readSkillContent: (skillPath: string) =>
     ipcRenderer.invoke("skill:read-content", skillPath),
+  writeSkillContent: (filePath: string, content: string) =>
+    ipcRenderer.invoke("skill:write-content", filePath, content),
+  openInFinder: (filePath: string) =>
+    ipcRenderer.invoke("skill:open-in-finder", filePath),
+  removeFromAgent: (skillName: string, agentName: string) =>
+    ipcRenderer.invoke("skills:remove-from-agent", skillName, agentName),
 
   // Auth
   authLoad: () => ipcRenderer.invoke("auth:load"),

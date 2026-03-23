@@ -1031,6 +1031,29 @@ export function registerIpcHandlers(): void {
   ipcMain.handle("settings:all", () => {
     return settingsStore.getAll()
   })
+
+  // -------------------------------------------------------------------------
+  // Skill editing & management
+  // -------------------------------------------------------------------------
+
+  // Write skill content back to disk
+  ipcMain.handle("skill:write-content", async (_, filePath: string, content: string) => {
+    await fs.writeFile(filePath, content, "utf-8")
+  })
+
+  // Open skill folder in Finder/Explorer
+  ipcMain.handle("skill:open-in-finder", async (_, filePath: string) => {
+    shell.showItemInFolder(filePath)
+  })
+
+  // Remove skill from a specific agent only (delete symlink, keep canonical)
+  ipcMain.handle("skills:remove-from-agent", async (_, skillName: string, agentName: string) => {
+    const safeName = sanitizeName(skillName)
+    const agent = agentRegistry[agentName]
+    if (!agent) throw new Error(`Unknown agent: ${agentName}`)
+    const skillPath = path.join(agent.globalSkillsDir, safeName)
+    await fs.rm(skillPath, { recursive: true, force: true })
+  })
 }
 
 // Export for use by file-watcher

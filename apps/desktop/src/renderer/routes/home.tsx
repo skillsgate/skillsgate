@@ -391,6 +391,106 @@ function MiddlePanel({
 }
 
 // --------------------------------------------------------------------------
+// Inline SVG icons for the right panel
+// --------------------------------------------------------------------------
+
+function FolderIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+    </svg>
+  )
+}
+
+// --------------------------------------------------------------------------
+// Remove Skill Dialog
+// --------------------------------------------------------------------------
+
+interface RemoveSkillDialogProps {
+  skill: InstalledSkill
+  onClose: () => void
+  onRemoveFromAgents: (agentDisplayNames: string[]) => void
+  onRemoveAll: () => void
+}
+
+function RemoveSkillDialog({ skill, onClose, onRemoveFromAgents, onRemoveAll }: RemoveSkillDialogProps) {
+  const [checked, setChecked] = useState<Record<string, boolean>>({})
+
+  const toggleAgent = (displayName: string) => {
+    setChecked((prev) => ({ ...prev, [displayName]: !prev[displayName] }))
+  }
+
+  const selectedAgents = skill.agents.filter((a) => checked[a])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-surface border border-border rounded-xl shadow-lg w-full max-w-sm mx-4 p-5 animate-slide-down">
+        <h2 className="text-[14px] font-semibold text-foreground mb-1">
+          Remove "{skill.name}"
+        </h2>
+        <p className="text-[12px] text-muted mb-4">
+          This skill is installed in {skill.agents.length} agent{skill.agents.length !== 1 ? "s" : ""}:
+        </p>
+
+        <div className="flex flex-col gap-2 mb-5">
+          {skill.agents.map((agent) => (
+            <label
+              key={agent}
+              className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-surface-hover transition-colors cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                checked={!!checked[agent]}
+                onChange={() => toggleAgent(agent)}
+                className="rounded border-border accent-foreground"
+              />
+              <span
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: getAgentColor(agent) }}
+              />
+              <span className="text-[12px] text-foreground">{agent}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2 justify-end">
+          <button
+            onClick={onClose}
+            className="text-muted text-[12px] px-4 py-1.5 hover:text-foreground transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              if (selectedAgents.length > 0) onRemoveFromAgents(selectedAgents)
+            }}
+            disabled={selectedAgents.length === 0}
+            className="text-[12px] px-4 py-1.5 rounded-lg border border-border text-foreground hover:bg-surface-hover transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            Remove selected
+          </button>
+          <button
+            onClick={onRemoveAll}
+            className="bg-red-600 text-white text-[12px] px-4 py-1.5 rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Remove all
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// --------------------------------------------------------------------------
 // Right Detail Panel
 // --------------------------------------------------------------------------
 
@@ -398,9 +498,92 @@ interface RightPanelProps {
   skill: InstalledSkill | null
   content: string | null
   contentLoading: boolean
+  onContentSaved: (newContent: string) => void
+  onSkillRemoved: () => void
 }
 
-function RightPanel({ skill, content, contentLoading }: RightPanelProps) {
+function RightPanel({ skill, content, contentLoading, onContentSaved, onSkillRemoved }: RightPanelProps) {
+  const [editMode, setEditMode] = useState(false)
+  const [editContent, setEditContent] = useState("")
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
+  const [showRemoveDialog, setShowRemoveDialog] = useState(false)
+
+  // Reset edit mode when skill changes
+  useEffect(() => {
+    setEditMode(false)
+    setEditContent("")
+    setSaveStatus("idle")
+    setShowRemoveDialog(false)
+  }, [skill?.name])
+
+  const isLocalSkill = !!(skill?.path)
+
+  const handleEditToggle = () => {
+    if (!editMode && content) {
+      setEditContent(content)
+      setSaveStatus("idle")
+    }
+    setEditMode(!editMode)
+  }
+
+  const handleSave = async () => {
+    if (!skill?.path) return
+    setSaveStatus("saving")
+    try {
+      const filePath = skill.path + "/SKILL.md"
+      await electronAPI.writeSkillContent(filePath, editContent)
+      onContentSaved(editContent)
+      setSaveStatus("saved")
+      setTimeout(() => {
+        setEditMode(false)
+        setSaveStatus("idle")
+      }, 800)
+    } catch (err) {
+      console.error("Failed to save skill content:", err)
+      setSaveStatus("error")
+    }
+  }
+
+  const handleCancel = () => {
+    setEditContent("")
+    setEditMode(false)
+    setSaveStatus("idle")
+  }
+
+  const handleOpenInFinder = () => {
+    if (!skill?.path) return
+    electronAPI.openInFinder(skill.path + "/SKILL.md")
+  }
+
+  const handleDeleteClick = () => {
+    if (!skill) return
+    if (skill.agents.length > 1) {
+      setShowRemoveDialog(true)
+    } else {
+      // Single agent: just confirm and remove all
+      if (confirm(`Remove "${skill.name}" from ${skill.agents[0]}?`)) {
+        electronAPI.removeSkill(skill.name).then(() => onSkillRemoved())
+      }
+    }
+  }
+
+  const handleRemoveFromAgents = async (agentDisplayNames: string[]) => {
+    if (!skill) return
+    for (const displayName of agentDisplayNames) {
+      const registryKey = DISPLAY_NAME_TO_KEY[displayName] || displayName.toLowerCase().replace(/\s+/g, "-")
+      await electronAPI.removeFromAgent(skill.name, registryKey)
+    }
+    setShowRemoveDialog(false)
+    onSkillRemoved()
+  }
+
+  const handleRemoveAll = async () => {
+    if (!skill) return
+    await electronAPI.removeSkill(skill.name)
+    setShowRemoveDialog(false)
+    onSkillRemoved()
+  }
+
   if (!skill) {
     return (
       <div className="flex-1 flex items-center justify-center bg-background">
@@ -415,44 +598,136 @@ function RightPanel({ skill, content, contentLoading }: RightPanelProps) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-background">
-      <div className="max-w-3xl px-8 py-6">
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-2">
-            <h1 className="text-xl font-bold text-foreground">{skill.name}</h1>
-            <SourceBadge sourceType={skill.sourceType} />
+    <div className="flex-1 flex flex-col overflow-hidden bg-background">
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl px-8 py-6">
+          {/* Header */}
+          <div className="mb-6">
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <h1 className="text-xl font-bold text-foreground truncate">{skill.name}</h1>
+                <SourceBadge sourceType={skill.sourceType} />
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {/* View/Edit toggle */}
+                {isLocalSkill && content && (
+                  <div className="flex items-center rounded-lg border border-border bg-surface overflow-hidden text-[12px]">
+                    <button
+                      onClick={() => { if (editMode) handleCancel() }}
+                      className={`px-3 py-1.5 transition-colors ${!editMode ? "bg-surface-hover text-foreground font-medium" : "text-muted hover:text-foreground"}`}
+                    >
+                      View
+                    </button>
+                    <button
+                      onClick={() => { if (!editMode) handleEditToggle() }}
+                      className={`px-3 py-1.5 transition-colors ${editMode ? "bg-surface-hover text-foreground font-medium" : "text-muted hover:text-foreground"}`}
+                    >
+                      Edit
+                    </button>
+                  </div>
+                )}
+
+                {/* Open in Finder */}
+                {isLocalSkill && (
+                  <button
+                    onClick={handleOpenInFinder}
+                    title="Show in Finder"
+                    className="p-1.5 rounded-md text-muted hover:text-foreground hover:bg-surface-hover transition-colors"
+                  >
+                    <FolderIcon />
+                  </button>
+                )}
+
+                {/* Delete */}
+                {isLocalSkill && (
+                  <button
+                    onClick={handleDeleteClick}
+                    title="Remove skill"
+                    className="p-1.5 rounded-md text-muted hover:text-red-500 hover:bg-surface-hover transition-colors"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {skill.description && (
+              <p className="text-sm text-muted mb-3">{skill.description}</p>
+            )}
+            <div className="flex items-center gap-1.5">
+              <AgentDots agents={skill.agents} />
+            </div>
+            {skill.source && (
+              <p className="text-[11px] text-muted font-mono mt-2">
+                {skill.source}
+              </p>
+            )}
           </div>
-          {skill.description && (
-            <p className="text-sm text-muted mb-3">{skill.description}</p>
-          )}
-          <div className="flex items-center gap-1.5">
-            <AgentDots agents={skill.agents} />
-          </div>
-          {skill.source && (
-            <p className="text-[11px] text-muted font-mono mt-2">
-              {skill.source}
+
+          {/* Divider */}
+          <hr className="border-border mb-6" />
+
+          {/* Content: View or Edit mode */}
+          {editMode ? (
+            <div className="flex flex-col gap-3">
+              <textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                className="bg-background border border-border rounded-lg font-mono text-[13px] p-4 w-full resize-none text-foreground focus:outline-none focus:border-accent transition-colors"
+                style={{ minHeight: "400px" }}
+                spellCheck={false}
+              />
+              <div className="flex items-center gap-2 justify-end">
+                {saveStatus === "saved" && (
+                  <span className="text-[12px] text-green-500 mr-2">Saved</span>
+                )}
+                {saveStatus === "error" && (
+                  <span className="text-[12px] text-red-500 mr-2">Save failed</span>
+                )}
+                <button
+                  onClick={handleCancel}
+                  className="text-muted text-[12px] px-4 py-1.5 hover:text-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saveStatus === "saving"}
+                  className="bg-foreground text-background text-[12px] px-4 py-1.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {saveStatus === "saving" ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </div>
+          ) : contentLoading ? (
+            <p className="text-sm text-muted animate-fade-in">Loading content...</p>
+          ) : content ? (
+            <div
+              className="skill-prose"
+              dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
+            />
+          ) : (
+            <p className="text-sm text-muted">
+              Skill content not available. This skill may not have a SKILL.md file.
             </p>
           )}
         </div>
-
-        {/* Divider */}
-        <hr className="border-border mb-6" />
-
-        {/* Content */}
-        {contentLoading ? (
-          <p className="text-sm text-muted animate-fade-in">Loading content...</p>
-        ) : content ? (
-          <div
-            className="skill-prose"
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
-          />
-        ) : (
-          <p className="text-sm text-muted">
-            Skill content not available. This skill may not have a SKILL.md file.
-          </p>
-        )}
       </div>
+
+      {/* Remove skill dialog */}
+      {showRemoveDialog && skill && (
+        <RemoveSkillDialog
+          skill={skill}
+          onClose={() => setShowRemoveDialog(false)}
+          onRemoveFromAgents={handleRemoveFromAgents}
+          onRemoveAll={handleRemoveAll}
+        />
+      )}
     </div>
   )
 }
@@ -580,6 +855,21 @@ export function Home() {
     setActiveFilter("all")
   }, [])
 
+  const handleContentSaved = useCallback((newContent: string) => {
+    setSkillContent(newContent)
+  }, [])
+
+  const handleSkillRemoved = useCallback(async () => {
+    setSelectedSkill(null)
+    setSkillContent(null)
+    try {
+      const installedSkills = await electronAPI.listInstalled()
+      setSkills(installedSkills)
+    } catch (err) {
+      console.error("Failed to refresh skills after removal:", err)
+    }
+  }, [])
+
   return (
     <div className="flex h-full">
       {/* Column 1: Left sidebar (filter panel) */}
@@ -611,6 +901,8 @@ export function Home() {
         skill={selectedSkill}
         content={skillContent}
         contentLoading={contentLoading}
+        onContentSaved={handleContentSaved}
+        onSkillRemoved={handleSkillRemoved}
       />
     </div>
   )

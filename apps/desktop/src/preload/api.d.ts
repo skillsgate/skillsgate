@@ -84,6 +84,9 @@ declare global {
     removeSkill: (name: string) => Promise<void>
     updateSkill: (name: string) => Promise<void>
     readSkillContent: (path: string) => Promise<string>
+    writeSkillContent: (filePath: string, content: string) => Promise<void>
+    openInFinder: (filePath: string) => Promise<void>
+    removeFromAgent: (skillName: string, agentName: string) => Promise<void>
 
     // Auth
     authLoad: () => Promise<StoredAuth | null>

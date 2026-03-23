@@ -1,5 +1,7 @@
+import { useState } from "react"
 import { useKeyboard, useTerminalDimensions } from "@opentui/react"
 import { useStore, useDispatch } from "../store/context.js"
+import { useDb } from "../db/context.js"
 import { useDetectedAgents } from "../data/use-agents.js"
 import { useInstalledSkills } from "../data/use-installed-skills.js"
 import { useAuth } from "../data/use-auth.js"
@@ -9,11 +11,15 @@ import { HomeView } from "../views/home.js"
 import { SkillDetailView } from "../views/skill-detail.js"
 import { DiscoverView } from "../views/discover.js"
 import { FavoritesView } from "../views/favorites.js"
+import { ServersView } from "../views/servers.js"
+import { AddServerView } from "../views/add-server.js"
+import { ServerSkillsView } from "../views/server-skills.js"
+import { SettingsView } from "../views/settings.js"
 import { LoginView } from "../views/login.js"
 import { colors } from "../utils/colors.js"
 import type { ViewName } from "../store/types.js"
 
-function getTabOptions(favCount: number) {
+function getTabOptions(favCount: number, serverCount: number) {
   return [
     { name: "Installed", description: "Locally installed skills", value: "home" },
     { name: "Discover", description: "Search the registry", value: "discover" },
@@ -22,6 +28,11 @@ function getTabOptions(favCount: number) {
       description: "Your starred skills",
       value: "favorites",
     },
+    {
+      name: serverCount > 0 ? `Servers (${serverCount})` : "Servers",
+      description: "Remote SSH servers",
+      value: "servers",
+    },
   ]
 }
 
@@ -29,6 +40,8 @@ export function Layout() {
   const state = useStore()
   const dispatch = useDispatch()
   const { width, height } = useTerminalDimensions()
+  const { servers } = useDb()
+  const [serverCount, setServerCount] = useState(() => servers.list().length)
 
   // Load auth, agent + skill data on mount
   useAuth()
@@ -73,11 +86,24 @@ export function Layout() {
     // When help is shown, block other shortcuts
     if (state.showHelp) return
 
-    // Tab switching (only when not in detail view)
-    if (state.activeView !== "detail") {
+    // Tab switching (only when not in detail/form views)
+    const inFormView = state.activeView === "detail" || state.activeView === "add-server"
+      || state.activeView === "edit-server" || state.activeView === "settings"
+      || state.activeView === "server-skills" || state.activeView === "login"
+    if (!inFormView) {
       if (key.name === "1") dispatch({ type: "NAVIGATE", view: "home" })
       if (key.name === "2") dispatch({ type: "NAVIGATE", view: "discover" })
       if (key.name === "3") dispatch({ type: "NAVIGATE", view: "favorites" })
+      if (key.name === "4") {
+        setServerCount(servers.list().length)
+        dispatch({ type: "NAVIGATE", view: "servers" })
+      }
+    }
+
+    // "s" to open settings (from any non-form view)
+    if (key.name === "s" && state.focusedPane !== "search" && !inFormView) {
+      dispatch({ type: "NAVIGATE", view: "settings" })
+      return
     }
 
     // Tab to cycle focus (only on home/discover views)
@@ -92,9 +118,11 @@ export function Layout() {
       return
     }
 
-    // Esc: clear search or go back from detail
+    // Esc: go back from sub-views, clear search, etc.
     if (key.name === "escape") {
-      if (state.activeView === "detail") {
+      if (state.activeView === "detail" || state.activeView === "add-server"
+        || state.activeView === "edit-server" || state.activeView === "settings"
+        || state.activeView === "server-skills") {
         dispatch({ type: "GO_BACK" })
         return
       }
@@ -127,7 +155,7 @@ export function Layout() {
     }
   })
 
-  const TAB_OPTIONS = getTabOptions(state.favorites.length)
+  const TAB_OPTIONS = getTabOptions(state.favorites.length, serverCount)
 
   const activeTabIndex = TAB_OPTIONS.findIndex(
     (t) => t.value === state.activeView
@@ -185,6 +213,17 @@ export function Layout() {
             {state.activeView === "home" && <HomeView />}
             {state.activeView === "discover" && <DiscoverView />}
             {state.activeView === "favorites" && <FavoritesView />}
+            {state.activeView === "servers" && <ServersView onServerCountChange={setServerCount} />}
+            {(state.activeView === "add-server" || state.activeView === "edit-server") && (
+              <AddServerView
+                editServerId={state.activeView === "edit-server" ? state.selectedServerId : null}
+                onServerCountChange={setServerCount}
+              />
+            )}
+            {state.activeView === "server-skills" && state.selectedServerId && (
+              <ServerSkillsView serverId={state.selectedServerId} />
+            )}
+            {state.activeView === "settings" && <SettingsView />}
             {state.activeView === "login" && <LoginView />}
             {state.activeView === "detail" && state.selectedSkill && (
               <SkillDetailView />

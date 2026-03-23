@@ -13,7 +13,7 @@ export function StatusBar() {
       ? "Esc=back"
       : `focus:${state.focusedPane}`
 
-  const statusText = `Skills: ${skillCount} | Agents: ${agentCount} | ${user} | ${focusHint} | ?=help 1/2/3=tabs`
+  const statusText = `Skills: ${skillCount} | Agents: ${agentCount} | ${user} | ${focusHint} | ?=help 1/2/3/4=tabs s=settings`
 
   return (
     <box

@@ -17,6 +17,7 @@ export const initialState: AppState = {
   favorites: [],
   favoritesLoading: false,
   selectedSkill: null,
+  selectedServerId: null,
   showHelp: false,
   focusedPane: "list",
   notification: null,
@@ -106,6 +107,9 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case "REFRESH_SKILLS":
       return { ...state, installedLoading: true }
+
+    case "SET_SELECTED_SERVER":
+      return { ...state, selectedServerId: action.serverId }
 
     default:
       return state

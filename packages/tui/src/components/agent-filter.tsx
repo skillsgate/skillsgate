@@ -1,5 +1,7 @@
+import { useState } from "react"
 import { useKeyboard } from "@opentui/react"
 import { useStore, useDispatch } from "../store/context.js"
+import { useDb } from "../db/context.js"
 import { colors, agentBadges } from "../utils/colors.js"
 
 /**
@@ -10,8 +12,17 @@ import { colors, agentBadges } from "../utils/colors.js"
 export function AgentFilter() {
   const state = useStore()
   const dispatch = useDispatch()
+  const { servers } = useDb()
 
   const allCount = state.installedSkills.length
+
+  // Remote servers with skill counts
+  const serverList = servers.list()
+  const serverEntries = serverList.map((srv) => ({
+    id: srv.id,
+    label: srv.label,
+    count: servers.skillCount(srv.id),
+  }))
 
   // Build the list of filter options
   const agentOptions = state.detectedAgents.map((a) => ({
@@ -112,6 +123,39 @@ export function AgentFilter() {
             </box>
           )
         })
+      )}
+
+      {/* Spacer */}
+      <box style={{ height: 1 }}>
+        <text>{" "}</text>
+      </box>
+
+      {/* Servers section header */}
+      <box style={{ paddingLeft: 1, height: 1, backgroundColor: colors.bgAlt }}>
+        <text fg={colors.textDim}>SERVERS</text>
+      </box>
+
+      {/* Server entries */}
+      {serverEntries.length === 0 ? (
+        <box style={{ paddingLeft: 1, height: 1 }}>
+          <text fg={colors.textDim}>(none)</text>
+        </box>
+      ) : (
+        serverEntries.map((srv) => (
+          <box
+            key={srv.id}
+            style={{
+              paddingLeft: 1,
+              paddingRight: 1,
+              height: 1,
+              flexDirection: "row",
+            }}
+          >
+            <text fg={colors.secondary}>S </text>
+            <text fg={colors.text}>{srv.label}</text>
+            <text fg={colors.textDim}> {srv.count}</text>
+          </box>
+        ))
       )}
     </box>
   )

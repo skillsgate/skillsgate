@@ -2,7 +2,17 @@ import type { AgentType, SkillLockEntry, SourceType } from "../../../cli/src/typ
 
 // ---------- View Names ----------
 
-export type ViewName = "home" | "discover" | "favorites" | "detail" | "login"
+export type ViewName =
+  | "home"
+  | "discover"
+  | "favorites"
+  | "servers"
+  | "server-skills"
+  | "add-server"
+  | "edit-server"
+  | "settings"
+  | "detail"
+  | "login"
 
 // ---------- Enriched Skill ----------
 
@@ -74,6 +84,9 @@ export interface AppState {
   // Detail
   selectedSkill: EnrichedSkill | null
 
+  // Servers
+  selectedServerId: string | null
+
   // UI state
   showHelp: boolean
   focusedPane: FocusedPane
@@ -107,3 +120,4 @@ export type Action =
   | { type: "SET_FOCUSED_PANE"; pane: FocusedPane }
   | { type: "CYCLE_FOCUS" }
   | { type: "REFRESH_SKILLS" }
+  | { type: "SET_SELECTED_SERVER"; serverId: string | null }

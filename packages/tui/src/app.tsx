@@ -1,10 +1,18 @@
+import type { Database } from "bun:sqlite"
 import { StoreProvider } from "./store/context.js"
+import { DbProvider } from "./db/context.js"
 import { Layout } from "./components/layout.js"
 
-export function App() {
+interface AppProps {
+  db: Database
+}
+
+export function App({ db }: AppProps) {
   return (
-    <StoreProvider>
-      <Layout />
-    </StoreProvider>
+    <DbProvider db={db}>
+      <StoreProvider>
+        <Layout />
+      </StoreProvider>
+    </DbProvider>
   )
 }

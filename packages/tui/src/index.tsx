@@ -1,6 +1,10 @@
 import { createCliRenderer } from "@opentui/core"
 import { createRoot } from "@opentui/react"
+import { openDb } from "./db/index.js"
 import { App } from "./app.js"
+
+// Open the local SQLite database at ~/.skillsgate/skillsgate.db
+const db = openDb()
 
 const renderer = await createCliRenderer({
   exitOnCtrlC: false,
@@ -8,10 +12,15 @@ const renderer = await createCliRenderer({
 })
 
 const root = createRoot(renderer)
-root.render(<App />)
+root.render(<App db={db} />)
 
 // Make cleanExit available globally so layout.tsx can call it
 ;(globalThis as any).__skillsgateTuiCleanExit = function cleanExit() {
+  try {
+    db.close()
+  } catch {
+    // ignore close errors
+  }
   try {
     renderer.destroy()
   } catch {

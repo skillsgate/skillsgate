@@ -12,9 +12,11 @@ export interface CatalogSkill {
   capabilities?: string[]
   keywords?: string[]
   githubUrl?: string
+  githubStars?: number | null
   installCommand?: string | null
   score?: number
   username?: string
+  urlPath?: string
 }
 
 interface CatalogResponse {
@@ -23,24 +25,40 @@ interface CatalogResponse {
     total: number
     limit: number
     offset: number
+    hasMore?: boolean
   }
 }
 
-interface SearchResponse {
+interface KeywordSearchResponse {
+  skills: CatalogSkill[]
+  meta: {
+    total: number
+    limit: number
+    offset: number
+    hasMore?: boolean
+  }
+}
+
+interface SemanticSearchResponse {
   results: CatalogSkill[]
   meta: {
     query: string
     total: number
     limit: number
-    remainingSearches?: number
+    remainingSearches: number
   }
+}
+
+export type SearchMode = "keyword" | "semantic"
+
+export interface SearchResult {
+  skills: CatalogSkill[]
+  total: number
+  remainingSearches?: number
 }
 
 // ---------- Catalog ----------
 
-/**
- * Fetches the public skill catalog with pagination.
- */
 export async function fetchCatalog(
   limit: number = 20,
   offset: number = 0
@@ -59,34 +77,72 @@ export async function fetchCatalog(
   return { skills: data.skills ?? [], total: data.meta?.total ?? 0 }
 }
 
-// ---------- Search ----------
+// ---------- Keyword Search (public, no auth) ----------
 
-/**
- * Searches skills using the public keyword search endpoint.
- * Semantic search (POST /api/v1/search) requires auth -- this uses keyword search.
- */
-export async function searchSkills(
+export async function keywordSearch(
   query: string,
-  token?: string
-): Promise<{ results: CatalogSkill[]; total: number }> {
-  const url = `${API_BASE}/api/v1/skills/search?q=${encodeURIComponent(query)}`
+  limit: number = 20,
+  offset: number = 0
+): Promise<SearchResult> {
+  const url = `${API_BASE}/api/v1/skills/search?q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  }
-  if (token) {
-    headers.Authorization = `Bearer ${token}`
-  }
-
-  const response = await fetch(url, { headers })
+  const response = await fetch(url, {
+    headers: { "Content-Type": "application/json" },
+  })
 
   if (!response.ok) {
-    throw new Error(`Search failed (HTTP ${response.status})`)
+    throw new Error(`Keyword search failed (HTTP ${response.status})`)
   }
 
-  const data = (await response.json()) as SearchResponse
+  const data = (await response.json()) as KeywordSearchResponse
   return {
-    results: data.results ?? [],
+    skills: data.skills ?? [],
     total: data.meta?.total ?? 0,
   }
+}
+
+// ---------- Semantic Search (authenticated, rate limited) ----------
+
+export async function semanticSearch(
+  query: string,
+  token: string,
+  limit: number = 5
+): Promise<SearchResult> {
+  const url = `${API_BASE}/api/v1/search`
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ query, limit }),
+  })
+
+  if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error("Rate limit reached. Try again tomorrow or switch to keyword search.")
+    }
+    throw new Error(`Semantic search failed (HTTP ${response.status})`)
+  }
+
+  const data = (await response.json()) as SemanticSearchResponse
+  return {
+    skills: data.results ?? [],
+    total: data.meta?.total ?? 0,
+    remainingSearches: data.meta?.remainingSearches,
+  }
+}
+
+// ---------- Unified search ----------
+
+export async function searchSkills(
+  query: string,
+  mode: SearchMode,
+  token?: string | null
+): Promise<SearchResult> {
+  if (mode === "semantic" && token) {
+    return semanticSearch(query, token)
+  }
+  return keywordSearch(query)
 }

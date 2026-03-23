@@ -4,23 +4,33 @@ import { useStore, useDispatch } from "../store/context.js"
 import { useSearch } from "../data/use-search.js"
 import { useSkillActions } from "../data/use-skill-actions.js"
 import { ConfirmDialog } from "../components/confirm-dialog.js"
-import type { CatalogSkill } from "../data/api-client.js"
+import type { CatalogSkill, SearchMode } from "../data/api-client.js"
 import { colors } from "../utils/colors.js"
 
 /**
- * Discover view: two-column layout.
- * LEFT  - Search input + results list (40%)
+ * Discover view: two-column layout with search mode toggle.
+ * LEFT  - Search input + mode toggle + results list (40%)
  * RIGHT - Selected result detail (flexGrow)
+ *
+ * Search modes:
+ * - Keyword (public, no auth): ILIKE pattern matching, unlimited
+ * - Semantic (auth required): AI-powered vector search, 30/day limit
+ * Toggle with 'm' key.
  */
 export function DiscoverView() {
   const state = useStore()
   const dispatch = useDispatch()
   const [query, setQuery] = useState("")
+  const [searchMode, setSearchMode] = useState<SearchMode>("keyword")
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [installTarget, setInstallTarget] = useState<CatalogSkill | null>(null)
   const [previewSkill, setPreviewSkill] = useState<CatalogSkill | null>(null)
 
-  const { results, loading, error, total, hasMore, loadMore } = useSearch(query)
+  const token = state.auth?.token ?? null
+  const isAuthenticated = !!state.auth
+
+  const { results, loading, error, total, hasMore, loadMore, remainingSearches } =
+    useSearch(query, searchMode, token)
   const { installSkill } = useSkillActions()
 
   // Update preview when selection changes
@@ -77,6 +87,20 @@ export function DiscoverView() {
       setInstallTarget(results[selectedIndex])
       return
     }
+
+    // m to toggle search mode
+    if (key.name === "m") {
+      if (!isAuthenticated) {
+        dispatch({
+          type: "SET_NOTIFICATION",
+          notification: { type: "info", message: "Sign in to use semantic search (press l)" },
+        })
+        return
+      }
+      setSearchMode((prev) => (prev === "keyword" ? "semantic" : "keyword"))
+      setSelectedIndex(0)
+      return
+    }
   })
 
   // Confirm dialog for install
@@ -97,6 +121,7 @@ export function DiscoverView() {
   return (
     <box style={{ flexDirection: "column", width: "100%", flexGrow: 1 }}>
       {/* Search input */}
+      {/* Search input */}
       <box
         style={{
           height: 3,
@@ -106,10 +131,14 @@ export function DiscoverView() {
           paddingLeft: 1,
           paddingRight: 1,
         }}
-        title="Search skills"
+        title={searchMode === "semantic" ? "AI Search" : "Keyword Search"}
       >
         <input
-          placeholder="Search the SkillsGate catalog..."
+          placeholder={
+            searchMode === "semantic"
+              ? 'AI search -- try "audit website performance"...'
+              : "Search skills by keyword..."
+          }
           focused={state.activeView === "discover" && state.focusedPane === "search" && !state.showHelp}
           onInput={(value: string) => {
             setQuery(value)
@@ -118,7 +147,7 @@ export function DiscoverView() {
         />
       </box>
 
-      {/* Status line */}
+      {/* Status line: mode indicator + results + remaining */}
       <box
         style={{
           height: 1,
@@ -128,6 +157,11 @@ export function DiscoverView() {
           flexDirection: "row",
         }}
       >
+        {/* Mode badge */}
+        <text fg={searchMode === "semantic" ? colors.warning : colors.textDim}>
+          {searchMode === "semantic" ? "AI " : "KW "}
+        </text>
+        {/* Results info */}
         <text fg={colors.textDim}>
           {loading
             ? "Loading..."
@@ -135,7 +169,17 @@ export function DiscoverView() {
               ? `Error: ${error}`
               : query.trim()
                 ? `${results.length} result${results.length !== 1 ? "s" : ""} for "${query}"`
-                : `Catalog: ${results.length} of ${total} skills loaded`}
+                : `Catalog: ${results.length} of ${total} skills`}
+        </text>
+        {/* Remaining searches (semantic only) */}
+        {searchMode === "semantic" && remainingSearches !== null ? (
+          <text fg={remainingSearches <= 5 ? colors.error : colors.textDim}>
+            {`  ${remainingSearches} search${remainingSearches !== 1 ? "es" : ""} remaining`}
+          </text>
+        ) : null}
+        {/* Mode toggle hint */}
+        <text fg={colors.textDim}>
+          {"  m=toggle mode"}
         </text>
       </box>
 
@@ -282,6 +326,14 @@ function DiscoverDetailPanel({ skill }: DiscoverDetailPanelProps) {
           <box style={{ flexDirection: "row", height: 1 }}>
             <text fg={colors.textDim}>Keywords: </text>
             <text fg={colors.secondary}>{keywords}</text>
+          </box>
+        ) : null}
+
+        {/* Score (semantic search only) */}
+        {skill.score ? (
+          <box style={{ flexDirection: "row", height: 1 }}>
+            <text fg={colors.textDim}>Score: </text>
+            <text fg={colors.success}>{skill.score.toFixed(3)}</text>
           </box>
         ) : null}
 

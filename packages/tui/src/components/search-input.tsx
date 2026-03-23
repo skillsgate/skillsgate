@@ -30,13 +30,11 @@ export function SearchInput({
         paddingLeft: 1,
         paddingRight: 1,
       }}
-      title="Filter skills"
-      onClick={() => dispatch({ type: "SET_FOCUSED_PANE", pane: "search" })}
+      title={isFocused ? "Filter skills" : "Press / to search"}
     >
       <input
-        placeholder={placeholder}
+        placeholder={isFocused ? placeholder : `${placeholder} (press / to focus)`}
         focused={isFocused && !state.showHelp}
-        onClick={() => dispatch({ type: "SET_FOCUSED_PANE", pane: "search" })}
         onInput={(value: string) => {
           dispatch({ type: filterAction, [filterAction === "SET_INSTALLED_FILTER" ? "filter" : "query"]: value } as any)
         }}

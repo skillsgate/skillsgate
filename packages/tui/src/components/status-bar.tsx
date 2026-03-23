@@ -11,9 +11,11 @@ export function StatusBar() {
     ? "q=back"
     : state.activeView === "login"
       ? "Esc=back"
-      : `focus:${state.focusedPane}`
+      : state.focusedPane === "search"
+        ? "Tab=results  Esc=exit search"
+        : "/=search  Tab=switch pane"
 
-  const statusText = `Skills: ${skillCount} | Agents: ${agentCount} | ${user} | ${focusHint} | ?=help 1/2/3/4=tabs s=settings`
+  const statusText = `Skills: ${skillCount} | Agents: ${agentCount} | ${user} | ${focusHint} | ?=help 1/2/3/4=tabs`
 
   return (
     <box

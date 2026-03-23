@@ -143,14 +143,14 @@ export function DiscoverView() {
           paddingRight: 1,
         }}
         title={searchMode === "semantic" ? "AI Search" : "Keyword Search"}
-        onClick={() => dispatch({ type: "SET_FOCUSED_PANE", pane: "search" })}
       >
         <input
-          onClick={() => dispatch({ type: "SET_FOCUSED_PANE", pane: "search" })}
           placeholder={
-            searchMode === "semantic"
-              ? 'AI search -- try "audit website performance" (Enter to search)'
-              : "Search by keyword... (Enter to search)"
+            state.focusedPane === "search"
+              ? (searchMode === "semantic"
+                  ? 'AI search -- try "audit website performance" (Enter to search)'
+                  : "Search by keyword... (Enter to search)")
+              : "Press / to search"
           }
           focused={state.activeView === "discover" && state.focusedPane === "search" && !state.showHelp}
           onSubmit={(value: string) => {

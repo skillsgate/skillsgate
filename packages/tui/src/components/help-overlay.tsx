@@ -18,6 +18,10 @@ const SHORTCUTS_LEFT: ShortcutEntry[] = [
 const SHORTCUTS_RIGHT: ShortcutEntry[] = [
   { key: "1/2/3", description: "Switch tabs" },
   { key: "r", description: "Refresh installed skills" },
+  { key: "l", description: "Login / auth status" },
+  { key: "i", description: "Install selected skill" },
+  { key: "d", description: "Remove selected skill" },
+  { key: "x", description: "Unfavorite (favorites view)" },
   { key: "?", description: "Toggle this help" },
   { key: "Ctrl+Q", description: "Quit" },
   { key: "", description: "" },

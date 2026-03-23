@@ -2,11 +2,13 @@ import { useKeyboard, useTerminalDimensions } from "@opentui/react"
 import { useStore, useDispatch } from "../store/context.js"
 import { useDetectedAgents } from "../data/use-agents.js"
 import { useInstalledSkills } from "../data/use-installed-skills.js"
+import { useAuth } from "../data/use-auth.js"
 import { StatusBar } from "./status-bar.js"
 import { HelpOverlay } from "./help-overlay.js"
 import { HomeView } from "../views/home.js"
 import { SkillDetailView } from "../views/skill-detail.js"
 import { DiscoverView } from "../views/discover.js"
+import { LoginView } from "../views/login.js"
 import { colors } from "../utils/colors.js"
 import type { ViewName } from "../store/types.js"
 
@@ -21,7 +23,8 @@ export function Layout() {
   const dispatch = useDispatch()
   const { width, height } = useTerminalDimensions()
 
-  // Load agent + skill data on mount
+  // Load auth, agent + skill data on mount
+  useAuth()
   useDetectedAgents()
   useInstalledSkills()
 
@@ -75,6 +78,19 @@ export function Layout() {
       }
       if (state.focusedPane === "search") {
         dispatch({ type: "SET_FOCUSED_PANE", pane: "list" })
+      }
+      return
+    }
+
+    // "l" to navigate to login view (when not authenticated and not typing in search)
+    if (key.name === "l" && state.focusedPane !== "search" && state.activeView !== "detail" && state.activeView !== "login") {
+      if (!state.auth) {
+        dispatch({ type: "NAVIGATE", view: "login" })
+      } else {
+        dispatch({
+          type: "SHOW_NOTIFICATION",
+          notification: { type: "info", message: `Logged in as ${state.auth.user.name}` },
+        })
       }
       return
     }
@@ -146,6 +162,7 @@ export function Layout() {
                 <text fg={colors.textDim}>Favorites view - coming soon</text>
               </box>
             )}
+            {state.activeView === "login" && <LoginView />}
             {state.activeView === "detail" && state.selectedSkill && (
               <SkillDetailView />
             )}

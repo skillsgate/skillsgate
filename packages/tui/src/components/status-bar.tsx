@@ -6,10 +6,12 @@ export function StatusBar() {
 
   const skillCount = state.installedSkills.length
   const agentCount = state.detectedAgents.length
-  const user = state.auth?.user?.name ?? "not logged in"
+  const user = state.auth?.user?.name ?? "not logged in (l=login)"
   const focusHint = state.activeView === "detail"
     ? "q=back"
-    : `focus:${state.focusedPane}`
+    : state.activeView === "login"
+      ? "Esc=back"
+      : `focus:${state.focusedPane}`
 
   const statusText = `Skills: ${skillCount} | Agents: ${agentCount} | ${user} | ${focusHint} | ?=help 1/2/3=tabs`
 

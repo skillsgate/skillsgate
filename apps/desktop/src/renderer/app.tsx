@@ -4,6 +4,8 @@ import { Sidebar } from "./components/sidebar"
 import { Home } from "./routes/home"
 import { Discover } from "./routes/discover"
 import { Favorites } from "./routes/favorites"
+import { Servers } from "./routes/servers"
+import { ServerSkills } from "./routes/server-skills"
 import { Dashboard } from "./routes/dashboard"
 import { Settings } from "./routes/settings"
 
@@ -31,6 +33,18 @@ export function App() {
                     <Favorites />
                   </div>
                 }
+              />
+              <Route
+                path="/servers"
+                element={
+                  <div className="flex-1 overflow-y-auto">
+                    <Servers />
+                  </div>
+                }
+              />
+              <Route
+                path="/servers/:id/skills"
+                element={<ServerSkills />}
               />
               <Route
                 path="/dashboard"

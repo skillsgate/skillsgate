@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell } from "electron"
 import path from "node:path"
 import { registerIpcHandlers } from "./ipc-handlers"
 import { SkillsFileWatcher } from "./file-watcher"
+import { closeDb } from "./db/index"
 
 let mainWindow: BrowserWindow | null = null
 let fileWatcher: SkillsFileWatcher | null = null
@@ -67,4 +68,8 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit()
   }
+})
+
+app.on("will-quit", () => {
+  closeDb()
 })

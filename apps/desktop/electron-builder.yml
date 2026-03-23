@@ -6,6 +6,11 @@ directories:
 files:
   - out/**/*
   - "!node_modules"
+  - node_modules/better-sqlite3/**/*
+  - node_modules/bindings/**/*
+  - node_modules/file-uri-to-path/**/*
+  - node_modules/prebuild-install/**/*
+npmRebuild: true
 extraMetadata:
   main: out/main/index.js
 

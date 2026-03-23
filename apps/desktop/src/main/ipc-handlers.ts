@@ -4,6 +4,11 @@ import path from "node:path"
 import fs from "node:fs/promises"
 import { execFile } from "node:child_process"
 import matter from "gray-matter"
+import { openDb } from "./db/index"
+import { SettingsStore } from "./db/settings"
+import { RemoteServerStore } from "./db/servers"
+import { RemoteSkillStore } from "./db/skills"
+import { testConnection, syncRemoteServer } from "./db/ssh"
 
 // ---------------------------------------------------------------------------
 // Agent registry (mirrored from packages/cli/src/core/agents.ts)
@@ -634,7 +639,17 @@ async function installSkillToAgent(
 // IPC Handlers
 // ---------------------------------------------------------------------------
 
+// Initialize SQLite stores (lazy, created on first registerIpcHandlers call)
+let settingsStore: SettingsStore
+let serverStore: RemoteServerStore
+let skillStore: RemoteSkillStore
+
 export function registerIpcHandlers(): void {
+  // Open shared SQLite database
+  const db = openDb()
+  settingsStore = new SettingsStore(db)
+  serverStore = new RemoteServerStore(db)
+  skillStore = new RemoteSkillStore(db)
   // Detect which agents are installed on this machine
   ipcMain.handle("agents:detect", async () => {
     return detectAgents()
@@ -936,6 +951,67 @@ export function registerIpcHandlers(): void {
   // Open a URL in the default browser
   ipcMain.handle("auth:open-browser", async (_event, url: string) => {
     await shell.openExternal(url)
+  })
+
+  // -------------------------------------------------------------------------
+  // Remote server handlers
+  // -------------------------------------------------------------------------
+
+  ipcMain.handle("servers:list", () => {
+    const servers = serverStore.list()
+    // Enrich with skill count
+    return servers.map((s) => ({
+      ...s,
+      skillCount: skillStore.countByServer(s.id),
+    }))
+  })
+
+  ipcMain.handle("servers:create", (_event, data) => {
+    return serverStore.create(data)
+  })
+
+  ipcMain.handle("servers:update", (_event, id: string, fields) => {
+    return serverStore.update(id, fields)
+  })
+
+  ipcMain.handle("servers:delete", (_event, id: string) => {
+    serverStore.delete(id)
+  })
+
+  ipcMain.handle("servers:test", async (_event, id: string) => {
+    const server = serverStore.get(id)
+    if (!server) return { ok: false, error: "Server not found" }
+    return testConnection(server)
+  })
+
+  ipcMain.handle("servers:sync", async (_event, id: string) => {
+    const server = serverStore.get(id)
+    if (!server) return { added: 0, updated: 0, removed: 0, unchanged: 0, error: "Server not found" }
+    return syncRemoteServer({ remoteServers: serverStore, remoteSkills: skillStore }, server)
+  })
+
+  ipcMain.handle("servers:skills", (_event, serverId: string) => {
+    return skillStore.listByServer(serverId)
+  })
+
+  ipcMain.handle("servers:count", () => {
+    return serverStore.count()
+  })
+
+  // -------------------------------------------------------------------------
+  // Settings handlers
+  // -------------------------------------------------------------------------
+
+  ipcMain.handle("settings:get", (_event, key: string, defaultValue: unknown) => {
+    return settingsStore.get(key, defaultValue)
+  })
+
+  ipcMain.handle("settings:set", (_event, key: string, value: unknown) => {
+    settingsStore.set(key, value)
+  })
+
+  ipcMain.handle("settings:all", () => {
+    return settingsStore.getAll()
   })
 }
 

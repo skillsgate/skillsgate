@@ -1,11 +1,131 @@
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useAuthStore } from "../lib/auth-store"
+import { electronAPI } from "../lib/electron-api"
+
+// ---------------------------------------------------------------------------
+// Setting row components
+// ---------------------------------------------------------------------------
+
+function SettingSelect({
+  label,
+  description,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  description: string
+  value: string
+  options: { value: string; label: string }[]
+  onChange: (value: string) => void
+}) {
+  return (
+    <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-surface">
+      <div>
+        <p className="text-sm text-foreground">{label}</p>
+        <p className="text-[11px] text-muted">{description}</p>
+      </div>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="px-2 py-1 rounded bg-background border border-border text-[11px] text-foreground focus:outline-none focus:border-accent/40 transition-colors cursor-pointer"
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
+function SettingToggle({
+  label,
+  description,
+  value,
+  onChange,
+}: {
+  label: string
+  description: string
+  value: boolean
+  onChange: (value: boolean) => void
+}) {
+  return (
+    <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-surface">
+      <div>
+        <p className="text-sm text-foreground">{label}</p>
+        <p className="text-[11px] text-muted">{description}</p>
+      </div>
+      <button
+        onClick={() => onChange(!value)}
+        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+          value ? "bg-foreground" : "bg-border"
+        }`}
+      >
+        <span
+          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
+            value ? "translate-x-4" : "translate-x-0.5"
+          }`}
+        />
+      </button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Settings page
+// ---------------------------------------------------------------------------
 
 export function Settings() {
-  const { user, loading: authLoading, signIn, signOut, exchangeCode } = useAuthStore()
+  const {
+    user,
+    loading: authLoading,
+    signIn,
+    signOut,
+    exchangeCode,
+  } = useAuthStore()
   const [code, setCode] = useState("")
   const [exchanging, setExchanging] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // SQLite-backed settings
+  const [installScope, setInstallScope] = useState("global")
+  const [installMethod, setInstallMethod] = useState("symlink")
+  const [searchPreference, setSearchPreference] = useState("semantic")
+  const [telemetryEnabled, setTelemetryEnabled] = useState(true)
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
+
+  const loadSettings = useCallback(async () => {
+    try {
+      const all = await electronAPI.settingsAll()
+      if (all["install.scope"]) setInstallScope(all["install.scope"] as string)
+      if (all["install.method"])
+        setInstallMethod(all["install.method"] as string)
+      if (all["search.preferSemantic"] !== undefined)
+        setSearchPreference(
+          all["search.preferSemantic"] ? "semantic" : "keyword",
+        )
+      if (all["telemetry.enabled"] !== undefined)
+        setTelemetryEnabled(all["telemetry.enabled"] as boolean)
+    } catch (err) {
+      console.error("Failed to load settings:", err)
+    } finally {
+      setSettingsLoaded(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadSettings()
+  }, [loadSettings])
+
+  async function saveSetting(key: string, value: unknown) {
+    try {
+      await electronAPI.settingsSet(key, value)
+    } catch (err) {
+      console.error("Failed to save setting:", err)
+    }
+  }
 
   async function handleExchange() {
     if (!code.trim()) return
@@ -35,28 +155,84 @@ export function Settings() {
             Installation
           </h3>
           <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-surface">
-              <div>
-                <p className="text-sm text-foreground">Default scope</p>
-                <p className="text-[11px] text-muted">
-                  Where skills are installed by default
-                </p>
+            {settingsLoaded ? (
+              <>
+                <SettingSelect
+                  label="Default scope"
+                  description="Where skills are installed by default"
+                  value={installScope}
+                  options={[
+                    { value: "global", label: "Global" },
+                    { value: "project", label: "Project" },
+                  ]}
+                  onChange={(v) => {
+                    setInstallScope(v)
+                    saveSetting("install.scope", v)
+                  }}
+                />
+                <SettingSelect
+                  label="Install method"
+                  description="How skill files are placed in agent directories"
+                  value={installMethod}
+                  options={[
+                    { value: "symlink", label: "Symlink" },
+                    { value: "copy", label: "Copy" },
+                  ]}
+                  onChange={(v) => {
+                    setInstallMethod(v)
+                    saveSetting("install.method", v)
+                  }}
+                />
+              </>
+            ) : (
+              <div className="p-3 rounded-lg border border-border bg-surface">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted border-t-foreground" />
               </div>
-              <span className="text-[11px] text-muted px-2 py-1 rounded bg-surface-hover">
-                Global
-              </span>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-surface">
-              <div>
-                <p className="text-sm text-foreground">Install method</p>
-                <p className="text-[11px] text-muted">
-                  How skill files are placed in agent directories
-                </p>
-              </div>
-              <span className="text-[11px] text-muted px-2 py-1 rounded bg-surface-hover">
-                Symlink
-              </span>
-            </div>
+            )}
+          </div>
+        </section>
+
+        {/* Search preferences */}
+        <section>
+          <h3 className="text-sm font-semibold text-foreground mb-3">
+            Search
+          </h3>
+          <div className="flex flex-col gap-3">
+            {settingsLoaded && (
+              <SettingSelect
+                label="Search preference"
+                description="Preferred search method for discovering skills"
+                value={searchPreference}
+                options={[
+                  { value: "semantic", label: "Semantic" },
+                  { value: "keyword", label: "Keyword" },
+                ]}
+                onChange={(v) => {
+                  setSearchPreference(v)
+                  saveSetting("search.preferSemantic", v === "semantic")
+                }}
+              />
+            )}
+          </div>
+        </section>
+
+        {/* Privacy */}
+        <section>
+          <h3 className="text-sm font-semibold text-foreground mb-3">
+            Privacy
+          </h3>
+          <div className="flex flex-col gap-3">
+            {settingsLoaded && (
+              <SettingToggle
+                label="Telemetry"
+                description="Send anonymous usage data to help improve SkillsGate"
+                value={telemetryEnabled}
+                onChange={(v) => {
+                  setTelemetryEnabled(v)
+                  saveSetting("telemetry.enabled", v)
+                }}
+              />
+            )}
           </div>
         </section>
 
@@ -144,7 +320,9 @@ export function Settings() {
         <section>
           <h3 className="text-sm font-semibold text-foreground mb-3">About</h3>
           <div className="p-3 rounded-lg border border-border bg-surface">
-            <p className="text-sm text-foreground">SkillsGate Desktop v0.1.0</p>
+            <p className="text-sm text-foreground">
+              SkillsGate Desktop v0.1.0
+            </p>
             <p className="text-[11px] text-muted mt-1">
               Manage AI agent skills from your desktop.
             </p>

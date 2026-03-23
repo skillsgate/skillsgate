@@ -19,6 +19,41 @@ contextBridge.exposeInMainWorld("electronAPI", {
   authLogout: () => ipcRenderer.invoke("auth:logout"),
   authOpenBrowser: (url: string) => ipcRenderer.invoke("auth:open-browser", url),
 
+  // Remote servers
+  serversList: () => ipcRenderer.invoke("servers:list"),
+  serversCreate: (data: {
+    label: string
+    host: string
+    port?: number
+    username: string
+    skillsBasePath?: string
+    sshKeyPath?: string | null
+  }) => ipcRenderer.invoke("servers:create", data),
+  serversUpdate: (
+    id: string,
+    fields: {
+      label?: string
+      host?: string
+      port?: number
+      username?: string
+      skillsBasePath?: string
+      sshKeyPath?: string | null
+    },
+  ) => ipcRenderer.invoke("servers:update", id, fields),
+  serversDelete: (id: string) => ipcRenderer.invoke("servers:delete", id),
+  serversTest: (id: string) => ipcRenderer.invoke("servers:test", id),
+  serversSync: (id: string) => ipcRenderer.invoke("servers:sync", id),
+  serversSkills: (serverId: string) =>
+    ipcRenderer.invoke("servers:skills", serverId),
+  serversCount: () => ipcRenderer.invoke("servers:count"),
+
+  // Settings
+  settingsGet: (key: string, defaultValue: unknown) =>
+    ipcRenderer.invoke("settings:get", key, defaultValue),
+  settingsSet: (key: string, value: unknown) =>
+    ipcRenderer.invoke("settings:set", key, value),
+  settingsAll: () => ipcRenderer.invoke("settings:all"),
+
   // Events
   onSkillsUpdated: (callback: (skills: unknown[]) => void) => {
     ipcRenderer.on("skills:updated", (_event, skills) => callback(skills))

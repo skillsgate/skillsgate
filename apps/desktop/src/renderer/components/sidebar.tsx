@@ -1,11 +1,14 @@
 import { NavLink, useLocation } from "react-router-dom"
+import { useEffect, useState } from "react"
 import { ThemeToggle } from "@skillsgate/ui"
 import { useAuthStore } from "../lib/auth-store"
+import { electronAPI } from "../lib/electron-api"
 
 interface NavItem {
   to: string
   label: string
   icon: React.ReactNode
+  badge?: number
 }
 
 const navItems: NavItem[] = [
@@ -66,6 +69,27 @@ const navItems: NavItem[] = [
     ),
   },
   {
+    to: "/servers",
+    label: "Servers",
+    icon: (
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+        <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+        <line x1="6" y1="6" x2="6.01" y2="6" />
+        <line x1="6" y1="18" x2="6.01" y2="18" />
+      </svg>
+    ),
+  },
+  {
     to: "/dashboard",
     label: "Dashboard",
     icon: (
@@ -89,14 +113,14 @@ const navItems: NavItem[] = [
 ]
 
 // Compact icon-only nav button for Home view
-function CompactNavButton({ to, label, icon }: NavItem) {
+function CompactNavButton({ to, label, icon, badge }: NavItem) {
   return (
     <NavLink
       to={to}
       end={to === "/"}
       title={label}
       className={({ isActive }) =>
-        `flex items-center justify-center w-9 h-9 rounded-lg transition-colors ${
+        `relative flex items-center justify-center w-9 h-9 rounded-lg transition-colors ${
           isActive
             ? "bg-surface-hover text-foreground"
             : "text-muted hover:text-foreground hover:bg-surface-hover"
@@ -104,12 +128,17 @@ function CompactNavButton({ to, label, icon }: NavItem) {
       }
     >
       {icon}
+      {badge !== undefined && badge > 0 && (
+        <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-foreground text-background text-[8px] font-bold px-0.5">
+          {badge}
+        </span>
+      )}
     </NavLink>
   )
 }
 
 // Full nav button with label for non-Home views
-function FullNavButton({ to, label, icon }: NavItem) {
+function FullNavButton({ to, label, icon, badge }: NavItem) {
   return (
     <NavLink
       to={to}
@@ -123,7 +152,12 @@ function FullNavButton({ to, label, icon }: NavItem) {
       }
     >
       {icon}
-      {label}
+      <span className="flex-1">{label}</span>
+      {badge !== undefined && badge > 0 && (
+        <span className="text-[10px] font-mono text-muted">
+          {badge}
+        </span>
+      )}
     </NavLink>
   )
 }
@@ -132,6 +166,16 @@ export function Sidebar() {
   const location = useLocation()
   const isHome = location.pathname === "/"
   const { user, loading: authLoading, signIn } = useAuthStore()
+  const [serverCount, setServerCount] = useState(0)
+
+  useEffect(() => {
+    electronAPI.serversCount().then(setServerCount).catch(() => {})
+  }, [location.pathname])
+
+  // Enrich nav items with badge data
+  const enrichedNavItems = navItems.map((item) =>
+    item.to === "/servers" ? { ...item, badge: serverCount } : item,
+  )
 
   // On Home view: show compact icon-only sidebar (the Home page has its own
   // left panel with filters). On other views: show full sidebar with labels.
@@ -157,7 +201,7 @@ export function Sidebar() {
 
         {/* Compact navigation */}
         <nav className="flex flex-col items-center gap-1 px-1.5">
-          {navItems.map((item) => (
+          {enrichedNavItems.map((item) => (
             <CompactNavButton key={item.to} {...item} />
           ))}
         </nav>
@@ -255,7 +299,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
-        {navItems.map((item) => (
+        {enrichedNavItems.map((item) => (
           <FullNavButton key={item.to} {...item} />
         ))}
       </nav>

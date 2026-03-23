@@ -34,7 +34,7 @@ export function SkillDetail() {
     <div className="p-8">
       <button
         onClick={() => navigate(-1)}
-        className="flex items-center gap-1.5 text-sm text-[var(--color-foreground-secondary)] hover:text-[var(--color-foreground)] transition-colors mb-6"
+        className="flex items-center gap-1.5 text-sm text-muted hover:text-foreground transition-colors mb-6"
       >
         <svg
           width="16"
@@ -51,18 +51,18 @@ export function SkillDetail() {
         Back
       </button>
 
-      <h2 className="text-2xl font-bold text-[var(--color-foreground)] mb-2">
+      <h2 className="text-2xl font-bold text-foreground mb-2">
         {name || "Skill Detail"}
       </h2>
 
       {loading ? (
-        <p className="text-sm text-[var(--color-muted)]">Loading...</p>
+        <p className="text-sm text-muted">Loading...</p>
       ) : content ? (
-        <pre className="mt-4 p-4 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] text-sm text-[var(--color-foreground-secondary)] whitespace-pre-wrap overflow-x-auto font-mono">
+        <pre className="mt-4 p-4 rounded-lg bg-surface border border-border text-sm text-muted whitespace-pre-wrap overflow-x-auto font-mono">
           {content}
         </pre>
       ) : (
-        <p className="text-sm text-[var(--color-muted)]">
+        <p className="text-sm text-muted">
           Skill content not available. This skill may not be installed locally.
         </p>
       )}

@@ -93,10 +93,10 @@ function NavButton({ to, label, icon }: NavItem) {
       to={to}
       end={to === "/"}
       className={({ isActive }) =>
-        `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+        `flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] tracking-wide font-medium transition-colors ${
           isActive
-            ? "bg-[var(--color-accent)] text-white"
-            : "text-[var(--color-foreground-secondary)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-bg-tertiary)]"
+            ? "bg-surface-hover text-foreground"
+            : "text-muted hover:text-foreground hover:bg-surface-hover"
         }`
       }
     >
@@ -108,27 +108,28 @@ function NavButton({ to, label, icon }: NavItem) {
 
 export function Sidebar() {
   return (
-    <aside className="w-60 flex-shrink-0 flex flex-col bg-[var(--color-bg-secondary)] border-r border-[var(--color-border)]">
+    <aside className="w-60 flex-shrink-0 flex flex-col bg-surface border-r border-border">
       {/* App header */}
-      <div className="px-4 py-5 border-b border-[var(--color-border)]">
+      <div className="px-4 py-5 border-b border-border">
         <div className="flex items-center gap-2">
           <svg
             width="22"
             height="22"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="var(--color-accent)"
+            stroke="currentColor"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
+            className="text-accent"
           >
             <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
           </svg>
-          <span className="text-base font-semibold text-[var(--color-foreground)]">
+          <span className="text-base font-semibold text-foreground">
             SkillsGate
           </span>
         </div>
-        <span className="text-xs text-[var(--color-muted)] mt-1 block">
+        <span className="text-xs text-muted mt-1 block">
           Desktop v0.1.0
         </span>
       </div>
@@ -141,14 +142,14 @@ export function Sidebar() {
       </nav>
 
       {/* Bottom section: Settings + Theme */}
-      <div className="px-3 py-3 border-t border-[var(--color-border)] flex flex-col gap-1">
+      <div className="px-3 py-3 border-t border-border flex flex-col gap-1">
         <NavLink
           to="/settings"
           className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+            `flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] tracking-wide font-medium transition-colors ${
               isActive
-                ? "bg-[var(--color-accent)] text-white"
-                : "text-[var(--color-foreground-secondary)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-bg-tertiary)]"
+                ? "bg-surface-hover text-foreground"
+                : "text-muted hover:text-foreground hover:bg-surface-hover"
             }`
           }
         >
@@ -168,7 +169,7 @@ export function Sidebar() {
           Settings
         </NavLink>
         <div className="flex items-center justify-between px-3 py-1">
-          <span className="text-xs text-[var(--color-muted)]">Theme</span>
+          <span className="text-xs text-muted">Theme</span>
           <ThemeToggle />
         </div>
       </div>

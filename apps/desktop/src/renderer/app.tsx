@@ -12,7 +12,7 @@ export function App() {
     <HashRouter>
       <div className="flex h-screen overflow-hidden">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto bg-[var(--color-bg)]">
+        <main className="flex-1 overflow-y-auto bg-background text-foreground font-sans">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/discover" element={<Discover />} />

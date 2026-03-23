@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom"
+import { NavLink, useLocation } from "react-router-dom"
 import { ThemeToggle } from "@skillsgate/ui"
 
 interface NavItem {
@@ -87,7 +87,28 @@ const navItems: NavItem[] = [
   },
 ]
 
-function NavButton({ to, label, icon }: NavItem) {
+// Compact icon-only nav button for Home view
+function CompactNavButton({ to, label, icon }: NavItem) {
+  return (
+    <NavLink
+      to={to}
+      end={to === "/"}
+      title={label}
+      className={({ isActive }) =>
+        `flex items-center justify-center w-9 h-9 rounded-lg transition-colors ${
+          isActive
+            ? "bg-surface-hover text-foreground"
+            : "text-muted hover:text-foreground hover:bg-surface-hover"
+        }`
+      }
+    >
+      {icon}
+    </NavLink>
+  )
+}
+
+// Full nav button with label for non-Home views
+function FullNavButton({ to, label, icon }: NavItem) {
   return (
     <NavLink
       to={to}
@@ -107,6 +128,74 @@ function NavButton({ to, label, icon }: NavItem) {
 }
 
 export function Sidebar() {
+  const location = useLocation()
+  const isHome = location.pathname === "/"
+
+  // On Home view: show compact icon-only sidebar (the Home page has its own
+  // left panel with filters). On other views: show full sidebar with labels.
+  if (isHome) {
+    return (
+      <aside className="w-14 flex-shrink-0 flex flex-col items-center bg-surface border-r border-border">
+        {/* App icon */}
+        <div className="py-4">
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-accent"
+          >
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+          </svg>
+        </div>
+
+        {/* Compact navigation */}
+        <nav className="flex flex-col items-center gap-1 px-1.5">
+          {navItems.map((item) => (
+            <CompactNavButton key={item.to} {...item} />
+          ))}
+        </nav>
+
+        {/* Bottom section */}
+        <div className="mt-auto pb-3 flex flex-col items-center gap-1 px-1.5">
+          <NavLink
+            to="/settings"
+            title="Settings"
+            className={({ isActive }) =>
+              `flex items-center justify-center w-9 h-9 rounded-lg transition-colors ${
+                isActive
+                  ? "bg-surface-hover text-foreground"
+                  : "text-muted hover:text-foreground hover:bg-surface-hover"
+              }`
+            }
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          </NavLink>
+          <div className="py-1">
+            <ThemeToggle />
+          </div>
+        </div>
+      </aside>
+    )
+  }
+
+  // Full sidebar for non-Home views
   return (
     <aside className="w-60 flex-shrink-0 flex flex-col bg-surface border-r border-border">
       {/* App header */}
@@ -137,7 +226,7 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
         {navItems.map((item) => (
-          <NavButton key={item.to} {...item} />
+          <FullNavButton key={item.to} {...item} />
         ))}
       </nav>
 

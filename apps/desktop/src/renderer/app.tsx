@@ -5,21 +5,47 @@ import { Discover } from "./routes/discover"
 import { Favorites } from "./routes/favorites"
 import { Dashboard } from "./routes/dashboard"
 import { Settings } from "./routes/settings"
-import { SkillDetail } from "./routes/skill-detail"
 
 export function App() {
   return (
     <HashRouter>
-      <div className="flex h-screen overflow-hidden">
+      <div className="flex h-screen overflow-hidden bg-background text-foreground font-sans">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto bg-background text-foreground font-sans">
+        <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/discover" element={<Discover />} />
-            <Route path="/favorites" element={<Favorites />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/skill/:name" element={<SkillDetail />} />
+            <Route
+              path="/discover"
+              element={
+                <div className="flex-1 overflow-y-auto">
+                  <Discover />
+                </div>
+              }
+            />
+            <Route
+              path="/favorites"
+              element={
+                <div className="flex-1 overflow-y-auto">
+                  <Favorites />
+                </div>
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <div className="flex-1 overflow-y-auto">
+                  <Dashboard />
+                </div>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <div className="flex-1 overflow-y-auto">
+                  <Settings />
+                </div>
+              }
+            />
           </Routes>
         </main>
       </div>

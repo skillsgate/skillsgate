@@ -10,20 +10,21 @@
   },
   "dependencies": {
     "@skillsgate/ui": "*",
+    "gray-matter": "^4.0.3",
+    "marked": "^17",
     "react": "^19",
     "react-dom": "^19",
-    "react-router-dom": "^7",
-    "gray-matter": "^4.0.3"
+    "react-router-dom": "^7"
   },
   "devDependencies": {
-    "electron": "^35",
-    "electron-vite": "^3",
-    "electron-builder": "^26",
+    "@tailwindcss/postcss": "^4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^4",
+    "electron": "^35",
+    "electron-builder": "^26",
+    "electron-vite": "^3",
     "tailwindcss": "^4",
-    "@tailwindcss/vite": "^4",
     "typescript": "^5",
     "vite": "^6"
   }

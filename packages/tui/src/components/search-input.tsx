@@ -31,10 +31,12 @@ export function SearchInput({
         paddingRight: 1,
       }}
       title="Filter skills"
+      onClick={() => dispatch({ type: "SET_FOCUSED_PANE", pane: "search" })}
     >
       <input
         placeholder={placeholder}
         focused={isFocused && !state.showHelp}
+        onClick={() => dispatch({ type: "SET_FOCUSED_PANE", pane: "search" })}
         onInput={(value: string) => {
           dispatch({ type: filterAction, [filterAction === "SET_INSTALLED_FILTER" ? "filter" : "query"]: value } as any)
         }}

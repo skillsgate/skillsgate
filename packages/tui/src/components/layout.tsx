@@ -108,8 +108,10 @@ export function Layout() {
       }
     }
 
-    // "s" to open settings (from any non-form view)
-    if (key.name === "s" && state.focusedPane !== "search" && !inFormView) {
+    // "s" to open settings (only from home/favorites views when not in search)
+    if (key.name === "s" && state.focusedPane !== "search"
+      && state.activeView !== "discover" && state.activeView !== "detail"
+      && !inFormView) {
       dispatch({ type: "NAVIGATE", view: "settings" })
       return
     }

@@ -1,109 +1,99 @@
-# SkillsGate
+<p align="center">
+  <img src="apps/web/public/favicon.svg" width="96" height="96" alt="SkillsGate" />
+</p>
 
-**The open marketplace for AI agent skills.**
+<h1 align="center">SkillsGate</h1>
 
-Discover, install, and publish skills for Claude Code, Cursor, Windsurf, GitHub Copilot, and 13 other AI coding agents — all from one place.
+<p align="center">The open marketplace for AI agent skills.</p>
 
-[skillsgate.ai](https://skillsgate.ai) &middot; [npm package](https://www.npmjs.com/package/skillsgate)
+<p align="center">
+  <a href="https://skillsgate.ai">Website</a> &middot;
+  <a href="https://github.com/skillsgate/skillsgate/releases/latest">Download Desktop App</a> &middot;
+  <a href="https://www.npmjs.com/package/skillsgate">CLI on npm</a> &middot;
+  <a href="https://x.com/sultanvaliyev">@sultanvaliyev</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/npm/v/skillsgate?color=a8a29e&label=CLI" alt="CLI version" />
+  <img src="https://img.shields.io/github/v/release/skillsgate/skillsgate?color=a8a29e&label=Desktop" alt="Desktop version" />
+  <img src="https://img.shields.io/badge/agents-18-a8a29e" alt="18 agents" />
+  <img src="https://img.shields.io/badge/license-MIT-a8a29e" alt="MIT license" />
+</p>
 
 ---
 
-## Why SkillsGate?
+Discover, install, and publish skills for Claude Code, Cursor, Windsurf, GitHub Copilot, and 14 other AI coding agents -- all from one place. Think of it as **npm for AI skills**.
 
-AI coding skills are scattered across hundreds of GitHub repos. You can't find what exists, creators get no visibility, and every team builds the same workflows from scratch.
+## Download
 
-SkillsGate fixes this. One search, one install command, every agent.
+### Desktop App (macOS, Windows, Linux)
+
+<p>
+  <a href="https://github.com/skillsgate/skillsgate/releases/latest/download/SkillsGate.dmg">
+    <img src="https://img.shields.io/badge/macOS-Download%20.dmg-1c1917?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS" />
+  </a>
+  &nbsp;
+  <a href="https://github.com/skillsgate/skillsgate/releases/latest/download/SkillsGate-Setup.exe">
+    <img src="https://img.shields.io/badge/Windows-Download%20.exe-1c1917?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows" />
+  </a>
+  &nbsp;
+  <a href="https://github.com/skillsgate/skillsgate/releases/latest/download/SkillsGate.AppImage">
+    <img src="https://img.shields.io/badge/Linux-Download%20.AppImage-1c1917?style=for-the-badge&logo=linux&logoColor=white" alt="Download for Linux" />
+  </a>
+</p>
+
+Three-column skill browser with search, favorites, remote servers, and a built-in editor. Auto-updates via GitHub Releases.
+
+### CLI
 
 ```bash
-npx skillsgate search "tailwind responsive"
-npx skillsgate add @anthropic/frontend-design
+npm install -g skillsgate
 ```
 
----
-
-## Get Started
+### TUI (Terminal UI)
 
 ```bash
-# Install globally
+npm install -g @skillsgate/tui
+```
+
+Or run directly: `npx @skillsgate/tui`
+
+---
+
+## Features
+
+- **Search with natural language** -- AI-powered semantic search across 80,000+ skills
+- **One install, every agent** -- Skills installed to all your detected agents simultaneously
+- **18 agents supported** -- Claude Code, Cursor, Windsurf, GitHub Copilot, Codex CLI, Cline, Continue, Amp, Goose, Junie, Kilo Code, OpenCode, OpenClaw, Pear AI, Roo Code, Trae, Zed, and Universal
+- **Desktop app** -- Three-column Finder-style browser, view/edit skills, per-agent management
+- **Terminal UI** -- Full-featured TUI with keyboard-driven navigation
+- **Remote servers** -- Connect via SSH to browse and sync skills from other machines
+- **Security scanning** -- Scan skills for prompt injection and malicious code before installing
+- **Publish your own** -- Share skills publicly or keep them private for your team
+- **Settings sync** -- Shared SQLite database keeps desktop and TUI settings in sync
+
+---
+
+## Quick Start
+
+```bash
+# Install the CLI
 npm install -g skillsgate
 
-# Sign in (enables search + private skills)
+# Sign in (enables AI search + favorites)
 skillsgate login
 
 # Find a skill
 skillsgate search "SEO audit"
 
-# Install it — works across all your agents instantly
+# Install it
 skillsgate add @anthropic/audit-website
+
+# Or install from GitHub
+skillsgate add vercel-labs/agent-skills
 ```
 
-That's it. The skill is now available in Claude Code, Cursor, Windsurf, and every other agent you have installed.
-
----
-
-## How It Works
-
-### Search with natural language
-
-Describe what you need. SkillsGate understands intent, not just keywords.
-
-```bash
-skillsgate search "pdf manipulation"
-skillsgate search "deploy to AWS"
-skillsgate search "code review best practices"
-```
-
-### Install from anywhere
-
-```bash
-skillsgate add @username/my-skill               # from SkillsGate
-skillsgate add vercel-labs/agent-skills          # from GitHub
-skillsgate add anthropics/skills@audit-website   # specific skill in a repo
-skillsgate add ./my-local-skills                 # from a local path
-```
-
-One command installs across all your agents. No manual config, no duplication.
-
-### Publish your own skills
-
-Share your workflows with the world — or keep them private for your team.
-
-```bash
-# Create a skill template
-skillsgate publish --init
-
-# Publish to SkillsGate
-skillsgate publish ./my-skill
-```
-
-Your skill gets a scoped identifier (`@username/skill-name`) and becomes instantly searchable and installable by anyone.
-
-### Security scan before you install
-
-Skills run on your machine. Scan them first — SkillsGate uses your own AI coding tool to analyze skills for prompt injection, data exfiltration, malicious commands, and more.
-
-```bash
-skillsgate scan @username/audit-website        # scan a SkillsGate skill
-skillsgate scan vercel-labs/agent-skills        # scan a GitHub repo
-skillsgate scan owner/repo@skill-name          # scan a specific skill in a repo
-skillsgate scan ./local-skill                   # scan a local path
-```
-
-Supports Claude Code, Codex CLI, OpenCode, Goose, and Aider. Use `--scanner` to pick a specific tool, `--timeout` to adjust the limit, or `--raw` for unprocessed output. After scanning, share your results with the community to help others make informed decisions.
-
-### Private skills & team sharing
-
-Not everything should be public. SkillsGate gives you fine-grained control:
-
-- **Share with individuals** — grant access by GitHub username
-- **Organization skills** — private skills for your whole team
-- **Publisher catalogs** — bundle and distribute premium skills
-
-### 17 supported agents
-
-claude-code &middot; cursor &middot; github-copilot &middot; windsurf &middot; cline &middot; continue &middot; codex-cli &middot; amp &middot; goose &middot; junie &middot; kilo-code &middot; opencode &middot; openclaw &middot; pear-ai &middot; roo-code &middot; trae &middot; zed
-
-The universal `.agents/skills/` directory works as a fallback for any MCP-compatible tool.
+The skill is now available in Claude Code, Cursor, Windsurf, and every other agent you have installed.
 
 ---
 
@@ -112,18 +102,37 @@ The universal `.agents/skills/` directory works as a fallback for any MCP-compat
 | Command | Description |
 |---------|-------------|
 | `skillsgate add <source>` | Install from SkillsGate, GitHub, or local path |
-| `skillsgate scan <source>` | Security-scan skills before installing |
-| `skillsgate search <query>` | Semantic search for skills |
+| `skillsgate search <query>` | AI-powered semantic search |
+| `skillsgate scan <source>` | Security scan before installing |
 | `skillsgate publish [path]` | Publish a skill to SkillsGate |
 | `skillsgate remove [name]` | Remove installed skills |
 | `skillsgate list` | Show installed skills |
 | `skillsgate update [name]` | Check and apply updates |
 | `skillsgate sync` | Sync skills from node_modules |
+| `skillsgate tui` | Launch terminal UI |
 | `skillsgate login` | Sign in via browser |
 | `skillsgate logout` | Sign out |
 | `skillsgate whoami` | Show current user |
 
-See the [CLI README](packages/cli/README.md) for full usage and options.
+---
+
+## TUI Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `1/2/3/4` | Switch tabs (Installed/Discover/Favorites/Servers) |
+| `j/k` | Navigate list |
+| `/` | Focus search input |
+| `v` | View skill detail |
+| `e` | Toggle raw source view |
+| `i` | Install skill |
+| `d` | Remove skill (per-agent selection) |
+| `o` | Open folder / URL |
+| `m` | Toggle keyword / AI search |
+| `l` | Login / re-login |
+| `s` | Settings |
+| `?` | Help overlay |
+| `Ctrl+Q` | Quit |
 
 ---
 
@@ -131,23 +140,40 @@ See the [CLI README](packages/cli/README.md) for full usage and options.
 
 ```
 apps/
-  api/        Hono API on Cloudflare Workers (api.skillsgate.ai)
-  web/        React Router v7 on Cloudflare Workers (skillsgate.ai)
+  api/          Hono API on Cloudflare Workers (api.skillsgate.ai)
+  web/          React Router v7 on Workers (skillsgate.ai)
+  desktop/      Electron desktop app
+
 packages/
-  cli/        CLI published as `skillsgate` on npm
-  database/   Prisma schema + migrations (PlanetScale Postgres)
+  cli/          CLI published as `skillsgate` on npm
+  tui/          Terminal UI published as `@skillsgate/tui`
+  ui/           Shared React components
+  local-db/     Shared SQLite persistence + SSH client
+  database/     Prisma schema + migrations (PlanetScale Postgres)
 ```
 
 ## Development
 
 ```bash
-npm install          # install dependencies
-npm run db:generate  # generate Prisma client
-npm run dev          # run locally
-npm run deploy       # deploy to Cloudflare
+# Install dependencies
+npm install
+
+# Run the web app
+npm run dev -w skillsgate-web
+
+# Run the desktop app
+cd apps/desktop && npx electron-vite dev
+
+# Run the TUI
+cd packages/tui && bun run src/index.tsx
+
+# Deploy web + API
+npm run deploy
 ```
 
-Requires Node.js 18+, a Cloudflare account, PlanetScale database, and a GitHub OAuth app.
+Requires Node.js 18+, Bun (for TUI), a Cloudflare account, and PlanetScale database.
+
+---
 
 ## Contributing
 
@@ -161,3 +187,9 @@ SkillsGate is open source. Contributions welcome.
 ## License
 
 MIT
+
+---
+
+<p align="center">
+  Built by <a href="https://x.com/sultanvaliyev">Sultan Valiyev</a>
+</p>

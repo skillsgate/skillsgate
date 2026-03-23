@@ -32,6 +32,8 @@ export function useAuth() {
 
   // On mount, load auth from SQLite
   useEffect(() => {
+    let cancelled = false
+
     try {
       const token = settings.get<string | null>(AUTH_TOKEN_KEY, null)
       const user = settings.get<AuthUser | null>(AUTH_USER_KEY, null)
@@ -44,8 +46,8 @@ export function useAuth() {
       } else {
         // Try legacy file-based auth as fallback
         loadLegacyAuth().then((legacy) => {
+          if (cancelled) return
           if (legacy) {
-            // Migrate to SQLite
             settings.set(AUTH_TOKEN_KEY, legacy.token)
             settings.set(AUTH_USER_KEY, legacy.user)
             dispatch({
@@ -56,12 +58,14 @@ export function useAuth() {
             dispatch({ type: "SET_AUTH", auth: null })
           }
         }).catch(() => {
-          dispatch({ type: "SET_AUTH", auth: null })
+          if (!cancelled) dispatch({ type: "SET_AUTH", auth: null })
         })
       }
     } catch {
       dispatch({ type: "SET_AUTH", auth: null })
     }
+
+    return () => { cancelled = true }
   }, [])
 
   const login = useCallback(async (code: string): Promise<string | null> => {

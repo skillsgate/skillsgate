@@ -4,8 +4,7 @@ import { useKeyboard } from "@opentui/react"
 import { useStore, useDispatch } from "../store/context.js"
 import { useSkillActions } from "../data/use-skill-actions.js"
 import { ConfirmDialog } from "../components/confirm-dialog.js"
-import { agents } from "../../../cli/src/core/agents.js"
-import { colors } from "../utils/colors.js"
+import { colors, agentBadges as badgeMap } from "../utils/colors.js"
 
 /**
  * Reads the full SKILL.md content for display.
@@ -136,9 +135,14 @@ export function SkillDetailView() {
   // Build metadata lines
   const sourceType = skill.lock?.sourceType ?? "unknown"
   const sourceUrl = skill.lock?.originalUrl ?? ""
-  const agentBadges = skill.agents
-    .map((a) => agents[a]?.displayName ?? a)
-    .join(", ")
+  const agentBadgeElements = skill.agents.map((a, i) => {
+    const badge = badgeMap[a]
+    return (
+      <text key={a} fg={badge?.color ?? colors.agent}>
+        {i > 0 ? " " : ""}{badge?.label ?? a.slice(0, 2).toUpperCase()}
+      </text>
+    )
+  })
   const installedAt = skill.lock?.installedAt
     ? new Date(skill.lock.installedAt).toLocaleDateString()
     : "unknown"
@@ -258,7 +262,9 @@ export function SkillDetailView() {
 
         {/* Agents */}
         <text fg={colors.textDim}>Agents</text>
-        <text fg={colors.agent}>  {agentBadges}</text>
+        <box style={{ flexDirection: "row", paddingLeft: 2 }}>
+          {agentBadgeElements}
+        </box>
         <text>{" "}</text>
 
         {/* Dates */}

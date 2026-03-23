@@ -1,6 +1,5 @@
 import type { EnrichedSkill } from "../store/types.js"
-import { agents } from "../../../cli/src/core/agents.js"
-import { colors } from "../utils/colors.js"
+import { colors, agentBadges as badgeMap } from "../utils/colors.js"
 
 interface SkillListItemProps {
   skill: EnrichedSkill
@@ -8,10 +7,6 @@ interface SkillListItemProps {
 }
 
 export function SkillListItem({ skill, selected }: SkillListItemProps) {
-  const agentBadges = skill.agents
-    .map((a) => agents[a]?.displayName ?? a)
-    .join(", ")
-
   const sourceLabel = skill.lock?.sourceType === "github"
     ? "gh"
     : skill.lock?.sourceType === "skillsgate"
@@ -40,10 +35,17 @@ export function SkillListItem({ skill, selected }: SkillListItemProps) {
         {skill.description.slice(0, 50)}
       </text>
 
-      {/* Agent badges */}
-      <text fg={colors.agent} style={{ width: 20 }}>
-        {agentBadges}
-      </text>
+      {/* Agent badges - colored single/two-letter indicators */}
+      <box style={{ flexDirection: "row", width: 20 }}>
+        {skill.agents.map((a, i) => {
+          const badge = badgeMap[a]
+          return (
+            <text key={a} fg={badge?.color ?? colors.agent}>
+              {i > 0 ? " " : ""}{badge?.label ?? a.slice(0, 2).toUpperCase()}
+            </text>
+          )
+        })}
+      </box>
 
       {/* Source */}
       {sourceLabel ? (

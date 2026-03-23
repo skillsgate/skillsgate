@@ -12,6 +12,11 @@ function createWindow(): void {
   const iconPath = path.join(__dirname, "../../resources/icon.png")
   const icon = nativeImage.createFromPath(iconPath)
 
+  // Set dock icon on macOS (needed for dev mode)
+  if (process.platform === "darwin" && app.dock) {
+    app.dock.setIcon(icon)
+  }
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,

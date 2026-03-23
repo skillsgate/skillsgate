@@ -16,8 +16,12 @@ import type { AgentType, SkillLockFile } from "../../../cli/src/types.js"
  */
 export function useInstalledSkills() {
   const dispatch = useDispatch()
+  const { installedLoading } = useStore()
 
   useEffect(() => {
+    // Only scan when installedLoading is true (initial mount or refresh triggered)
+    if (!installedLoading) return
+
     let cancelled = false
 
     async function scan() {
@@ -104,7 +108,7 @@ export function useInstalledSkills() {
 
     scan()
     return () => { cancelled = true }
-  }, [])
+  }, [installedLoading])
 }
 
 /** Extracts the first non-empty, non-heading line from markdown content. */

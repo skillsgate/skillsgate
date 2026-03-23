@@ -40,6 +40,10 @@ export interface Notification {
   message: string
 }
 
+// ---------- Focus Pane ----------
+
+export type FocusedPane = "agents" | "search" | "list"
+
 // ---------- App State ----------
 
 export interface AppState {
@@ -70,6 +74,10 @@ export interface AppState {
   // Detail
   selectedSkill: EnrichedSkill | null
 
+  // UI state
+  showHelp: boolean
+  focusedPane: FocusedPane
+
   // Notification toast
   notification: Notification | null
 }
@@ -94,3 +102,7 @@ export type Action =
   | { type: "CLEAR_SKILL" }
   | { type: "SHOW_NOTIFICATION"; notification: Notification }
   | { type: "CLEAR_NOTIFICATION" }
+  | { type: "TOGGLE_HELP" }
+  | { type: "SET_FOCUSED_PANE"; pane: FocusedPane }
+  | { type: "CYCLE_FOCUS" }
+  | { type: "REFRESH_SKILLS" }

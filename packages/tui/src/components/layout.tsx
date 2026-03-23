@@ -3,7 +3,10 @@ import { useStore, useDispatch } from "../store/context.js"
 import { useDetectedAgents } from "../data/use-agents.js"
 import { useInstalledSkills } from "../data/use-installed-skills.js"
 import { StatusBar } from "./status-bar.js"
+import { HelpOverlay } from "./help-overlay.js"
 import { HomeView } from "../views/home.js"
+import { SkillDetailView } from "../views/skill-detail.js"
+import { DiscoverView } from "../views/discover.js"
 import { colors } from "../utils/colors.js"
 import type { ViewName } from "../store/types.js"
 
@@ -22,12 +25,65 @@ export function Layout() {
   useDetectedAgents()
   useInstalledSkills()
 
-  // Keyboard shortcuts for tab switching
+  // Global keyboard shortcuts
   useKeyboard((key) => {
-    if (key.name === "1") dispatch({ type: "NAVIGATE", view: "home" })
-    if (key.name === "2") dispatch({ type: "NAVIGATE", view: "discover" })
-    if (key.name === "3") dispatch({ type: "NAVIGATE", view: "favorites" })
+    // Help overlay toggle
+    if (key.name === "?" || (key.shift && key.name === "/")) {
+      dispatch({ type: "TOGGLE_HELP" })
+      return
+    }
+
+    // Dismiss help with Esc
+    if (state.showHelp && key.name === "escape") {
+      dispatch({ type: "TOGGLE_HELP" })
+      return
+    }
+
+    // When help is shown, block other shortcuts
+    if (state.showHelp) return
+
+    // Quit
     if (key.name === "q" && key.ctrl) process.exit(0)
+
+    // Tab switching (only when not in detail view and not focused on search input)
+    if (state.activeView !== "detail" && state.focusedPane !== "search") {
+      if (key.name === "1") dispatch({ type: "NAVIGATE", view: "home" })
+      if (key.name === "2") dispatch({ type: "NAVIGATE", view: "discover" })
+      if (key.name === "3") dispatch({ type: "NAVIGATE", view: "favorites" })
+    }
+
+    // Tab to cycle focus (only on home/discover views)
+    if (key.name === "tab" && !key.shift && (state.activeView === "home" || state.activeView === "discover")) {
+      dispatch({ type: "CYCLE_FOCUS" })
+      return
+    }
+
+    // "/" to focus search from anywhere
+    if (key.name === "/" && state.focusedPane !== "search" && state.activeView !== "detail") {
+      dispatch({ type: "SET_FOCUSED_PANE", pane: "search" })
+      return
+    }
+
+    // Esc: clear search or go back from detail
+    if (key.name === "escape") {
+      if (state.activeView === "detail") {
+        dispatch({ type: "GO_BACK" })
+        return
+      }
+      if (state.installedFilter) {
+        dispatch({ type: "SET_INSTALLED_FILTER", filter: "" })
+      }
+      if (state.focusedPane === "search") {
+        dispatch({ type: "SET_FOCUSED_PANE", pane: "list" })
+      }
+      return
+    }
+
+    // "r" to refresh installed skills (when not typing in search)
+    if (key.name === "r" && state.focusedPane !== "search" && state.activeView !== "detail") {
+      dispatch({ type: "REFRESH_SKILLS" })
+      return
+    }
   })
 
   const activeTabIndex = TAB_OPTIONS.findIndex(
@@ -63,7 +119,7 @@ export function Layout() {
       {/* Tab navigation */}
       <tab-select
         options={TAB_OPTIONS}
-        focused={state.activeView !== "detail"}
+        focused={state.activeView !== "detail" && !state.showHelp}
         selectedBackgroundColor={colors.tabActive}
         selectedTextColor={colors.tabText}
         textColor={colors.textDim}
@@ -71,7 +127,7 @@ export function Layout() {
         showDescription={false}
         showUnderline={true}
         wrapSelection={true}
-        onChange={(index) => {
+        onChange={(index: number) => {
           const view = TAB_OPTIONS[index]?.value as ViewName | undefined
           if (view) dispatch({ type: "NAVIGATE", view })
         }}
@@ -79,21 +135,21 @@ export function Layout() {
 
       {/* Content area */}
       <box style={{ flexGrow: 1, width: "100%" }}>
-        {state.activeView === "home" && <HomeView />}
-        {state.activeView === "discover" && (
-          <box style={{ padding: 1 }}>
-            <text fg={colors.textDim}>Discover view - coming soon</text>
-          </box>
-        )}
-        {state.activeView === "favorites" && (
-          <box style={{ padding: 1 }}>
-            <text fg={colors.textDim}>Favorites view - coming soon</text>
-          </box>
-        )}
-        {state.activeView === "detail" && state.selectedSkill && (
-          <box style={{ padding: 1 }}>
-            <text fg={colors.primary}>{state.selectedSkill.name}</text>
-          </box>
+        {state.showHelp ? (
+          <HelpOverlay />
+        ) : (
+          <>
+            {state.activeView === "home" && <HomeView />}
+            {state.activeView === "discover" && <DiscoverView />}
+            {state.activeView === "favorites" && (
+              <box style={{ padding: 1 }}>
+                <text fg={colors.textDim}>Favorites view - coming soon</text>
+              </box>
+            )}
+            {state.activeView === "detail" && state.selectedSkill && (
+              <SkillDetailView />
+            )}
+          </>
         )}
       </box>
 

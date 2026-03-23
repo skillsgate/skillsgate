@@ -14,16 +14,29 @@ export function SkillList({ skills }: SkillListProps) {
   const state = useStore()
   const [selectedIndex, setSelectedIndex] = useState(0)
 
-  // Only handle navigation when on the home view
+  // Only handle navigation when on a list-bearing view and list is focused
   useKeyboard((key) => {
+    if (state.showHelp) return
     if (state.activeView !== "home") return
+    if (state.focusedPane !== "list") return
 
+    // j/k or arrow keys for navigation
     if (key.name === "up" || (key.name === "k" && !key.ctrl)) {
       setSelectedIndex((i) => Math.max(0, i - 1))
     }
     if (key.name === "down" || (key.name === "j" && !key.ctrl)) {
       setSelectedIndex((i) => Math.min(skills.length - 1, i + 1))
     }
+
+    // g = jump to first, G (shift+g) = jump to last
+    if (key.name === "g" && !key.shift) {
+      setSelectedIndex(0)
+    }
+    if (key.name === "g" && key.shift) {
+      setSelectedIndex(Math.max(0, skills.length - 1))
+    }
+
+    // Enter to open skill detail
     if (key.name === "return" && skills[selectedIndex]) {
       dispatch({ type: "SELECT_SKILL", skill: skills[selectedIndex] })
     }
@@ -43,7 +56,7 @@ export function SkillList({ skills }: SkillListProps) {
 
   return (
     <scrollbox
-      focused={state.activeView === "home"}
+      focused={state.activeView === "home" && state.focusedPane === "list" && !state.showHelp}
       style={{
         width: "100%",
         flexGrow: 1,

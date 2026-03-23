@@ -1,4 +1,6 @@
-import type { AppState, Action } from "./types.js"
+import type { AppState, Action, FocusedPane } from "./types.js"
+
+const FOCUS_ORDER: FocusedPane[] = ["agents", "search", "list"]
 
 export const initialState: AppState = {
   activeView: "home",
@@ -15,6 +17,8 @@ export const initialState: AppState = {
   favorites: [],
   favoritesLoading: false,
   selectedSkill: null,
+  showHelp: false,
+  focusedPane: "list",
   notification: null,
 }
 
@@ -84,6 +88,21 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case "CLEAR_NOTIFICATION":
       return { ...state, notification: null }
+
+    case "TOGGLE_HELP":
+      return { ...state, showHelp: !state.showHelp }
+
+    case "SET_FOCUSED_PANE":
+      return { ...state, focusedPane: action.pane }
+
+    case "CYCLE_FOCUS": {
+      const currentIdx = FOCUS_ORDER.indexOf(state.focusedPane)
+      const nextIdx = (currentIdx + 1) % FOCUS_ORDER.length
+      return { ...state, focusedPane: FOCUS_ORDER[nextIdx] }
+    }
+
+    case "REFRESH_SKILLS":
+      return { ...state, installedLoading: true }
 
     default:
       return state

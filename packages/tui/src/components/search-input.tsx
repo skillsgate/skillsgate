@@ -2,13 +2,23 @@ import { useStore, useDispatch } from "../store/context.js"
 import { colors } from "../utils/colors.js"
 
 interface SearchInputProps {
-  /** Whether this input should be focused for keyboard input */
+  /** Override focus (if not provided, uses store's focusedPane) */
   focused?: boolean
+  /** Action type to dispatch on input change */
+  filterAction?: "SET_INSTALLED_FILTER" | "SET_SEARCH_QUERY"
+  /** Placeholder text */
+  placeholder?: string
 }
 
-export function SearchInput({ focused }: SearchInputProps) {
+export function SearchInput({
+  focused,
+  filterAction = "SET_INSTALLED_FILTER",
+  placeholder = "Type to filter...",
+}: SearchInputProps) {
   const state = useStore()
   const dispatch = useDispatch()
+
+  const isFocused = focused ?? (state.focusedPane === "search")
 
   return (
     <box
@@ -16,17 +26,17 @@ export function SearchInput({ focused }: SearchInputProps) {
         height: 3,
         width: "100%",
         border: true,
-        borderColor: colors.border,
+        borderColor: isFocused ? colors.primary : colors.border,
         paddingLeft: 1,
         paddingRight: 1,
       }}
       title="Filter skills"
     >
       <input
-        placeholder="Type to filter..."
-        focused={focused}
+        placeholder={placeholder}
+        focused={isFocused && !state.showHelp}
         onInput={(value: string) => {
-          dispatch({ type: "SET_INSTALLED_FILTER", filter: value })
+          dispatch({ type: filterAction, [filterAction === "SET_INSTALLED_FILTER" ? "filter" : "query"]: value } as any)
         }}
       />
     </box>

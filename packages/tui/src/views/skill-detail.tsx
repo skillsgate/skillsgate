@@ -340,14 +340,13 @@ export function SkillDetailView() {
           </box>
           <textarea
             focused={true}
-            value={rawContent}
-            onChange={(value: string) => setRawContent(value)}
-            style={{
-              width: "100%",
-              flexGrow: 1,
-              backgroundColor: colors.bg,
-              fg: colors.text,
-            }}
+            content={rawContent}
+            onContentChanged={(value: string) => setRawContent(value)}
+            placeholder="Loading..."
+            backgroundColor={colors.bg}
+            textColor={colors.text}
+            focusedBackgroundColor={colors.bg}
+            focusedTextColor={colors.text}
           />
         </box>
       ) : (

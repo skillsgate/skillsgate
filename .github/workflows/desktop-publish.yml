@@ -35,7 +35,7 @@ jobs:
         run: npm install
 
       - name: Rebuild native modules for Electron
-        run: npx electron-rebuild --module-dir node_modules/better-sqlite3
+        run: npx electron-rebuild --module-dir node_modules/better-sqlite3 --electron-version $(node -e "console.log(require('./apps/desktop/node_modules/electron/package.json').version)")
 
       - name: Build and package desktop app
         run: npm run package:${{ matrix.platform }} -w @skillsgate/desktop

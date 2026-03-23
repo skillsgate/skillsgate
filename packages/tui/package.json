@@ -16,12 +16,5 @@
   },
   "peerDependencies": {
     "react": ">=19.0.0"
-  },
-  "optionalDependencies": {
-    "@skillsgate/tui-darwin-arm64": "0.1.0",
-    "@skillsgate/tui-darwin-x64": "0.1.0",
-    "@skillsgate/tui-linux-arm64": "0.1.0",
-    "@skillsgate/tui-linux-x64": "0.1.0",
-    "@skillsgate/tui-win32-x64": "0.1.0"
   }
 }

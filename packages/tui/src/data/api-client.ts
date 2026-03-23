@@ -121,7 +121,10 @@ export async function semanticSearch(
 
   if (!response.ok) {
     if (response.status === 429) {
-      throw new Error("Rate limit reached. Try again tomorrow or switch to keyword search.")
+      throw new Error("RATE_LIMIT")
+    }
+    if (response.status === 401) {
+      throw new Error("AUTH_EXPIRED")
     }
     throw new Error(`Semantic search failed (HTTP ${response.status})`)
   }

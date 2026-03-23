@@ -90,14 +90,18 @@ export function DiscoverView() {
 
     // m to toggle search mode
     if (key.name === "m") {
-      if (!isAuthenticated) {
-        dispatch({
-          type: "SET_NOTIFICATION",
-          notification: { type: "info", message: "Sign in to use semantic search (press l)" },
-        })
-        return
+      if (searchMode === "keyword") {
+        if (!isAuthenticated) {
+          dispatch({
+            type: "SET_NOTIFICATION",
+            notification: { type: "info", message: "Sign in to use AI search (press l)" },
+          })
+          return
+        }
+        setSearchMode("semantic")
+      } else {
+        setSearchMode("keyword")
       }
-      setSearchMode((prev) => (prev === "keyword" ? "semantic" : "keyword"))
       setSelectedIndex(0)
       return
     }
@@ -147,7 +151,7 @@ export function DiscoverView() {
         />
       </box>
 
-      {/* Status line: mode indicator + results + remaining */}
+      {/* Status line: mode toggle + results + remaining */}
       <box
         style={{
           height: 1,
@@ -157,30 +161,37 @@ export function DiscoverView() {
           flexDirection: "row",
         }}
       >
-        {/* Mode badge */}
-        <text fg={searchMode === "semantic" ? colors.warning : colors.textDim}>
-          {searchMode === "semantic" ? "AI " : "KW "}
+        {/* Mode toggle: show both options, highlight active */}
+        <text fg={searchMode === "keyword" ? colors.primary : colors.textDim}>
+          {searchMode === "keyword" ? "[Keyword]" : " Keyword "}
         </text>
+        <text fg={colors.textDim}>{" | "}</text>
+        <text fg={searchMode === "semantic" ? colors.warning : colors.textDim}>
+          {searchMode === "semantic" ? "[AI Search]" : (isAuthenticated ? " AI Search " : " AI Search (login) ")}
+        </text>
+        <text fg={colors.textDim}>{"  m=switch  "}</text>
+
         {/* Results info */}
         <text fg={colors.textDim}>
           {loading
             ? "Loading..."
             : error
-              ? `Error: ${error}`
+              ? error === "AUTH_EXPIRED"
+                ? "Session expired -- press l to re-login"
+                : error === "RATE_LIMIT"
+                  ? "Daily limit reached -- switch to keyword (m)"
+                  : `Error: ${error}`
               : query.trim()
-                ? `${results.length} result${results.length !== 1 ? "s" : ""} for "${query}"`
-                : `Catalog: ${results.length} of ${total} skills`}
+                ? `${results.length} result${results.length !== 1 ? "s" : ""}`
+                : `${results.length}/${total} skills`}
         </text>
+
         {/* Remaining searches (semantic only) */}
         {searchMode === "semantic" && remainingSearches !== null ? (
           <text fg={remainingSearches <= 5 ? colors.error : colors.textDim}>
-            {`  ${remainingSearches} search${remainingSearches !== 1 ? "es" : ""} remaining`}
+            {`  ${remainingSearches} left today`}
           </text>
         ) : null}
-        {/* Mode toggle hint */}
-        <text fg={colors.textDim}>
-          {"  m=toggle mode"}
-        </text>
       </box>
 
       {/* Two-column content: results list | detail */}

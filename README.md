@@ -109,6 +109,10 @@ packages/
 # Install dependencies
 npm install
 
+# Native desktop dependencies are rebuilt for Electron automatically.
+# If install scripts were skipped, run this before starting the desktop app:
+# npm run rebuild:native --workspace=@skillsgate/desktop
+
 # Web app (default workspace dev server)
 npm run dev
 
@@ -123,6 +127,11 @@ npm run deploy
 ```
 
 Requires Node.js 18+, Bun (for TUI development), and a Cloudflare account.
+
+The desktop app uses the native `better-sqlite3` module. A normal `npm install`
+rebuilds it for the Electron version pinned by the desktop workspace. If you
+install with `--ignore-scripts` or encounter a native module ABI mismatch, run
+`npm run rebuild:native --workspace=@skillsgate/desktop` manually.
 
 ## Contributing
 

@@ -13,7 +13,9 @@
     "package": "electron-vite build && electron-builder --config electron-builder.yml",
     "package:mac": "electron-vite build && electron-builder --config electron-builder.yml --mac",
     "package:win": "electron-vite build && electron-builder --config electron-builder.yml --win",
-    "package:linux": "electron-vite build && electron-builder --config electron-builder.yml --linux"
+    "package:linux": "electron-vite build && electron-builder --config electron-builder.yml --linux",
+    "postinstall": "npm run rebuild:native",
+    "rebuild:native": "electron-rebuild -f -w better-sqlite3"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
@@ -34,6 +36,7 @@
     "react-window": "^2.2.7"
   },
   "devDependencies": {
+    "@electron/rebuild": "4.0.3",
     "@tailwindcss/postcss": "4.2.2",
     "@types/better-sqlite3": "7.6.13",
     "@types/react": "19.2.13",

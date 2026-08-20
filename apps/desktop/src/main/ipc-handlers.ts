@@ -684,6 +684,55 @@ async function listInstalledSkillsInternal(
         }
 
         const skillMdPath = path.join(skillDir, "SKILL.md")
+
+        // A directory without a SKILL.md is not a skill, it is a grouping folder
+        // (e.g. ~/.claude/skills/<group>/<skill>/). This branch used to take it
+        // anyway and fall back to the folder name (parsed?.name || entry.name),
+        // which caused two problems:
+        //   1. a ghost entry in the list that always reports "this skill may not
+        //      have a SKILL.md file" on open -- it genuinely does not have one;
+        //   2. the real skills inside the group were never listed at all.
+        // The custom scan path branch (maybeCollectSkillDir) already skips
+        // directories without a SKILL.md, so align with it here, and descend one
+        // level so grouped skills are still discovered.
+        if (!(await fileExists(skillMdPath))) {
+          // Deliberately not annotated: Awaited<ReturnType<typeof fs.readdir>>
+          // resolves to the Buffer overload, which is exactly what the existing
+          // Dirent<NonSharedBuffer> errors in this file come from. Let TS infer.
+          let nested
+          try {
+            nested = await fs.readdir(skillDir, { withFileTypes: true })
+          } catch {
+            continue
+          }
+          for (const child of nested) {
+            if (!child.isDirectory() && !child.isSymbolicLink()) continue
+            const childDir = path.join(skillDir, child.name)
+            if (!(await fileExists(path.join(childDir, "SKILL.md")))) continue
+            const childParsed = await parseSkillMd(path.join(childDir, "SKILL.md"))
+            if (skillMap.has(childDir)) continue
+            const childLock = lock.skills[child.name]
+            skillMap.set(childDir, {
+              name: childParsed?.name || child.name,
+              description: childParsed?.description || "",
+              path: childDir,
+              canonicalPath: childDir,
+              agents: [agent.displayName],
+              agentShortCodes: [agent.shortCode],
+              scope: getScopeForPath(childDir),
+              projectName: null,
+              hasSupportingFiles: false,
+              supportingFiles: [],
+              source: childLock?.source,
+              sourceType: childLock?.sourceType,
+              installedAt: childLock?.installedAt,
+              updatedAt: childLock?.updatedAt,
+              folderName: child.name,
+            })
+          }
+          continue
+        }
+
         const parsed = await parseSkillMd(skillMdPath)
         const supportingFiles: SupportingFile[] = []
         const scope = getScopeForPath(skillDir)

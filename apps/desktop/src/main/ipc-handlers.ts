@@ -421,11 +421,31 @@ function clearSupportingFilesCache(skillDir?: string): void {
 }
 
 function isSkillPathAllowed(resolvedPath: string): boolean {
-  return (
+  if (
     Object.values(agentRegistry).some((agent) =>
       resolvedPath.startsWith(path.resolve(agent.globalSkillsDir)),
-    ) || resolvedPath.startsWith(path.resolve(CANONICAL_SKILLS_DIR))
-  )
+    ) ||
+    resolvedPath.startsWith(path.resolve(CANONICAL_SKILLS_DIR))
+  ) {
+    return true
+  }
+
+  // Custom scan directories are allowed too. Without this the app contradicts
+  // itself: the scanner walks scan.customPaths and lists those skills, but reading
+  // one is denied because the allowlist does not know about that path -- the user
+  // sees "it is in the list, but opening it says the skill may have no SKILL.md".
+  // These directories are scan sources the user configured, so reading them is the
+  // expected behaviour.
+  try {
+    ensureStores()
+    const customScanPaths = settingsStore?.get<string[]>(CUSTOM_SCAN_PATHS_KEY, []) ?? []
+    return customScanPaths.some((custom) => {
+      const base = path.resolve(custom.replace(/^~(?=$|\/|\\)/, home))
+      return resolvedPath === base || resolvedPath.startsWith(base + path.sep)
+    })
+  } catch {
+    return false
+  }
 }
 
 function getExpandedTargetAgents(requestedAgentNames: string[]): AgentEntry[] {
@@ -839,10 +859,13 @@ function getCachedSkillsFingerprint(): string {
   return cachedSkillsFingerprint
 }
 
-function persistCachedSkills(raw: InternalSkill[]): string {
+function persistCachedSkills(
+  raw: InternalSkill[],
+  preserveCustomScope = false,
+): string {
   const fingerprint = createSkillsFingerprint(raw)
   if (fingerprint !== getCachedSkillsFingerprint()) {
-    saveCachedSkills(raw)
+    saveCachedSkills(raw, { preserveCustomScope })
     cachedSkillsFingerprint = fingerprint
   }
   return fingerprint
@@ -867,6 +890,7 @@ async function runRescan(
   key: string,
   run: () => Promise<InternalSkill[]>,
   broadcast: boolean,
+  preserveCustomScope = false,
 ): Promise<Array<Omit<InternalSkill, "folderName">>> {
   const inFlight = rescanInFlight.get(key)
   if (inFlight) {
@@ -874,9 +898,22 @@ async function runRescan(
   }
 
   const task = (async () => {
-    const raw = await run()
+    let raw = await run()
+    // A quick rescan skips the custom paths. Persisting and broadcasting that result
+    // as-is drops the custom-path skills from both the cache and the UI. Merge the
+    // custom entries already in the cache back in first, so the cache, the broadcast
+    // and the return value all stay consistent.
+    if (preserveCustomScope) {
+      const preserved = loadCachedSkills().filter((s) => s.scope === "custom")
+      if (preserved.length > 0) {
+        const seen = new Set(raw.map((s) => s.canonicalPath))
+        raw = raw.concat(
+          (preserved as InternalSkill[]).filter((s) => !seen.has(s.canonicalPath)),
+        )
+      }
+    }
     clearSupportingFilesCache()
-    const fingerprint = persistCachedSkills(raw)
+    const fingerprint = persistCachedSkills(raw, preserveCustomScope)
     maybeBroadcastSkills(raw, fingerprint, broadcast)
     return toRendererSkills(raw)
   })().finally(() => {
@@ -923,6 +960,8 @@ async function rescanAndCache(
       })
     },
     opts.broadcast ?? true,
+    // This pass did not scan the custom paths -> keep the cached custom entries.
+    opts.skipCustomPaths === true,
   )
 }
 

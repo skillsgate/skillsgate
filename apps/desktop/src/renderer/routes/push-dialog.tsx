@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n"
 // apps/desktop/src/renderer/routes/push-dialog.tsx
 import { useEffect, useState } from "react"
 
@@ -216,7 +217,7 @@ export function PushDialog({
               onClick={() => onClose()}
               className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-foreground hover:bg-background transition-colors"
             >
-              Cancel
+              {t("Cancel")}
             </button>
           )}
 
@@ -240,7 +241,7 @@ export function PushDialog({
               onClick={() => onClose(result ?? undefined)}
               className="px-3 py-1.5 rounded-lg text-[12px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity"
             >
-              Done
+              {t("Done")}
             </button>
           )}
         </div>

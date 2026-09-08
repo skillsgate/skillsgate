@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n"
 import {
   useDeferredValue,
   useEffect,
@@ -210,7 +211,7 @@ function LeftSidebar({
       {/* Library section */}
       <div className="px-3 pt-4 pb-2">
         <h3 className="text-[10px] uppercase tracking-widest font-semibold text-muted mb-2 px-2">
-          Library
+          {t("Library")}
         </h3>
         <nav className="flex flex-col gap-0.5">
           <button
@@ -224,7 +225,7 @@ function LeftSidebar({
                 : "text-muted hover:text-foreground hover:bg-surface-hover"
             }`}
           >
-            <span>All Skills</span>
+            <span>{t("All Skills")}</span>
             <span
               className={`text-[10px] font-mono ${
                 activeFilter === "all" && selectedAgent === null
@@ -243,7 +244,7 @@ function LeftSidebar({
                 : "text-muted hover:text-foreground hover:bg-surface-hover"
             }`}
           >
-            <span>Favorites</span>
+            <span>{t("Favorites")}</span>
             <span
               className={`text-[10px] font-mono ${
                 activeFilter === "favorites" ? "text-foreground" : "text-muted"
@@ -259,7 +260,7 @@ function LeftSidebar({
       {agentsWithSkills.length > 0 && (
         <div className="px-3 pt-3 pb-2">
           <h3 className="text-[10px] uppercase tracking-widest font-semibold text-muted mb-2 px-2">
-            Tools
+            {t("Tools")}
           </h3>
           <nav className="flex flex-col gap-0.5">
             {agentsWithSkills.map((agent) => (
@@ -314,19 +315,19 @@ function LeftSidebar({
       <div className="px-3 pt-3 pb-2">
         <div className="flex items-center justify-between px-2 mb-2">
           <h3 className="text-[10px] uppercase tracking-widest font-semibold text-muted">
-            Collections
+            {t("Collections")}
           </h3>
           <button
             onClick={onCreateCollection}
             className="text-[11px] text-muted hover:text-foreground"
-            title="Create collection"
+            title={t("Create collection")}
           >
             +
           </button>
         </div>
         <nav className="flex flex-col gap-0.5">
           {Object.keys(collections).length === 0 ? (
-            <p className="text-[11px] text-muted px-2 italic">None yet</p>
+            <p className="text-[11px] text-muted px-2 italic">{t("None yet")}</p>
           ) : (
             Object.keys(collections)
               .sort()
@@ -365,14 +366,14 @@ function LeftSidebar({
                   <button
                     onClick={() => onRenameCollection(name)}
                     className="hidden group-hover:inline text-[10px] text-muted hover:text-foreground"
-                    title="Rename collection"
+                    title={t("Rename collection")}
                   >
                     ✎
                   </button>
                   <button
                     onClick={() => onDeleteCollection(name)}
                     className="hidden group-hover:inline text-[10px] text-muted hover:text-red-400"
-                    title="Delete collection"
+                    title={t("Delete collection")}
                   >
                     ×
                   </button>
@@ -383,9 +384,9 @@ function LeftSidebar({
       </div>
       <div className="px-3 pt-3 pb-4 mt-auto">
         <h3 className="text-[10px] uppercase tracking-widest font-semibold text-muted mb-2 px-2">
-          Servers
+          {t("Servers")}
         </h3>
-        <p className="text-[11px] text-muted px-2 italic">None configured</p>
+        <p className="text-[11px] text-muted px-2 italic">{t("None configured")}</p>
       </div>
     </aside>
   )
@@ -622,12 +623,12 @@ function MiddlePanel({
       {/* Search input */}
       <div className="p-3 border-b border-border">
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-[10px] uppercase tracking-widest text-muted">Local Library</p>
+          <p className="text-[10px] uppercase tracking-widest text-muted">{t("Local Library")}</p>
           <button
             onClick={onCreateSkill}
             className="rounded-md border border-border px-2 py-1 text-[11px] text-foreground hover:bg-surface-hover"
           >
-            New Skill
+            {t("New Skill")}
           </button>
         </div>
         <div className="relative">
@@ -636,7 +637,7 @@ function MiddlePanel({
           </div>
           <input
             type="text"
-            placeholder="Search skills..."
+            placeholder={t("Search skills...")}
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             className="w-full pl-8 pr-8 py-1.5 rounded-md bg-surface border border-border text-[12px] text-foreground placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
@@ -686,7 +687,7 @@ function MiddlePanel({
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <p className="text-[12px] text-muted animate-fade-in">
-              Scanning for installed skills...
+              {t("Scanning for installed skills...")}
             </p>
           </div>
         ) : filteredSkills.length === 0 ? (
@@ -695,29 +696,29 @@ function MiddlePanel({
               <>
                 <SkillsGateIcon />
                 <p className="text-muted text-[12px] mt-3">
-                  No skills installed yet.
+                  {t("No skills installed yet.")}
                 </p>
                 <p className="text-muted text-[11px] mt-1">
-                  Head to Discover to find skills.
+                  {t("Head to Discover to find skills.")}
                 </p>
               </>
             ) : activeFilter === "favorites" ? (
               <>
-                <p className="text-muted text-[12px]">No favorites yet.</p>
+                <p className="text-muted text-[12px]">{t("No favorites yet.")}</p>
                 <p className="text-muted text-[11px] mt-1">
-                  Click the star on any skill to save it here.
+                  {t("Click the star on any skill to save it here.")}
                 </p>
               </>
             ) : (
               <>
                 <p className="text-muted text-[12px]">
-                  No skills match your search.
+                  {t("No skills match your search.")}
                 </p>
                 <button
                   onClick={onClearFilters}
                   className="text-accent text-[11px] mt-2 hover:text-foreground transition-colors"
                 >
-                  Clear filters
+                  {t("Clear filters")}
                 </button>
               </>
             )}
@@ -747,7 +748,7 @@ function MiddlePanel({
                 onClick={() => setShowCollectionDropdown(!showCollectionDropdown)}
                 className="rounded-md border border-border px-2 py-1 text-[11px] text-foreground hover:bg-surface-hover transition-colors flex items-center gap-1"
               >
-                <span>Collection</span>
+                <span>{t("Collection")}</span>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="6 9 12 15 18 9" />
                 </svg>
@@ -788,14 +789,14 @@ function MiddlePanel({
               onClick={onBulkDelete}
               className="rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1 text-[11px] text-red-400 hover:bg-red-500/20 transition-colors"
             >
-              Delete
+              {t("Delete")}
             </button>
             {/* Cancel */}
             <button
               onClick={onMultiSelectClear}
               className="rounded-md px-2 py-1 text-[11px] text-muted hover:text-foreground transition-colors"
             >
-              Cancel
+              {t("Cancel")}
             </button>
           </div>
         </div>
@@ -841,7 +842,7 @@ function BulkDeleteDialog({
             onClick={onCancel}
             className="text-muted text-[12px] px-4 py-1.5 hover:text-foreground transition-colors"
           >
-            Cancel
+            {t("Cancel")}
           </button>
           {selectedAgent ? (
             <>
@@ -855,7 +856,7 @@ function BulkDeleteDialog({
                 onClick={onConfirm}
                 className="text-red-400 text-[12px] px-4 py-1.5 hover:text-red-300 transition-colors"
               >
-                Remove from all
+                {t("Remove from all")}
               </button>
             </>
           ) : (
@@ -946,7 +947,7 @@ function RemoveSkillDialog({ skill, onClose, onRemoveFromAgents, onRemoveAll }: 
             onClick={onClose}
             className="text-muted text-[12px] px-4 py-1.5 hover:text-foreground transition-colors"
           >
-            Cancel
+            {t("Cancel")}
           </button>
           <button
             onClick={() => {
@@ -955,13 +956,13 @@ function RemoveSkillDialog({ skill, onClose, onRemoveFromAgents, onRemoveAll }: 
             disabled={selectedAgents.length === 0}
             className="text-[12px] px-4 py-1.5 rounded-lg border border-border text-foreground hover:bg-surface-hover transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            Remove selected
+            {t("Remove selected")}
           </button>
           <button
             onClick={onRemoveAll}
             className="bg-red-600 text-white text-[12px] px-4 py-1.5 rounded-lg hover:bg-red-700 transition-colors"
           >
-            Remove all
+            {t("Remove all")}
           </button>
         </div>
       </div>
@@ -1135,7 +1136,7 @@ function RightPanel({
         <div className="text-center">
           <SkillsGateIcon />
           <p className="text-muted text-sm mt-3">
-            Select a skill to view details
+            {t("Select a skill to view details")}
           </p>
         </div>
       </div>
@@ -1157,16 +1158,16 @@ function RightPanel({
           </div>
           <div className="flex items-center gap-2">
             {saveStatus === "saved" && (
-              <span className="text-[12px] text-green-500">Saved</span>
+              <span className="text-[12px] text-green-500">{t("Saved")}</span>
             )}
             {saveStatus === "error" && (
-              <span className="text-[12px] text-red-500">Save failed</span>
+              <span className="text-[12px] text-red-500">{t("Save failed")}</span>
             )}
             <button
               onClick={handleCancel}
               className="rounded-lg border border-border px-4 py-2 text-[12px] text-muted transition-colors hover:text-foreground"
             >
-              Cancel
+              {t("Cancel")}
             </button>
             <button
               onClick={() => handleSave()}
@@ -1210,13 +1211,13 @@ function RightPanel({
                       onClick={() => { if (editMode) handleCancel() }}
                       className={`px-3 py-1.5 transition-colors ${!editMode ? "bg-surface-hover text-foreground font-medium" : "text-muted hover:text-foreground"}`}
                     >
-                      View
+                      {t("View")}
                     </button>
                     <button
                       onClick={() => { if (!editMode) handleEditToggle() }}
                       className={`px-3 py-1.5 transition-colors ${editMode ? "bg-surface-hover text-foreground font-medium" : "text-muted hover:text-foreground"}`}
                     >
-                      Edit
+                      {t("Edit")}
                     </button>
                   </div>
                 )}
@@ -1225,7 +1226,7 @@ function RightPanel({
                 {isLocalSkill && (
                   <button
                     onClick={handleOpenInFinder}
-                    title="Show in Finder"
+                    title={t("Show in Finder")}
                     className="p-1.5 rounded-md text-muted hover:text-foreground hover:bg-surface-hover transition-colors"
                   >
                     <FolderIcon />
@@ -1236,7 +1237,7 @@ function RightPanel({
                 {isLocalSkill && (
                   <button
                     onClick={handleDeleteClick}
-                    title="Remove skill"
+                    title={t("Remove skill")}
                     className="p-1.5 rounded-md text-muted hover:text-red-500 hover:bg-surface-hover transition-colors"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1277,7 +1278,7 @@ function RightPanel({
             </p>
             <div className="mt-3">
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-[10px] uppercase tracking-widest text-muted">Collections</p>
+                <p className="text-[10px] uppercase tracking-widest text-muted">{t("Collections")}</p>
                 <button
                   onClick={onCreateCollection}
                   className="text-[11px] text-muted hover:text-foreground"
@@ -1287,7 +1288,7 @@ function RightPanel({
               </div>
               <div className="flex flex-wrap gap-2">
                 {Object.keys(collections).length === 0 ? (
-                  <span className="text-[11px] text-muted">No collections yet.</span>
+                  <span className="text-[11px] text-muted">{t("No collections yet.")}</span>
                 ) : (
                   Object.entries(collections).map(([name, items]) => {
                     const included = items.includes(skill.canonicalPath)
@@ -1315,12 +1316,12 @@ function RightPanel({
 
           {/* Content: View or Edit mode */}
           {contentLoading ? (
-            <p className="text-sm text-muted animate-fade-in">Loading content...</p>
+            <p className="text-sm text-muted animate-fade-in">{t("Loading content...")}</p>
           ) : content ? (
             <MemoizedMarkdown content={content} />
           ) : (
             <p className="text-sm text-muted">
-              Skill content not available. This skill may not have a SKILL.md file.
+              {t("Skill content not available. This skill may not have a SKILL.md file.")}
             </p>
           )}
 
@@ -1330,7 +1331,7 @@ function RightPanel({
               <div className="grid grid-cols-[220px_1fr] gap-4">
                 <div>
                   <h2 className="text-[12px] uppercase tracking-widest text-muted mb-3">
-                    Supporting Files
+                    {t("Supporting Files")}
                   </h2>
                   <div className="flex flex-col gap-1">
                     {supportingFiles.map((file) => (
@@ -1351,7 +1352,7 @@ function RightPanel({
                 </div>
                 <div>
                   <h2 className="text-[12px] uppercase tracking-widest text-muted mb-3">
-                    Preview
+                    {t("Preview")}
                   </h2>
                   <pre className="min-h-[220px] overflow-x-auto rounded-lg border border-border bg-surface p-4 text-[12px] text-foreground whitespace-pre-wrap">
                     {supportingPreview || "Select a supporting file to preview it."}
@@ -1414,19 +1415,19 @@ function CreateSkillDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-lg">
-        <h2 className="text-[15px] font-semibold text-foreground mb-1">New Skill</h2>
-        <p className="text-[12px] text-muted mb-4">Create a local skill and install it into one or more targets.</p>
+        <h2 className="text-[15px] font-semibold text-foreground mb-1">{t("New Skill")}</h2>
+        <p className="text-[12px] text-muted mb-4">{t("Create a local skill and install it into one or more targets.")}</p>
         <div className="flex flex-col gap-3">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Skill name"
+            placeholder={t("Skill name")}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[12px] text-foreground"
           />
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Short description"
+            placeholder={t("Short description")}
             className="min-h-[90px] w-full rounded-lg border border-border bg-background px-3 py-2 text-[12px] text-foreground"
           />
           <textarea
@@ -1445,7 +1446,7 @@ Add your skill instructions here.`}
             className="min-h-[220px] w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-[12px] text-foreground"
           />
           <div>
-            <p className="text-[12px] font-medium text-foreground mb-2">Targets</p>
+            <p className="text-[12px] font-medium text-foreground mb-2">{t("Targets")}</p>
             <div className="grid grid-cols-2 gap-2">
               {agents.map((agent) => (
                 <label key={agent.name} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-[12px] text-foreground">
@@ -1460,13 +1461,13 @@ Add your skill instructions here.`}
             </div>
           </div>
           <div className="flex items-center justify-end gap-2">
-            <button onClick={onClose} className="px-4 py-2 text-[12px] text-muted">Cancel</button>
+            <button onClick={onClose} className="px-4 py-2 text-[12px] text-muted">{t("Cancel")}</button>
             <button
               onClick={() => onCreate({ name: name.trim(), description: description.trim(), content, targets })}
               disabled={!name.trim()}
               className="rounded-lg bg-foreground px-4 py-2 text-[12px] text-background disabled:opacity-40"
             >
-              Create
+              {t("Create")}
             </button>
           </div>
         </div>
@@ -1514,7 +1515,7 @@ function CollectionDialog({
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Collection name"
+            placeholder={t("Collection name")}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[12px] text-foreground"
             onKeyDown={(e) => {
               if (e.key === "Enter" && name.trim()) {
@@ -1524,7 +1525,7 @@ function CollectionDialog({
           />
           <div className="flex items-center justify-end gap-2">
             <button onClick={onClose} className="px-4 py-2 text-[12px] text-muted">
-              Cancel
+              {t("Cancel")}
             </button>
             <button
               onClick={() => onSubmit(name.trim())}

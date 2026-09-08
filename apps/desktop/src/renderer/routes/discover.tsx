@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n"
 import {
   memo,
   useDeferredValue,
@@ -208,7 +209,7 @@ function BadgeCheckIcon({ size = 13 }: { size?: number }) {
       strokeLinecap="round"
       strokeLinejoin="round"
       className="text-blue-500 flex-shrink-0"
-      aria-label="Official"
+      aria-label={t("Official")}
     >
       <path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" />
       <path d="m9 12 2 2 4-4" />
@@ -224,7 +225,7 @@ function OfficialBadge() {
         role="tooltip"
         className="official-tooltip pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-surface px-2 py-1 text-[10px] font-medium text-foreground shadow-lg"
       >
-        Skill by a verified organization
+        {t("Skill by a verified organization")}
       </span>
     </span>
   )
@@ -342,7 +343,7 @@ function AgentDropdown({
   return (
     <div ref={ref} className="relative">
       <p className="text-[12px] font-medium text-foreground mb-2">
-        Install targets
+        {t("Install targets")}
       </p>
       <button
         type="button"
@@ -560,7 +561,7 @@ function DetailPanel({
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 text-[11px] text-muted hover:text-foreground transition-colors"
           >
-            GitHub <ExternalLinkIcon />
+            {t("GitHub")} <ExternalLinkIcon />
           </a>
         </div>
 
@@ -583,7 +584,7 @@ function DetailPanel({
             <div className="flex items-center gap-3 mb-4">
               {installed ? (
                 <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[12px] font-medium bg-surface-hover text-muted border border-border">
-                  <CheckIcon /> Installed
+                  <CheckIcon /> {t("Installed")}
                 </span>
               ) : (
                 <button
@@ -593,11 +594,11 @@ function DetailPanel({
                 >
                   {installing ? (
                     <>
-                      <SpinnerIcon /> Installing...
+                      <SpinnerIcon /> {t("Installing...")}
                     </>
                   ) : (
                     <>
-                      <DownloadIcon /> Install
+                      <DownloadIcon /> {t("Install")}
                     </>
                   )}
                 </button>
@@ -636,7 +637,7 @@ function DetailPanel({
             />
           ) : (
             <p className="text-sm text-muted">
-              Skill content not available.
+              {t("Skill content not available.")}
             </p>
           )}
         </div>
@@ -857,7 +858,7 @@ export function Discover() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="px-8 pt-6 pb-4">
-        <h2 className="text-xl font-bold text-foreground mb-1">Discover</h2>
+        <h2 className="text-xl font-bold text-foreground mb-1">{t("Discover")}</h2>
         <p className="text-[12px] text-muted mb-5">
           Browse and search skills from skills.sh.{" "}
           {skills.length > 0 && (
@@ -871,7 +872,7 @@ export function Discover() {
           </div>
           <input
             type="text"
-            placeholder="Search by name or keyword... (Enter to search)"
+            placeholder={t("Search by name or keyword... (Enter to search)")}
             value={searchQuery}
             onChange={(e) => handleSearchChange(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") handleSearchSubmit() }}
@@ -923,7 +924,7 @@ export function Discover() {
               onChange={(e) => setOfficialOnly(e.target.checked)}
               className="h-3 w-3 accent-blue-500"
             />
-            Official only
+            {t("Official only")}
           </label>
         </div>
       </div>
@@ -942,7 +943,7 @@ export function Discover() {
             <div className="text-center">
               <SpinnerIcon />
               <p className="text-muted text-[12px] mt-3">
-                Loading popular skills...
+                {t("Loading popular skills...")}
               </p>
             </div>
           </div>
@@ -951,7 +952,7 @@ export function Discover() {
             <div className="text-center">
               <SpinnerIcon />
               <p className="text-muted text-[12px] mt-3">
-                Loading catalog...
+                {t("Loading catalog...")}
               </p>
             </div>
           </div>
@@ -994,7 +995,7 @@ export function Discover() {
             )}
             {isSearching && !hasMore && visibleSkills.length > 0 && (
               <p className="text-center text-[11px] text-muted py-4">
-                No more results
+                {t("No more results")}
               </p>
             )}
           </>

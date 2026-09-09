@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n"
 import { useEffect, useState, useCallback, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { electronAPI } from "../lib/electron-api"
@@ -152,7 +153,7 @@ function ServerDialog({
             {editingServer ? "Edit Server" : "Add Server"}
           </h3>
           <p className="text-[11px] text-muted mt-0.5">
-            Configure an SSH connection to discover remote skills.
+            {t("Configure an SSH connection to discover remote skills.")}
           </p>
         </div>
 
@@ -160,7 +161,7 @@ function ServerDialog({
           {/* Label */}
           <div>
             <label className="block text-[12px] font-medium text-foreground mb-1.5">
-              Label
+              {t("Label")}
             </label>
             <input
               type="text"
@@ -175,7 +176,7 @@ function ServerDialog({
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="block text-[12px] font-medium text-foreground mb-1.5">
-                Host
+                {t("Host")}
               </label>
               <input
                 type="text"
@@ -187,7 +188,7 @@ function ServerDialog({
             </div>
             <div className="w-20">
               <label className="block text-[12px] font-medium text-foreground mb-1.5">
-                Port
+                {t("Port")}
               </label>
               <input
                 type="text"
@@ -202,7 +203,7 @@ function ServerDialog({
           {/* Username */}
           <div>
             <label className="block text-[12px] font-medium text-foreground mb-1.5">
-              Username
+              {t("Username")}
             </label>
             <input
               type="text"
@@ -216,7 +217,7 @@ function ServerDialog({
           {/* Skills Base Path */}
           <div>
             <label className="block text-[12px] font-medium text-foreground mb-1.5">
-              Skills Base Path
+              {t("Skills Base Path")}
             </label>
             <input
               type="text"
@@ -232,12 +233,12 @@ function ServerDialog({
           {/* SSH Key Path */}
           <div>
             <label className="block text-[12px] font-medium text-foreground mb-1.5">
-              SSH Key Path
+              {t("SSH Key Path")}
               <span className="font-normal text-muted ml-1">(optional)</span>
             </label>
             <input
               type="text"
-              placeholder="Auto-discover (id_ed25519, id_rsa, ...)"
+              placeholder={t("Auto-discover (id_ed25519, id_rsa, ...)")}
               value={form.sshKeyPath}
               onChange={(e) =>
                 setForm({ ...form, sshKeyPath: e.target.value })
@@ -253,7 +254,7 @@ function ServerDialog({
               onClick={onClose}
               className="px-4 py-2 rounded-lg text-[12px] font-medium border border-border text-muted hover:text-foreground hover:bg-surface-hover transition-colors"
             >
-              Cancel
+              {t("Cancel")}
             </button>
             <button
               type="submit"
@@ -485,7 +486,7 @@ export function Servers() {
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-1">
-        <h2 className="text-xl font-bold text-foreground">Remote Servers</h2>
+        <h2 className="text-xl font-bold text-foreground">{t("Remote Servers")}</h2>
         <button
           onClick={openAdd}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity"
@@ -503,17 +504,17 @@ export function Servers() {
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
-          Add Server
+          {t("Add Server")}
         </button>
       </div>
       <p className="text-[12px] text-muted mb-6">
-        Connect to remote machines via SSH to discover and sync skills.
+        {t("Connect to remote machines via SSH to discover and sync skills.")}
       </p>
 
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <p className="text-[12px] text-muted animate-fade-in">
-            Loading servers...
+            {t("Loading servers...")}
           </p>
         </div>
       ) : servers.length === 0 ? (
@@ -534,15 +535,15 @@ export function Servers() {
             <line x1="6" y1="6" x2="6.01" y2="6" />
             <line x1="6" y1="18" x2="6.01" y2="18" />
           </svg>
-          <p className="text-sm text-muted">No servers configured.</p>
+          <p className="text-sm text-muted">{t("No servers configured.")}</p>
           <p className="text-[11px] text-muted mt-1">
-            Add a server to discover skills from remote machines.
+            {t("Add a server to discover skills from remote machines.")}
           </p>
           <button
             onClick={openAdd}
             className="mt-4 px-4 py-2 rounded-lg text-[12px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity"
           >
-            Add your first server
+            {t("Add your first server")}
           </button>
         </div>
       ) : (
@@ -611,15 +612,15 @@ export function Servers() {
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={() => navigate(`/servers/${server.id}/skills`)}
-                    title="Browse skills"
+                    title={t("Browse skills")}
                     className="px-2 py-1.5 rounded-md text-[11px] font-medium text-muted hover:text-foreground hover:bg-background transition-colors"
                   >
-                    Browse
+                    {t("Browse")}
                   </button>
                   <button
                     onClick={() => handleTest(server.id)}
                     disabled={isTesting}
-                    title="Test connection"
+                    title={t("Test connection")}
                     className="px-2 py-1.5 rounded-md text-[11px] font-medium text-muted hover:text-foreground hover:bg-background transition-colors disabled:opacity-40"
                   >
                     {isTesting ? "..." : "Test"}
@@ -632,24 +633,24 @@ export function Servers() {
                       setManageOpenFor((prev) => (prev === server.id ? null : server.id))
                     }
                     disabled={isSyncing}
-                    title="Manage this server"
+                    title={t("Manage this server")}
                     className="px-2.5 py-1 rounded-md text-[11px] font-medium border border-border text-foreground hover:bg-background transition-colors disabled:opacity-40"
                   >
                     {isSyncing ? "Syncing..." : "Manage ▾"}
                   </button>
                   <button
                     onClick={() => openEdit(server)}
-                    title="Edit server"
+                    title={t("Edit server")}
                     className="px-2 py-1.5 rounded-md text-[11px] font-medium text-muted hover:text-foreground hover:bg-background transition-colors"
                   >
-                    Edit
+                    {t("Edit")}
                   </button>
                   <button
                     onClick={() => handleDelete(server.id)}
-                    title="Delete server"
+                    title={t("Delete server")}
                     className="px-2 py-1.5 rounded-md text-[11px] font-medium text-red-400 hover:text-red-300 hover:bg-background transition-colors"
                   >
-                    Delete
+                    {t("Delete")}
                   </button>
                 </div>
                 </div>

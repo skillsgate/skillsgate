@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n"
 // apps/desktop/src/renderer/components/manage-popover.tsx
 import { useEffect, useRef } from "react"
 
@@ -75,10 +76,10 @@ export function ManagePopover({
         <span className="text-foreground text-base leading-none mt-0.5">↻</span>
         <span className="flex-1">
           <span className="block text-[12px] font-medium text-foreground">
-            Refresh from remote
+            {t("Refresh from remote")}
           </span>
           <span className="block text-[11px] text-muted mt-0.5">
-            Pull the latest list of skills on this server.
+            {t("Pull the latest list of skills on this server.")}
           </span>
         </span>
       </button>
@@ -94,7 +95,7 @@ export function ManagePopover({
         <span className="text-foreground text-base leading-none mt-0.5">↑</span>
         <span className="flex-1">
           <span className="block text-[12px] font-medium text-foreground">
-            Push to remote
+            {t("Push to remote")}
           </span>
           <span className="block text-[11px] text-muted mt-0.5">
             Send your local skills. Adds new ones, updates changed ones, never deletes.
@@ -114,7 +115,7 @@ export function ManagePopover({
         <span className="flex-1">
           <span className="flex items-center gap-2">
             <span className="text-[12px] font-medium text-foreground">
-              Mirror to remote
+              {t("Mirror to remote")}
             </span>
             <span className="px-1.5 py-0.5 text-[10px] rounded bg-red-500/15 text-red-400">
               destructive

@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n"
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { marked } from "marked"
@@ -125,7 +126,7 @@ export function ServerSkills() {
             >
               <polyline points="15 18 9 12 15 6" />
             </svg>
-            Back to Servers
+            {t("Back to Servers")}
           </button>
           <h3 className="text-sm font-semibold text-foreground">
             {serverLabel}
@@ -140,7 +141,7 @@ export function ServerSkills() {
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <p className="text-[12px] text-muted animate-fade-in">
-                Loading skills...
+                {t("Loading skills...")}
               </p>
             </div>
           ) : skills.length === 0 ? (
@@ -159,10 +160,10 @@ export function ServerSkills() {
                 <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
               </svg>
               <p className="text-[12px] text-muted">
-                No skills found on this server.
+                {t("No skills found on this server.")}
               </p>
               <p className="text-[11px] text-muted mt-1">
-                Try syncing the server to discover skills.
+                {t("Try syncing the server to discover skills.")}
               </p>
             </div>
           ) : (
@@ -211,7 +212,7 @@ export function ServerSkills() {
                 <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
               </svg>
               <p className="text-muted text-sm mt-3">
-                Select a skill to view details
+                {t("Select a skill to view details")}
               </p>
             </div>
           </div>
@@ -268,10 +269,10 @@ export function ServerSkills() {
                   spellCheck={false}
                 />
                 {saveState === "saved" && (
-                  <p className="text-[12px] text-green-500">Saved</p>
+                  <p className="text-[12px] text-green-500">{t("Saved")}</p>
                 )}
                 {saveState === "error" && (
-                  <p className="text-[12px] text-red-500">Save failed</p>
+                  <p className="text-[12px] text-red-500">{t("Save failed")}</p>
                 )}
               </div>
             ) : selectedSkill.content ? (
@@ -283,7 +284,7 @@ export function ServerSkills() {
               />
             ) : (
               <p className="text-sm text-muted">
-                Skill content not cached. Sync the server to fetch content.
+                {t("Skill content not cached. Sync the server to fetch content.")}
               </p>
             )}
           </div>

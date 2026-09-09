@@ -1,3 +1,4 @@
+import { t, useLocale } from "./lib/i18n"
 import { Suspense, lazy } from "react"
 import { HashRouter, Routes, Route } from "react-router-dom"
 import { Sidebar } from "./components/sidebar"
@@ -27,15 +28,23 @@ const ScanSources = lazy(() =>
 function RouteFallback() {
   return (
     <div className="flex flex-1 items-center justify-center text-[12px] text-muted">
-      Loading view...
+      {t("Loading view...")}
     </div>
   )
 }
 
 export function App() {
+  const locale = useLocale()
+
   return (
     <HashRouter>
-      <div className="flex h-screen overflow-hidden bg-background text-foreground font-sans">
+      {/* Keyed on the locale: t() is a plain function, so re-keying the tree is
+          what makes a language switch reach memoised components immediately,
+          without reloading the window. */}
+      <div
+        key={locale}
+        className="flex h-screen overflow-hidden bg-background text-foreground font-sans"
+      >
         <Sidebar />
         <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
           <UpdateBanner />

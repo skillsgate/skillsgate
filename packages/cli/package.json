@@ -23,6 +23,7 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
+    "test": "tsx --test 'src/core/*.test.ts'",
     "prepublishOnly": "npm run build",
     "postinstall": "node bin/postinstall.mjs"
   },
@@ -51,6 +52,7 @@
   "devDependencies": {
     "@types/node": "22.19.11",
     "tsup": "8.5.1",
+    "tsx": "4.21.0",
     "typescript": "5.9.3"
   }
 }

@@ -22,7 +22,10 @@ export const colors = {
  */
 export const agentBadges: Record<string, { label: string; color: string }> = {
   "claude-code":    { label: "C",  color: "#FFAA00" }, // amber
+  antigravity:      { label: "AG", color: "#4285F4" }, // blue
   cursor:           { label: "Cu", color: "#5599FF" }, // blue
+  codebuddy:        { label: "CB", color: "#0052D9" }, // deep blue
+  "codebuddy-cn":   { label: "CBN", color: "#165DFF" }, // bright blue
   windsurf:         { label: "W",  color: "#00CED1" }, // cyan
   "codex-cli":      { label: "Cx", color: "#FF4444" }, // red
   "droid-cli":      { label: "Dr", color: "#22D3EE" }, // cyan
@@ -38,7 +41,12 @@ export const agentBadges: Record<string, { label: string; color: string }> = {
   "kilo-code":      { label: "K",  color: "#67E8F9" }, // light cyan
   openclaw:         { label: "Oc", color: "#FB923C" }, // light orange
   "pear-ai":        { label: "P",  color: "#86EFAC" }, // light green
+  pi:               { label: "PI", color: "#8B5CF6" }, // violet
   "roo-code":       { label: "R",  color: "#FCA5A5" }, // light red
   trae:             { label: "T",  color: "#C4B5FD" }, // lavender
+  "trae-cn":        { label: "TCN", color: "#0284C7" }, // sky blue
+  workbuddy:        { label: "WB", color: "#07C160" }, // green
+  "workbuddy-ai":   { label: "WBA", color: "#10B981" }, // emerald
+  mercury:          { label: "MC", color: "#64748B" }, // slate
   universal:        { label: "U",  color: "#888888" }, // dim
 }

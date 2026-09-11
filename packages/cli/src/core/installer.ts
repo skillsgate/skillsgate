@@ -31,6 +31,14 @@ export function isPathSafe(targetPath: string, baseDir: string): boolean {
 // to prevent concurrent installations from deleting each other's work
 const claimedCanonicalDirs = new Set<string>();
 
+async function realpathOrResolve(dir: string): Promise<string> {
+  try {
+    return await fs.realpath(dir);
+  } catch {
+    return path.resolve(dir);
+  }
+}
+
 export async function installSkillForAgent(
   skill: Skill,
   agent: AgentConfig,
@@ -63,7 +71,11 @@ export async function installSkillForAgent(
     } else {
       const resolvedCanonical = path.resolve(canonicalDir);
       const resolvedAgent = path.resolve(agentTargetDir);
-      const isCanonicalAgent = resolvedCanonical === resolvedAgent;
+      const realAgentSkillsDir = await realpathOrResolve(agentSkillsDir);
+      const realCanonicalDir = await realpathOrResolve(CANONICAL_SKILLS_DIR());
+      const isCanonicalAgent =
+        resolvedCanonical === resolvedAgent ||
+        realAgentSkillsDir === realCanonicalDir;
 
       // Symlink mode: write to canonical, symlink from agent dir
       // Only write to canonical if not already claimed (first agent wins)

@@ -2,6 +2,7 @@ import { ipcMain, shell, type BrowserWindow } from "electron"
 import os from "node:os"
 import path from "node:path"
 import fs from "node:fs/promises"
+import { existsSync } from "node:fs"
 import { execFile, spawn } from "node:child_process"
 import matter from "gray-matter"
 import { app } from "electron"
@@ -34,6 +35,12 @@ const home = os.homedir()
 const configHome = process.env.XDG_CONFIG_HOME || path.join(home, ".config")
 const factoryHome = process.env.FACTORY_HOME || path.join(home, ".factory")
 const ob1Home = process.env.OB1_HOME || path.join(home, ".ob1")
+const geminiConfigHome = path.join(home, ".gemini", "config")
+const geminiSkillsHome = path.join(
+  home,
+  ".gemini",
+  existsSync(geminiConfigHome) ? "config/skills" : "skills",
+)
 
 
 interface AgentEntry {
@@ -60,6 +67,13 @@ async function fileExists(p: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+function commandExists(command: string): Promise<boolean> {
+  const binary = process.platform === "win32" ? "where" : "which"
+  return new Promise((resolve) => {
+    execFile(binary, [command], (error) => resolve(!error))
+  })
 }
 
 const agentRegistry: Record<string, AgentEntry> = {
@@ -141,6 +155,38 @@ const agentRegistry: Record<string, AgentEntry> = {
     globalSkillsDir: path.join(home, ".amp", "skills"),
     detectInstalled: () => dirExists(path.join(home, ".amp")),
   },
+  antigravity: {
+    name: "antigravity",
+    displayName: "Antigravity",
+    shortCode: "AG",
+    globalSkillsDir: geminiSkillsHome,
+    detectInstalled: async () =>
+      (await dirExists(path.join(home, ".gemini"))) ||
+      (await commandExists("agy")) ||
+      (await dirExists("/Applications/Antigravity.app")),
+  },
+  codebuddy: {
+    name: "codebuddy",
+    displayName: "CodeBuddy",
+    shortCode: "CB",
+    globalSkillsDir: path.join(home, ".codebuddy", "skills"),
+    detectInstalled: async () =>
+      (await dirExists(path.join(home, ".codebuddy"))) ||
+      (await commandExists("codebuddy")) ||
+      (await dirExists("/Applications/CodeBuddy.app")),
+  },
+  "codebuddy-cn": {
+    name: "codebuddy-cn",
+    displayName: "CodeBuddy CN",
+    shortCode: "CBN",
+    globalSkillsDir: existsSync(path.join(home, ".codebuddycn"))
+      ? path.join(home, ".codebuddycn", "skills")
+      : path.join(home, ".codebuddy-cn", "skills"),
+    detectInstalled: async () =>
+      (await dirExists(path.join(home, ".codebuddycn"))) ||
+      (await dirExists(path.join(home, ".codebuddy-cn"))) ||
+      (await dirExists("/Applications/CodeBuddy CN.app")),
+  },
   goose: {
     name: "goose",
     displayName: "Goose",
@@ -186,6 +232,15 @@ const agentRegistry: Record<string, AgentEntry> = {
     globalSkillsDir: path.join(home, ".pear-ai", "skills"),
     detectInstalled: () => dirExists(path.join(home, ".pear-ai")),
   },
+  pi: {
+    name: "pi",
+    displayName: "Pi Coding Agent",
+    shortCode: "PI",
+    globalSkillsDir: path.join(home, ".pi", "agent", "skills"),
+    detectInstalled: async () =>
+      (await dirExists(path.join(home, ".pi", "agent"))) ||
+      (await commandExists("pi")),
+  },
   "roo-code": {
     name: "roo-code",
     displayName: "Roo Code",
@@ -199,6 +254,43 @@ const agentRegistry: Record<string, AgentEntry> = {
     shortCode: "TR",
     globalSkillsDir: path.join(home, ".trae", "skills"),
     detectInstalled: () => dirExists(path.join(home, ".trae")),
+  },
+  "trae-cn": {
+    name: "trae-cn",
+    displayName: "Trae CN",
+    shortCode: "TCN",
+    globalSkillsDir: path.join(home, ".trae-cn", "skills"),
+    detectInstalled: async () =>
+      (await dirExists(path.join(home, ".trae-cn"))) ||
+      (await dirExists("/Applications/Trae CN.app")) ||
+      (await dirExists("/Applications/TRAE SOLO CN.app")),
+  },
+  workbuddy: {
+    name: "workbuddy",
+    displayName: "WorkBuddy",
+    shortCode: "WB",
+    globalSkillsDir: path.join(home, ".workbuddy", "skills"),
+    detectInstalled: async () =>
+      (await dirExists(path.join(home, ".workbuddy"))) ||
+      (await dirExists("/Applications/WorkBuddy.app")),
+  },
+  "workbuddy-ai": {
+    name: "workbuddy-ai",
+    displayName: "WorkBuddy AI",
+    shortCode: "WBA",
+    globalSkillsDir: path.join(home, ".workbuddy-ai", "skills"),
+    detectInstalled: async () =>
+      (await dirExists(path.join(home, ".workbuddy-ai"))) ||
+      (await dirExists("/Applications/WorkBuddy AI.app")),
+  },
+  mercury: {
+    name: "mercury",
+    displayName: "Mercury Agent",
+    shortCode: "MC",
+    globalSkillsDir: path.join(home, ".mercury", "skills"),
+    detectInstalled: async () =>
+      (await dirExists(path.join(home, ".mercury"))) ||
+      (await commandExists("mercury")),
   },
   zed: {
     name: "zed",
@@ -277,8 +369,12 @@ const MIRROR_AGENTS_KEY = "sync.mirrorAgents"
 
 const PROJECT_PROBES = [
   { subpath: ".claude/skills" },
+  { subpath: ".gemini/skills" },
   { subpath: ".cursor/skills" },
   { subpath: ".cursor/rules" },
+  { subpath: ".codebuddy/skills" },
+  { subpath: ".codebuddy-cn/skills" },
+  { subpath: ".codebuddycn/skills" },
   { subpath: ".codex/skills" },
   { subpath: ".github/skills" },
   { subpath: ".windsurf/skills" },
@@ -292,6 +388,11 @@ const PROJECT_PROBES = [
   { subpath: ".pear-ai/skills" },
   { subpath: ".roo-code/skills" },
   { subpath: ".trae/skills" },
+  { subpath: ".trae-cn/skills" },
+  { subpath: ".workbuddy/skills" },
+  { subpath: ".workbuddy-ai/skills" },
+  { subpath: ".pi/skills" },
+  { subpath: ".mercury/skills" },
   { subpath: ".zed/skills" },
   { subpath: ".agents/skills" },
 ]
@@ -1196,6 +1297,14 @@ async function discoverSkillsInDir(
 // Install skill files to an agent directory (symlink with copy fallback)
 // ---------------------------------------------------------------------------
 
+async function realpathOrResolve(dir: string): Promise<string> {
+  try {
+    return await fs.realpath(dir)
+  } catch {
+    return path.resolve(dir)
+  }
+}
+
 async function installSkillToAgent(
   skillDir: string,
   skillName: string,
@@ -1209,8 +1318,16 @@ async function installSkillToAgent(
     // Ensure agent skills directory exists
     await fs.mkdir(agent.globalSkillsDir, { recursive: true })
 
-    // If the agent IS the universal agent, the canonical dir IS the target
-    if (path.resolve(agentTargetDir) === path.resolve(canonicalDir)) {
+    const resolvedCanonical = path.resolve(canonicalDir)
+    const resolvedAgent = path.resolve(agentTargetDir)
+    const realAgentSkillsDir = await realpathOrResolve(agent.globalSkillsDir)
+    const realCanonicalDir = await realpathOrResolve(CANONICAL_SKILLS_DIR)
+    const isCanonicalAgent =
+      resolvedCanonical === resolvedAgent ||
+      realAgentSkillsDir === realCanonicalDir
+
+    // If the agent IS the universal agent or points directly to canonical store, write directly
+    if (isCanonicalAgent) {
       // Copy skill files directly to the canonical dir
       await fs.rm(canonicalDir, { recursive: true, force: true }).catch(() => {})
       await fs.cp(skillDir, canonicalDir, { recursive: true })

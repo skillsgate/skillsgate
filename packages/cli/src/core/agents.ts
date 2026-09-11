@@ -2,6 +2,9 @@
 import os from "node:os";
 import path from "node:path";
 import fs from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { AgentConfig, AgentType } from "../types.js";
 import { AGENTS_DIR, SKILLS_SUBDIR } from "../constants.js";
 
@@ -9,11 +12,28 @@ const home = os.homedir();
 const configHome = process.env.XDG_CONFIG_HOME || path.join(home, ".config");
 const factoryHome = process.env.FACTORY_HOME || path.join(home, ".factory");
 const ob1Home = process.env.OB1_HOME || path.join(home, ".ob1");
+const geminiConfigHome = path.join(home, ".gemini", "config");
+const geminiSkillsHome = path.join(
+  home,
+  ".gemini",
+  existsSync(geminiConfigHome) ? "config/skills" : "skills",
+);
+const execFileAsync = promisify(execFile);
 
 async function dirExists(p: string): Promise<boolean> {
   try {
     const stat = await fs.stat(p);
     return stat.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+async function commandExists(command: string): Promise<boolean> {
+  const binary = process.platform === "win32" ? "where" : "which";
+  try {
+    await execFileAsync(binary, [command]);
+    return true;
   } catch {
     return false;
   }
@@ -117,6 +137,41 @@ export const agents: Record<string, AgentConfig> = {
     detectInstalled: async () => dirExists(path.join(home, ".amp")),
   },
 
+  antigravity: {
+    name: "antigravity",
+    displayName: "Antigravity",
+    skillsDir: ".gemini/skills",
+    globalSkillsDir: geminiSkillsHome,
+    detectInstalled: async () =>
+      (await dirExists(path.join(home, ".gemini"))) ||
+      (await commandExists("agy")) ||
+      (await dirExists("/Applications/Antigravity.app")),
+  },
+
+  codebuddy: {
+    name: "codebuddy",
+    displayName: "CodeBuddy",
+    skillsDir: ".codebuddy/skills",
+    globalSkillsDir: path.join(home, ".codebuddy", "skills"),
+    detectInstalled: async () =>
+      (await dirExists(path.join(home, ".codebuddy"))) ||
+      (await commandExists("codebuddy")) ||
+      (await dirExists("/Applications/CodeBuddy.app")),
+  },
+
+  "codebuddy-cn": {
+    name: "codebuddy-cn",
+    displayName: "CodeBuddy CN",
+    skillsDir: ".codebuddy-cn/skills",
+    globalSkillsDir: existsSync(path.join(home, ".codebuddycn"))
+      ? path.join(home, ".codebuddycn", "skills")
+      : path.join(home, ".codebuddy-cn", "skills"),
+    detectInstalled: async () =>
+      (await dirExists(path.join(home, ".codebuddycn"))) ||
+      (await dirExists(path.join(home, ".codebuddy-cn"))) ||
+      (await dirExists("/Applications/CodeBuddy CN.app")),
+  },
+
   goose: {
     name: "goose",
     displayName: "Goose",
@@ -172,6 +227,16 @@ export const agents: Record<string, AgentConfig> = {
     detectInstalled: async () => dirExists(path.join(home, ".pear-ai")),
   },
 
+  pi: {
+    name: "pi",
+    displayName: "Pi Coding Agent",
+    skillsDir: ".pi/skills",
+    globalSkillsDir: path.join(home, ".pi", "agent", "skills"),
+    detectInstalled: async () =>
+      (await dirExists(path.join(home, ".pi", "agent"))) ||
+      (await commandExists("pi")),
+  },
+
   "roo-code": {
     name: "roo-code",
     displayName: "Roo Code",
@@ -186,6 +251,47 @@ export const agents: Record<string, AgentConfig> = {
     skillsDir: ".trae/skills",
     globalSkillsDir: path.join(home, ".trae", "skills"),
     detectInstalled: async () => dirExists(path.join(home, ".trae")),
+  },
+
+  "trae-cn": {
+    name: "trae-cn",
+    displayName: "Trae CN",
+    skillsDir: ".trae-cn/skills",
+    globalSkillsDir: path.join(home, ".trae-cn", "skills"),
+    detectInstalled: async () =>
+      (await dirExists(path.join(home, ".trae-cn"))) ||
+      (await dirExists("/Applications/Trae CN.app")) ||
+      (await dirExists("/Applications/TRAE SOLO CN.app")),
+  },
+
+  workbuddy: {
+    name: "workbuddy",
+    displayName: "WorkBuddy",
+    skillsDir: ".workbuddy/skills",
+    globalSkillsDir: path.join(home, ".workbuddy", "skills"),
+    detectInstalled: async () =>
+      (await dirExists(path.join(home, ".workbuddy"))) ||
+      (await dirExists("/Applications/WorkBuddy.app")),
+  },
+
+  "workbuddy-ai": {
+    name: "workbuddy-ai",
+    displayName: "WorkBuddy AI",
+    skillsDir: ".workbuddy-ai/skills",
+    globalSkillsDir: path.join(home, ".workbuddy-ai", "skills"),
+    detectInstalled: async () =>
+      (await dirExists(path.join(home, ".workbuddy-ai"))) ||
+      (await dirExists("/Applications/WorkBuddy AI.app")),
+  },
+
+  mercury: {
+    name: "mercury",
+    displayName: "Mercury Agent",
+    skillsDir: ".mercury/skills",
+    globalSkillsDir: path.join(home, ".mercury", "skills"),
+    detectInstalled: async () =>
+      (await dirExists(path.join(home, ".mercury"))) ||
+      (await commandExists("mercury")),
   },
 
   zed: {

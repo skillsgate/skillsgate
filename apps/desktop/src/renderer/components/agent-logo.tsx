@@ -1,13 +1,21 @@
 import { memo } from "react"
 import ampLogo from "../assets/agent-logos/amp.svg"
+import antigravityLogo from "../assets/agent-logos/antigravity.svg"
 import claudeLogo from "../assets/agent-logos/claude.svg"
+import codebuddyLogo from "../assets/agent-logos/codebuddy.svg"
+import codebuddyCnLogo from "../assets/agent-logos/codebuddy-cn.svg"
 import codexLogo from "../assets/agent-logos/codex.svg"
 import copilotLogo from "../assets/agent-logos/copilot.svg"
 import cursorLogo from "../assets/agent-logos/cursor.svg"
 import droidCliLogo from "../assets/agent-logos/droid-cli.svg"
+import mercuryLogo from "../assets/agent-logos/mercury.svg"
 import ob1Logo from "../assets/agent-logos/ob-1.svg"
 import openclawLogo from "../assets/agent-logos/openclaw.svg"
 import opencodeLogo from "../assets/agent-logos/opencode.svg"
+import piLogo from "../assets/agent-logos/pi.svg"
+import traeCnLogo from "../assets/agent-logos/trae-cn.svg"
+import workbuddyLogo from "../assets/agent-logos/workbuddy.svg"
+import workbuddyAiLogo from "../assets/agent-logos/workbuddy-ai.svg"
 import windsurfLogo from "../assets/agent-logos/windsurf.svg"
 
 const AGENT_LOGOS: Record<string, string> = {
@@ -19,17 +27,36 @@ const AGENT_LOGOS: Record<string, string> = {
   "droid-cli": droidCliLogo,
   "ob-1": ob1Logo,
   amp: ampLogo,
+  antigravity: antigravityLogo,
+  codebuddy: codebuddyLogo,
+  "codebuddy-cn": codebuddyCnLogo,
   opencode: opencodeLogo,
   openclaw: openclawLogo,
+  pi: piLogo,
+  "trae-cn": traeCnLogo,
+  workbuddy: workbuddyLogo,
+  "workbuddy-ai": workbuddyAiLogo,
+  mercury: mercuryLogo,
 }
 
 const AGENT_LOGO_FILTERS: Record<string, string> = {
+  antigravity: "none",
+  codebuddy: "none",
+  "codebuddy-cn": "none",
+  mercury: "none",
   "ob-1": "none",
+  pi: "none",
+  "trae-cn": "none",
+  workbuddy: "none",
+  "workbuddy-ai": "none",
 }
 
-const DISPLAY_NAME_TO_KEY: Record<string, string> = {
+export const DISPLAY_NAME_TO_KEY: Record<string, string> = {
   "Claude Code": "claude-code",
+  Antigravity: "antigravity",
   Cursor: "cursor",
+  CodeBuddy: "codebuddy",
+  "CodeBuddy CN": "codebuddy-cn",
   "GitHub Copilot": "github-copilot",
   Windsurf: "windsurf",
   Cline: "cline",
@@ -44,8 +71,13 @@ const DISPLAY_NAME_TO_KEY: Record<string, string> = {
   OpenCode: "opencode",
   OpenClaw: "openclaw",
   "Pear AI": "pear-ai",
+  "Pi Coding Agent": "pi",
   "Roo Code": "roo-code",
   Trae: "trae",
+  "Trae CN": "trae-cn",
+  WorkBuddy: "workbuddy",
+  "WorkBuddy AI": "workbuddy-ai",
+  "Mercury Agent": "mercury",
   Zed: "zed",
   "Universal (.agents/skills)": "universal",
 }

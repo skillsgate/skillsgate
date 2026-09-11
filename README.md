@@ -13,7 +13,7 @@
 <p align="center">
   <img src="https://img.shields.io/npm/v/skillsgate?color=a8a29e&label=npm" alt="npm version" />
   <img src="https://img.shields.io/badge/powered_by-skills.sh-a8a29e" alt="powered by skills.sh" />
-  <img src="https://img.shields.io/badge/agents-20-a8a29e" alt="20 agents" />
+  <img src="https://img.shields.io/badge/agents-27-a8a29e" alt="27 agents" />
   <img src="https://img.shields.io/badge/license-MIT-a8a29e" alt="MIT license" />
 </p>
 
@@ -25,7 +25,7 @@
 
 ## What is SkillsGate?
 
-SkillsGate lets you browse, install, and manage AI agent skills from a single interface. It works with 20+ agents and integrates [skills.sh](https://skills.sh) for public skill discovery.
+SkillsGate lets you browse, install, and manage AI agent skills from a single interface. It works with 27+ agents and integrates [skills.sh](https://skills.sh) for public skill discovery.
 
 Instead of hunting through GitHub repos and copying markdown files by hand, you open SkillsGate, search for what you need, and install it to any combination of agents with one click.
 
@@ -57,7 +57,7 @@ npm install -g skillsgate
 
 ## Supported Agents
 
-Claude Code, Cursor, Windsurf, GitHub Copilot, Cline, Continue, Codex CLI, Droid CLI, OB-1, Amp, Goose, Junie, Kilo Code, OpenCode, OpenClaw, Pear AI, Roo Code, Trae, Zed, and Universal.
+Antigravity, Claude Code, Cline, CodeBuddy CN, Codex CLI, Continue, Cursor, Droid CLI, GitHub Copilot, Goose, Junie, Kilo Code, Mercury Agent, OB-1, Amp, OpenClaw, OpenCode, Pear AI, Pi Coding Agent, Roo Code, Trae, Trae CN, Windsurf, WorkBuddy, WorkBuddy AI, Zed, and Universal.
 
 ## Features
 

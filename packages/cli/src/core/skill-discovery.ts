@@ -23,6 +23,8 @@ const PRIORITY_SEARCH_SUFFIXES = [
   ".claude/skills",
   ".cline/skills",
   ".codebuddy/skills",
+  ".codebuddy-cn/skills",
+  ".codebuddycn/skills",
   ".codex/skills",
   ".commandcode/skills",
   ".continue/skills",

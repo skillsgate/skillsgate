@@ -25,6 +25,7 @@ export const agentBadges: Record<string, { label: string; color: string }> = {
   antigravity:      { label: "AG", color: "#4285F4" }, // blue
   cursor:           { label: "Cu", color: "#5599FF" }, // blue
   codebuddy:        { label: "CB", color: "#0052D9" }, // deep blue
+  "codebuddy-cn":   { label: "CBN", color: "#165DFF" }, // bright blue
   windsurf:         { label: "W",  color: "#00CED1" }, // cyan
   "codex-cli":      { label: "Cx", color: "#FF4444" }, // red
   "droid-cli":      { label: "Dr", color: "#22D3EE" }, // cyan

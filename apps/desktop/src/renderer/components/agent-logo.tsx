@@ -3,6 +3,7 @@ import ampLogo from "../assets/agent-logos/amp.svg"
 import antigravityLogo from "../assets/agent-logos/antigravity.svg"
 import claudeLogo from "../assets/agent-logos/claude.svg"
 import codebuddyLogo from "../assets/agent-logos/codebuddy.svg"
+import codebuddyCnLogo from "../assets/agent-logos/codebuddy-cn.svg"
 import codexLogo from "../assets/agent-logos/codex.svg"
 import copilotLogo from "../assets/agent-logos/copilot.svg"
 import cursorLogo from "../assets/agent-logos/cursor.svg"
@@ -28,6 +29,7 @@ const AGENT_LOGOS: Record<string, string> = {
   amp: ampLogo,
   antigravity: antigravityLogo,
   codebuddy: codebuddyLogo,
+  "codebuddy-cn": codebuddyCnLogo,
   opencode: opencodeLogo,
   openclaw: openclawLogo,
   pi: piLogo,
@@ -40,6 +42,7 @@ const AGENT_LOGOS: Record<string, string> = {
 const AGENT_LOGO_FILTERS: Record<string, string> = {
   antigravity: "none",
   codebuddy: "none",
+  "codebuddy-cn": "none",
   mercury: "none",
   "ob-1": "none",
   pi: "none",
@@ -53,7 +56,7 @@ export const DISPLAY_NAME_TO_KEY: Record<string, string> = {
   Antigravity: "antigravity",
   Cursor: "cursor",
   CodeBuddy: "codebuddy",
-  "CodeBuddy CN": "codebuddy",
+  "CodeBuddy CN": "codebuddy-cn",
   "GitHub Copilot": "github-copilot",
   Windsurf: "windsurf",
   Cline: "cline",

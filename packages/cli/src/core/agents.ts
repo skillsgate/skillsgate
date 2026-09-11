@@ -150,13 +150,25 @@ export const agents: Record<string, AgentConfig> = {
 
   codebuddy: {
     name: "codebuddy",
-    displayName: "CodeBuddy CN",
+    displayName: "CodeBuddy",
     skillsDir: ".codebuddy/skills",
     globalSkillsDir: path.join(home, ".codebuddy", "skills"),
     detectInstalled: async () =>
       (await dirExists(path.join(home, ".codebuddy"))) ||
       (await commandExists("codebuddy")) ||
-      (await dirExists("/Applications/CodeBuddy.app")) ||
+      (await dirExists("/Applications/CodeBuddy.app")),
+  },
+
+  "codebuddy-cn": {
+    name: "codebuddy-cn",
+    displayName: "CodeBuddy CN",
+    skillsDir: ".codebuddy-cn/skills",
+    globalSkillsDir: existsSync(path.join(home, ".codebuddycn"))
+      ? path.join(home, ".codebuddycn", "skills")
+      : path.join(home, ".codebuddy-cn", "skills"),
+    detectInstalled: async () =>
+      (await dirExists(path.join(home, ".codebuddycn"))) ||
+      (await dirExists(path.join(home, ".codebuddy-cn"))) ||
       (await dirExists("/Applications/CodeBuddy CN.app")),
   },
 

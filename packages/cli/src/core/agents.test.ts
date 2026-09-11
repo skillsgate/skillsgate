@@ -7,6 +7,7 @@ describe("agents registry", () => {
   const expectedNewAgents: AgentType[] = [
     "antigravity",
     "codebuddy",
+    "codebuddy-cn",
     "workbuddy",
     "workbuddy-ai",
     "trae-cn",
@@ -14,7 +15,7 @@ describe("agents registry", () => {
     "mercury",
   ];
 
-  it("should have all 7 new agents registered", () => {
+  it("should have all 8 new agents registered", () => {
     for (const agentName of expectedNewAgents) {
       assert.ok(
         agents[agentName],
@@ -45,9 +46,9 @@ describe("agents registry", () => {
     }
   });
 
-  it("should register 27 total coding agents", () => {
+  it("should register 28 total coding agents", () => {
     const keys = Object.keys(agents);
-    assert.equal(keys.length, 27, `Expected 27 agents registered, found ${keys.length}`);
+    assert.equal(keys.length, 28, `Expected 28 agents registered, found ${keys.length}`);
   });
 
   it("should safely evaluate detectInstalled without crashing", async () => {

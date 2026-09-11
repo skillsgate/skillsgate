@@ -2,8 +2,10 @@
 
 export type AgentType =
   | "amp"
+  | "antigravity"
   | "claude-code"
   | "cline"
+  | "codebuddy"
   | "codex-cli"
   | "droid-cli"
   | "ob-1"
@@ -16,8 +18,13 @@ export type AgentType =
   | "opencode"
   | "openclaw"
   | "pear-ai"
+  | "pi"
   | "roo-code"
   | "trae"
+  | "trae-cn"
+  | "workbuddy"
+  | "workbuddy-ai"
+  | "mercury"
   | "windsurf"
   | "zed"
   | "universal";

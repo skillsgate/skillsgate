@@ -156,6 +156,7 @@ export const agents: Record<string, AgentConfig> = {
     detectInstalled: async () =>
       (await dirExists(path.join(home, ".codebuddy"))) ||
       (await commandExists("codebuddy")) ||
+      (await dirExists("/Applications/CodeBuddy.app")) ||
       (await dirExists("/Applications/CodeBuddy CN.app")),
   },
 

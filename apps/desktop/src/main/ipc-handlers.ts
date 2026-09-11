@@ -173,6 +173,7 @@ const agentRegistry: Record<string, AgentEntry> = {
     detectInstalled: async () =>
       (await dirExists(path.join(home, ".codebuddy"))) ||
       (await commandExists("codebuddy")) ||
+      (await dirExists("/Applications/CodeBuddy.app")) ||
       (await dirExists("/Applications/CodeBuddy CN.app")),
   },
   goose: {

@@ -52,6 +52,7 @@ export const DISPLAY_NAME_TO_KEY: Record<string, string> = {
   "Claude Code": "claude-code",
   Antigravity: "antigravity",
   Cursor: "cursor",
+  CodeBuddy: "codebuddy",
   "CodeBuddy CN": "codebuddy",
   "GitHub Copilot": "github-copilot",
   Windsurf: "windsurf",

@@ -181,11 +181,6 @@ export default function Home() {
 								<div className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">18</div>
 								<div className="text-[11px] font-mono tracking-wider uppercase text-muted mt-1">Agents supported</div>
 							</div>
-							<div className="w-px h-8 bg-border" />
-							<div className="text-center">
-								<div className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">2</div>
-								<div className="text-[11px] font-mono tracking-wider uppercase text-muted mt-1">Interfaces</div>
-							</div>
 						</div>
 					</div>
 

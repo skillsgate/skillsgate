@@ -22,12 +22,11 @@ import type { PushPreview } from "./db/push"
 import { checkForAppUpdates, getUpdateState, quitAndInstallUpdate } from "./auto-updater"
 
 // ---------------------------------------------------------------------------
-// Agent registry (mirrored from packages/cli/src/core/agents.ts)
+// Agent registry
 //
-// We duplicate the agent config here rather than importing from packages/cli
-// directly because the CLI uses ESM with .js extensions in imports, which
-// complicates bundling. The agent list is small and stable, so maintaining
-// a mirror is acceptable. A shared config package can be extracted later.
+// This is the canonical implementation. It originated in the retired CLI
+// package (packages/cli, removed 2026-09) and was adapted from
+// vercel-labs/skills; see THIRD_PARTY_NOTICES.md.
 // ---------------------------------------------------------------------------
 
 const home = os.homedir()
@@ -217,7 +216,7 @@ const agentRegistry: Record<string, AgentEntry> = {
 }
 
 // ---------------------------------------------------------------------------
-// Lock file reading (mirrored from packages/cli/src/core/skill-lock.ts)
+// Lock file reading (canonical; adapted from vercel-labs/skills, see THIRD_PARTY_NOTICES.md)
 // ---------------------------------------------------------------------------
 
 const LOCK_FILE_VERSION = 1
@@ -1077,7 +1076,7 @@ function gitClone(
 }
 
 // ---------------------------------------------------------------------------
-// Source parser (mirrored from packages/cli/src/core/source-parser.ts)
+// Source parser (canonical; adapted from vercel-labs/skills, see THIRD_PARTY_NOTICES.md)
 // ---------------------------------------------------------------------------
 
 interface ParsedSource {
@@ -1260,7 +1259,7 @@ async function installSkillToAgent(
 }
 
 // ---------------------------------------------------------------------------
-// Trending scrape (mirrored from packages/cli/src/core/skills-sh-client.ts)
+// Trending scrape (canonical implementation; the CLI copy was removed with the CLI)
 //
 // The trending listing has no JSON API, so we read the trending page HTML and
 // extract the embedded skill payload. The page lives on the www host (the apex

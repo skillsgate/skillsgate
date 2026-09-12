@@ -66,8 +66,6 @@ packages/
   ui/           Shared React components
 ```
 
-`packages/cli`, `packages/tui`, and `packages/local-db` are deprecated and pending removal. Do not build on them.
-
 ### Running locally
 
 ```bash
@@ -88,7 +86,7 @@ cd apps/desktop && npm run dev
 npm run deploy
 ```
 
-Requires Node.js 18+ and, for web deploys, a Cloudflare account.
+Requires Node.js 22+ and, for web deploys, a Cloudflare account.
 
 The desktop app uses the native `better-sqlite3` module. A normal `npm install`
 rebuilds it for the Electron version pinned by the desktop workspace. If you

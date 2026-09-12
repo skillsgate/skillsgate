@@ -43,8 +43,24 @@ jobs:
           npm install --no-package-lock
         shell: bash
 
+      # Read the Electron version from the app manifest so this can never drift
+      # from the `electron` devDependency the app is actually built against.
+      - name: Resolve Electron version
+        id: electron
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./apps/desktop/package.json').devDependencies.electron")"
+          if [[ -z "$version" || "$version" == "undefined" ]]; then
+            echo "Could not read the electron devDependency from apps/desktop/package.json" >&2
+            exit 1
+          fi
+          echo "Building against Electron $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: Rebuild native modules for Electron
-        run: npx electron-rebuild -v 35.7.5 -m node_modules/better-sqlite3 ${{ matrix.arch && format('-a {0}', matrix.arch) || '' }}
+        shell: bash
+        run: npx electron-rebuild -v "${{ steps.electron.outputs.version }}" -m node_modules/better-sqlite3 ${{ matrix.arch && format('-a {0}', matrix.arch) || '' }}
 
       - name: Build and package desktop app
         shell: bash
@@ -83,6 +99,23 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
+      # Both macOS matrix jobs emit their own latest-mac.yml listing only their
+      # own artifacts. The publish job downloads everything with
+      # merge-multiple: true, so identically named manifests would clobber each
+      # other and the survivor would advertise a single architecture. Give each
+      # one an arch-specific name; the publish job merges them back together.
+      - name: Disambiguate macOS update manifest
+        if: matrix.platform == 'mac'
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="apps/desktop/release/latest-mac.yml"
+          if [[ ! -f "$src" ]]; then
+            echo "Expected $src to exist after packaging" >&2
+            exit 1
+          fi
+          mv "$src" "apps/desktop/release/latest-mac-${{ matrix.arch }}.yml"
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -109,6 +142,30 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
+
+      # Rebuild a single latest-mac.yml listing every macOS artifact from both
+      # matrix jobs, so electron-updater hands arm64 Macs the arm64 build.
+      # Windows (latest.yml) and Linux (latest-linux.yml) manifests are built by
+      # a single job each and are left untouched.
+      - name: Merge macOS update manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Install js-yaml into a scratch dir so we don't have to install the
+          # whole monorepo (and run its native-module postinstall) in this job.
+          yaml_dir="$RUNNER_TEMP/yaml-tools"
+          mkdir -p "$yaml_dir"
+          npm install --prefix "$yaml_dir" --no-save --no-package-lock --ignore-scripts js-yaml
+          NODE_PATH="$yaml_dir/node_modules" node .github/scripts/merge-mac-manifests.mjs artifacts
+          echo "--- merged latest-mac.yml ---"
+          cat artifacts/latest-mac.yml
+        env:
+          # Darwin kernel version of the oldest macOS the bundled Electron
+          # supports. Electron 44 requires macOS 13 (Darwin 22). Bump this when
+          # a future Electron raises its macOS floor. electron-updater on older
+          # Macs will then skip the update instead of installing an app that
+          # cannot launch.
+          MAC_MINIMUM_SYSTEM_VERSION: "22.0.0"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

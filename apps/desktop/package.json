@@ -1,6 +1,6 @@
 {
   "name": "@skillsgate/desktop",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "SkillsGate desktop app for managing AI agent skills",
   "author": "Sultan Valiyev <valiyevsultan@gmail.com>",
   "homepage": "https://skillsgate.ai",
@@ -44,7 +44,7 @@
     "@types/react-dom": "19.2.3",
     "@types/react-window": "^1.8.8",
     "@vitejs/plugin-react": "4.7.0",
-    "electron": "44.3.0",
+    "electron": "42.11.3",
     "electron-builder": "26.8.1",
     "electron-vite": "3.1.0",
     "tailwindcss": "4.2.2",

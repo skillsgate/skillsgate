@@ -161,11 +161,12 @@ jobs:
           cat artifacts/latest-mac.yml
         env:
           # Darwin kernel version of the oldest macOS the bundled Electron
-          # supports. Electron 44 requires macOS 13 (Darwin 22). Bump this when
-          # a future Electron raises its macOS floor. electron-updater on older
-          # Macs will then skip the update instead of installing an app that
+          # supports. Electron 42 requires macOS 12 (Darwin 21); Electron 44
+          # will raise that to macOS 13 (Darwin 22). Bump this when a future
+          # Electron raises its macOS floor. electron-updater on older Macs
+          # will then skip the update instead of installing an app that
           # cannot launch.
-          MAC_MINIMUM_SYSTEM_VERSION: "22.0.0"
+          MAC_MINIMUM_SYSTEM_VERSION: "21.0.0"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

@@ -73,13 +73,16 @@ apps/web/next-env.d.ts
 apps/web/*.tsbuildinfo
 
 # ==========================================
-# Packages/cli specific
+# Agent skill directories
 # ==========================================
 
-# Lock file written by skillsgate CLI
+# Legacy lock file written by the retired skillsgate CLI
 .skill-lock.json
 
-# Agent skill directories (installed by skillsgate CLI)
+# Bun lockfiles: a lone bun.lock makes electron-builder pick Bun in CI
+bun.lock*
+
+# Agent skill directories (installed by `npx skills add` or the desktop app)
 .agents/
 .claude/skills/
 .cursor/skills/

@@ -15,7 +15,7 @@
     "package:mac": "electron-vite build && electron-builder --config electron-builder.yml --mac",
     "package:win": "electron-vite build && electron-builder --config electron-builder.yml --win",
     "package:linux": "electron-vite build && electron-builder --config electron-builder.yml --linux",
-    "postinstall": "npm run rebuild:native",
+    "postinstall": "node scripts/postinstall.mjs",
     "rebuild:native": "electron-rebuild -f -w better-sqlite3"
   },
   "dependencies": {

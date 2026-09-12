@@ -13,14 +13,12 @@
     "preview": "npm run preview -w apps/web"
   },
   "optionalDependencies": {
-    "@ast-grep/napi-linux-x64-gnu": "0.40.5",
     "@rollup/rollup-linux-x64-gnu": "4.59.0",
     "@tailwindcss/oxide-linux-x64-gnu": "4.1.18",
     "lightningcss-linux-x64-gnu": "1.30.2"
   },
   "devDependencies": {
     "@types/node": "22.19.11",
-    "gray-matter": "4.0.3",
     "wrangler": "4.63.0"
   }
 }

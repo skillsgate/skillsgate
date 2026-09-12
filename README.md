@@ -33,9 +33,7 @@ Available as a **desktop app** for macOS, Windows, and Linux.
 
 ## Quick Start
 
-Download for your platform:
-
-[macOS (Apple Silicon)](https://github.com/skillsgate/skillsgate/releases/latest) &middot; [macOS (Intel)](https://github.com/skillsgate/skillsgate/releases/latest) &middot; [Windows](https://github.com/skillsgate/skillsgate/releases/latest) &middot; [Linux](https://github.com/skillsgate/skillsgate/releases/latest)
+[Download the latest release](https://github.com/skillsgate/skillsgate/releases/latest) for macOS (Apple Silicon or Intel), Windows, or Linux. Every release ships a DMG, an NSIS installer, an AppImage, and a Debian package.
 
 > **Terminal UI discontinued.** The `skillsgate` and `@skillsgate/tui` npm packages are deprecated and no longer maintained. `npx skillsgate` still runs the last published version but will not receive updates. Use the desktop app instead. For command-line installs of public skills, use [`npx skills add`](https://skills.sh).
 

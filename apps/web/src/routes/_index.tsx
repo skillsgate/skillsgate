@@ -94,11 +94,7 @@ const FAQ_ITEMS = [
 	},
 	{
 		q: "Is SkillsGate free?",
-		a: "Yes. The desktop app, TUI, browsing, and installing public skills are all free.",
-	},
-	{
-		q: "Desktop app or TUI?",
-		a: "Both share the same features and sync preferences via a local SQLite database. The desktop app (Electron) is best for visual browsing. The TUI is best for keyboard-driven workflows and headless servers.",
+		a: "Yes. The desktop app, browsing, and installing public skills are all free.",
 	},
 ];
 
@@ -169,9 +165,6 @@ export default function Home() {
 								</svg>
 								Download Desktop App
 							</a>
-							<code className="text-[12px] font-mono text-muted bg-code-bg px-4 py-3 rounded-lg border border-border">
-								npx skillsgate
-							</code>
 						</div>
 
 						{/* Stats */}
@@ -222,39 +215,6 @@ export default function Home() {
 						</div>
 					</div>
 
-					{/* TUI section */}
-					<div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center mt-20">
-						<div>
-							<div className="flex items-center gap-2 mb-4">
-								<div className="w-2 h-2 rounded-full bg-accent/40" />
-								<span className="text-[10px] font-mono tracking-[0.2em] uppercase text-muted">Terminal UI</span>
-							</div>
-							<h3 className="text-xl md:text-2xl font-semibold tracking-tight text-foreground mb-4">
-								For keyboard-driven workflows
-							</h3>
-							<p className="text-[14px] text-muted leading-relaxed mb-6">
-								Navigate with j/k, search with /, install with i, edit with e.
-								Everything you need without leaving the terminal. Works on headless servers over SSH.
-							</p>
-							<code className="inline-block text-[12px] font-mono text-muted bg-code-bg px-3 py-1.5 rounded-md border border-border">
-								$ npx skillsgate
-							</code>
-						</div>
-						<div className="relative">
-							<div className="bg-card-bg border border-card-border rounded-xl overflow-hidden shadow-xl shadow-black/10">
-								<div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-surface">
-									<div className="flex gap-1.5">
-										<div className="w-2.5 h-2.5 rounded-full bg-muted/20" />
-										<div className="w-2.5 h-2.5 rounded-full bg-muted/20" />
-										<div className="w-2.5 h-2.5 rounded-full bg-muted/20" />
-									</div>
-									<span className="text-[11px] font-mono text-muted/40 ml-2">Terminal</span>
-								</div>
-								<img src="/tui-screenshot.png" alt="SkillsGate TUI" className="w-full" loading="lazy" />
-							</div>
-						</div>
-					</div>
-
 					{/* Feature cards */}
 					<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-14">
 						<div className="bg-card-bg border border-card-border rounded-xl p-6">
@@ -270,9 +230,9 @@ export default function Home() {
 							</p>
 						</div>
 						<div className="bg-card-bg border border-card-border rounded-xl p-6">
-							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">Settings sync</h3>
+							<h3 className="text-[14px] font-semibold text-foreground mb-1.5">Local-first</h3>
 							<p className="text-[12px] text-muted leading-relaxed">
-								Desktop and TUI share preferences via a local SQLite database. Configure once, use everywhere.
+								Settings, favorites, and server configs live in a local SQLite database on your machine. No account, no cloud.
 							</p>
 						</div>
 					</div>
@@ -472,9 +432,6 @@ export default function Home() {
 							>
 								Download Desktop App
 							</a>
-							<code className="text-[12px] font-mono text-muted bg-code-bg px-4 py-3 rounded-lg border border-border">
-								npx skillsgate
-							</code>
 						</div>
 					</div>
 				</div>

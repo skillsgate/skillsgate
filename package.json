@@ -19,18 +19,8 @@
     "lightningcss-linux-x64-gnu": "1.30.2"
   },
   "devDependencies": {
-    "@pinecone-database/pinecone": "7.0.0",
     "@types/node": "22.19.11",
-    "commander": "12.1.0",
-    "csv-parse": "5.6.0",
-    "dotenv": "16.6.1",
-    "execa": "9.6.1",
     "gray-matter": "4.0.3",
-    "octokit": "4.1.4",
-    "p-limit": "5.0.0",
-    "ts-node": "10.9.2",
-    "tsx": "4.21.0",
     "wrangler": "4.63.0"
-  },
-  "dependencies": {}
+  }
 }

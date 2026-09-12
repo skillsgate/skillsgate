@@ -46,10 +46,6 @@ jobs:
       - name: Rebuild native modules for Electron
         run: npx electron-rebuild -v 35.7.5 -m node_modules/better-sqlite3 ${{ matrix.arch && format('-a {0}', matrix.arch) || '' }}
 
-      - name: Remove bun.lock to prevent electron-builder from using bun
-        run: rm -f bun.lock
-        shell: bash
-
       - name: Build and package desktop app
         shell: bash
         run: |

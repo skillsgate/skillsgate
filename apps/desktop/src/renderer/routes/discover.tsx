@@ -10,6 +10,7 @@ import {
 } from "react"
 import { marked } from "marked"
 import { electronAPI } from "../lib/electron-api"
+import { intersectActive, useActiveAgents } from "../lib/use-active-agents"
 
 // ---------------------------------------------------------------------------
 // Types matching the skills.sh response shape
@@ -304,21 +305,19 @@ const SkillCard = memo(function SkillCard({
 // Agent Dropdown (multi-select for install targets)
 // ---------------------------------------------------------------------------
 
-interface DetectedAgent {
-  name: string
-  displayName: string
-}
-
 function AgentDropdown({
   agents,
   selected,
   defaults,
   onToggle,
+  onToggleAll,
 }: {
-  agents: DetectedAgent[]
+  /** Active tools only. */
+  agents: AgentInfo[]
   selected: string[]
   defaults: string[]
   onToggle: (name: string) => void
+  onToggleAll: (selectAll: boolean) => void
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -333,12 +332,15 @@ function AgentDropdown({
     return () => document.removeEventListener("mousedown", handleClick)
   }, [])
 
+  const allSelected = agents.length > 0 && selected.length === agents.length
+  const someSelected = selected.length > 0 && !allSelected
+
   const label =
     selected.length === 0
-      ? "No agents selected"
-      : selected.length === agents.length
-        ? `All agents (${agents.length})`
-        : `${selected.length} agent${selected.length > 1 ? "s" : ""} selected`
+      ? t("No tools selected")
+      : allSelected
+        ? `${t("All my tools")} (${agents.length})`
+        : `${selected.length} ${selected.length > 1 ? t("tools selected") : t("tool selected")}`
 
   return (
     <div ref={ref} className="relative">
@@ -369,6 +371,31 @@ function AgentDropdown({
       {open && (
         <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-background shadow-lg overflow-hidden">
           <div className="max-h-48 overflow-y-auto py-1">
+            <button
+              type="button"
+              onClick={() => onToggleAll(!allSelected)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-foreground hover:bg-surface-hover transition-colors border-b border-border"
+            >
+              <span
+                className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                  allSelected || someSelected
+                    ? "bg-accent border-accent text-background"
+                    : "border-border"
+                }`}
+              >
+                {allSelected ? (
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : someSelected ? (
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                ) : null}
+              </span>
+              <span className="font-medium">{t("All my tools")}</span>
+              <span className="ml-auto text-[10px] text-muted">{agents.length}</span>
+            </button>
             {agents.map((agent) => (
               <button
                 key={agent.name}
@@ -408,7 +435,9 @@ function AgentDropdown({
 
 interface DetailPanelProps {
   skill: CatalogSkill
-  availableAgents: DetectedAgent[]
+  /** Active tools only, ordered by the agent registry. */
+  availableAgents: AgentInfo[]
+  /** install.defaultAgents already intersected with the active set. */
   defaultAgents: string[]
   onClose: () => void
   installedNames: Set<string>
@@ -485,9 +514,15 @@ function DetailPanel({
     )
   }, [installedNames, installedSources, skill.name, skill.source])
 
+  // Preselect the configured defaults, falling back to every active tool so the
+  // Install button is usable without opening the dropdown.
   useEffect(() => {
-    setSelectedAgents(defaultAgents)
-  }, [defaultAgents, skill.skillId])
+    setSelectedAgents(
+      defaultAgents.length > 0
+        ? defaultAgents
+        : availableAgents.map((agent) => agent.name),
+    )
+  }, [defaultAgents, availableAgents, skill.skillId])
 
   const renderedContent = useMemo(
     () => (content ? renderMarkdown(content) : ""),
@@ -528,6 +563,10 @@ function DetailPanel({
         ? prev.filter((value) => value !== name)
         : [...prev, name],
     )
+  }
+
+  function toggleAllAgents(selectAll: boolean) {
+    setSelectedAgents(selectAll ? availableAgents.map((agent) => agent.name) : [])
   }
 
   const githubUrl = `https://github.com/${skill.source}`
@@ -609,14 +648,23 @@ function DetailPanel({
               </code>
             </div>
 
-            {!installed && availableAgents.length > 0 && (
-              <AgentDropdown
-                agents={availableAgents}
-                selected={selectedAgents}
-                defaults={defaultAgents}
-                onToggle={toggleAgent}
-              />
-            )}
+            {!installed &&
+              (availableAgents.length > 0 ? (
+                <AgentDropdown
+                  agents={availableAgents}
+                  selected={selectedAgents}
+                  defaults={defaultAgents}
+                  onToggle={toggleAgent}
+                  onToggleAll={toggleAllAgents}
+                />
+              ) : (
+                <p className="text-[12px] text-muted">
+                  {t("No tools selected")}.{" "}
+                  <a href="#/settings#tools" className="text-accent hover:text-foreground">
+                    {t("Manage tools...")}
+                  </a>
+                </p>
+              ))}
 
             {installError && (
               <p className="text-[12px] text-red-400 mt-3">{installError}</p>
@@ -658,8 +706,9 @@ export function Discover() {
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const [activeQuery, setActiveQuery] = useState("skill")
   const [selectedSkill, setSelectedSkill] = useState<CatalogSkill | null>(null)
-  const [availableAgents, setAvailableAgents] = useState<DetectedAgent[]>([])
-  const [defaultAgents, setDefaultAgents] = useState<string[]>([])
+  const { activeAgents: availableAgents, activeNames: activeAgentNames } =
+    useActiveAgents()
+  const [storedDefaultAgents, setStoredDefaultAgents] = useState<string[]>([])
   const [installedNames, setInstalledNames] = useState<Set<string>>(new Set())
   const [installedSources, setInstalledSources] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
@@ -699,19 +748,17 @@ export function Discover() {
   }, [])
 
   useEffect(() => {
-    Promise.all([
-      electronAPI.detectAgents(),
-      electronAPI.settingsGet("install.defaultAgents", [] as string[]),
-    ])
-      .then(([agents, defaults]) => {
-        setAvailableAgents(agents)
-        setDefaultAgents(defaults)
-      })
-      .catch(() => {
-        setAvailableAgents([])
-        setDefaultAgents([])
-      })
+    electronAPI
+      .settingsGet("install.defaultAgents", [] as string[])
+      .then(setStoredDefaultAgents)
+      .catch(() => setStoredDefaultAgents([]))
   }, [])
+
+  // A default pointing at a hidden tool is ignored here, not deleted.
+  const defaultAgents = useMemo(
+    () => intersectActive(storedDefaultAgents, activeAgentNames),
+    [storedDefaultAgents, activeAgentNames],
+  )
 
   // Initial catalog load
   useEffect(() => {
@@ -813,6 +860,12 @@ export function Discover() {
   async function handleInstall(source: string, agentNames: string[]) {
     console.log("[discover] starting install", { source, agentNames })
     const results = await electronAPI.installSkill(source, agentNames, "global")
+    // An empty result set means the install reached no target at all. Treating
+    // it as success is what used to flip the button to "Installed" after
+    // writing nothing.
+    if (results.length === 0) {
+      throw new Error("No install targets selected.")
+    }
     const failed = results.filter((r: { success: boolean }) => !r.success)
     if (failed.length > 0) {
       const errorMsg = failed.map((r: { error?: string }) => r.error).join(", ")

@@ -1,4 +1,5 @@
 import { memo } from "react"
+import { t } from "../lib/i18n"
 import ampLogo from "../assets/agent-logos/amp.svg"
 import claudeLogo from "../assets/agent-logos/claude.svg"
 import codexLogo from "../assets/agent-logos/codex.svg"
@@ -124,12 +125,37 @@ export const AgentLogo = memo(function AgentLogo({ name, size = 16, shortCode, c
   )
 })
 
-export const AgentLogoRow = memo(function AgentLogoRow({ agents, size = 14 }: { agents: string[]; size?: number }) {
+/**
+ * `dimmed` lists agents to render at half opacity — tools the skill is installed
+ * in that the user has hidden from My Tools. They stay visible so the row is
+ * still a truthful account of where the skill lives.
+ */
+export const AgentLogoRow = memo(function AgentLogoRow({
+  agents,
+  size = 14,
+  dimmed,
+}: {
+  agents: string[]
+  size?: number
+  dimmed?: string[]
+}) {
+  const dimmedSet = dimmed && dimmed.length > 0 ? new Set(dimmed) : null
+
   return (
     <span className="flex items-center gap-1">
-      {agents.map((agent) => (
-        <AgentLogo key={agent} name={agent} size={size} />
-      ))}
+      {agents.map((agent) =>
+        dimmedSet?.has(agent) ? (
+          <span
+            key={agent}
+            className="inline-flex opacity-50"
+            title={t("Hidden tool — enable in Settings")}
+          >
+            <AgentLogo name={agent} size={size} />
+          </span>
+        ) : (
+          <AgentLogo key={agent} name={agent} size={size} />
+        ),
+      )}
     </span>
   )
 })

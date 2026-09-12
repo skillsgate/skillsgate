@@ -153,6 +153,33 @@ export const zhCN: Record<string, string> = {
   "Project-local paths discovered under each root": "在每个根目录下发现的项目级路径",
   "Skill by a verified organization": "由已验证组织发布的技能",
 
+  // My Tools (curated agent visibility)
+  "My Tools": "我的工具",
+  "Add tool": "添加工具",
+  "Add tools": "添加工具",
+  "Hide tool": "隐藏工具",
+  "All tools added": "所有工具都已添加",
+  "Manage tools...": "管理工具…",
+  "All my tools": "我的全部工具",
+  "Reset to detected": "重置为已检测",
+  "Select all": "全选",
+  "No tools selected": "未选择任何工具",
+  "No tools selected.": "未选择任何工具。",
+  "Hidden tool — enable in Settings": "已隐藏的工具 — 可在设置中启用",
+  "Showing the {n} tools you use.": "仅显示你在用的 {n} 个工具。",
+  Adjust: "调整",
+  detected: "已检测",
+  "tool selected": "个工具已选择",
+  "tools selected": "个工具已选择",
+  "These are the tools SkillsGate shows and installs to. Scanning always covers every detected tool.":
+    "SkillsGate 只会显示这些工具并向其安装技能。扫描始终覆盖所有已检测到的工具。",
+  "Shared store at ~/.agents/skills. Every skill lives here. Enable only if your agent reads this directory directly.":
+    "位于 ~/.agents/skills 的共享存储，所有技能都保存在这里。仅当你的 agent 直接读取该目录时才需要启用。",
+
+  // Layout
+  "Resize tools pane": "调整工具面板宽度",
+  "Resize library pane": "调整技能库面板宽度",
+
   // Language
   Language: "语言",
   "Display language": "界面语言",

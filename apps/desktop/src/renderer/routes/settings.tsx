@@ -1,6 +1,9 @@
 import { LOCALES, changeLocale, getLocale, t, type Locale } from "../lib/i18n"
 import { useState, useEffect, useCallback } from "react"
+import { useLocation } from "react-router-dom"
 import { electronAPI } from "../lib/electron-api"
+import { AgentLogo } from "../components/agent-logo"
+import { useActiveAgents } from "../lib/use-active-agents"
 
 // ---------------------------------------------------------------------------
 // Setting row components
@@ -87,7 +90,13 @@ export function Settings() {
   const [newScanPath, setNewScanPath] = useState("")
   const [defaultAgents, setDefaultAgents] = useState<string[]>([])
   const [mirrorAgents, setMirrorAgents] = useState<string[]>([])
-  const [detectedAgents, setDetectedAgents] = useState<DetectedAgent[]>([])
+  const {
+    registry: agentRegistry,
+    activeNames: activeAgents,
+    activeAgents: activeAgentInfos,
+    setActive: saveActiveAgents,
+    resetToDetected,
+  } = useActiveAgents()
   const [appVersion, setAppVersion] = useState("")
   const [updateState, setUpdateState] = useState<UpdateState | null>(null)
   const [checkingUpdates, setCheckingUpdates] = useState(false)
@@ -126,7 +135,6 @@ export function Settings() {
   }, [loadSettings])
 
   useEffect(() => {
-    electronAPI.detectAgents().then(setDetectedAgents).catch(() => {})
     electronAPI.appGetVersion().then(setAppVersion).catch(() => {})
     electronAPI.updatesGetState().then(setUpdateState).catch(() => {})
     const cleanup = electronAPI.onUpdateState((state) => {
@@ -144,6 +152,14 @@ export function Settings() {
     }
   }
 
+  function toggleActiveAgent(name: string) {
+    void saveActiveAgents(
+      activeAgents.includes(name)
+        ? activeAgents.filter((item) => item !== name)
+        : [...activeAgents, name],
+    )
+  }
+
   function toggleAgentSelection(
     current: string[],
     setCurrent: (value: string[]) => void,
@@ -156,6 +172,15 @@ export function Settings() {
     setCurrent(next)
     saveSetting(key, next)
   }
+
+  // `/settings#tools` (from the Home tools panel) lands on the My Tools grid.
+  const { hash } = useLocation()
+  useEffect(() => {
+    if (hash !== "#tools" || agentRegistry.length === 0) return
+    document
+      .getElementById("tools")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [hash, agentRegistry.length])
 
   async function handleCheckUpdates() {
     setCheckingUpdates(true)
@@ -391,6 +416,68 @@ export function Settings() {
           </div>
         </section>
 
+        {/* My Tools */}
+        <section id="tools" className="scroll-mt-6">
+          <h3 className="text-sm font-semibold text-foreground mb-3">
+            {t("My Tools")}
+          </h3>
+          <div className="rounded-lg border border-border bg-surface p-3">
+            <p className="text-[11px] text-muted mb-3">
+              {t(
+                "These are the tools SkillsGate shows and installs to. Scanning always covers every detected tool.",
+              )}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {agentRegistry.map((agent) => (
+                <label
+                  key={agent.name}
+                  className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-[12px] text-foreground"
+                >
+                  <input
+                    type="checkbox"
+                    checked={activeAgents.includes(agent.name)}
+                    onChange={() => toggleActiveAgent(agent.name)}
+                  />
+                  <AgentLogo
+                    name={agent.displayName}
+                    shortCode={agent.shortCode}
+                    size={14}
+                  />
+                  <span className="truncate">{agent.displayName}</span>
+                  {agent.detected && (
+                    <span className="ml-auto flex-shrink-0 text-[10px] text-muted">
+                      {t("detected")}
+                    </span>
+                  )}
+                </label>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted mt-3">
+              <span className="text-foreground">Universal (.agents/skills)</span>{" "}
+              —{" "}
+              {t(
+                "Shared store at ~/.agents/skills. Every skill lives here. Enable only if your agent reads this directory directly.",
+              )}
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                onClick={() => void resetToDetected()}
+                className="rounded-md border border-border px-3 py-1.5 text-[11px] text-foreground hover:bg-surface-hover transition-colors"
+              >
+                {t("Reset to detected")}
+              </button>
+              <button
+                onClick={() =>
+                  void saveActiveAgents(agentRegistry.map((agent) => agent.name))
+                }
+                className="rounded-md border border-border px-3 py-1.5 text-[11px] text-foreground hover:bg-surface-hover transition-colors"
+              >
+                {t("Select all")}
+              </button>
+            </div>
+          </div>
+        </section>
+
         {/* Target defaults */}
         <section>
           <h3 className="text-sm font-semibold text-foreground mb-3">
@@ -401,20 +488,24 @@ export function Settings() {
             <p className="text-[11px] text-muted mb-3">
               These targets are used for installs and new local skill creation when no explicit target set is chosen.
             </p>
-            <div className="grid grid-cols-2 gap-2">
-              {detectedAgents.map((agent) => (
-                <label key={agent.name} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-[12px] text-foreground">
-                  <input
-                    type="checkbox"
-                    checked={defaultAgents.includes(agent.name)}
-                    onChange={() =>
-                      toggleAgentSelection(defaultAgents, setDefaultAgents, "install.defaultAgents", agent.name)
-                    }
-                  />
-                  <span>{agent.displayName}</span>
-                </label>
-              ))}
-            </div>
+            {activeAgentInfos.length === 0 ? (
+              <p className="text-[11px] text-muted">{t("No tools selected")}</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {activeAgentInfos.map((agent) => (
+                  <label key={agent.name} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-[12px] text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={defaultAgents.includes(agent.name)}
+                      onChange={() =>
+                        toggleAgentSelection(defaultAgents, setDefaultAgents, "install.defaultAgents", agent.name)
+                      }
+                    />
+                    <span className="truncate">{agent.displayName}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
@@ -428,20 +519,24 @@ export function Settings() {
             <p className="text-[11px] text-muted mb-3">
               Any skill installed or created in the desktop app will also be linked into these targets.
             </p>
-            <div className="grid grid-cols-2 gap-2">
-              {detectedAgents.map((agent) => (
-                <label key={agent.name} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-[12px] text-foreground">
-                  <input
-                    type="checkbox"
-                    checked={mirrorAgents.includes(agent.name)}
-                    onChange={() =>
-                      toggleAgentSelection(mirrorAgents, setMirrorAgents, "sync.mirrorAgents", agent.name)
-                    }
-                  />
-                  <span>{agent.displayName}</span>
-                </label>
-              ))}
-            </div>
+            {activeAgentInfos.length === 0 ? (
+              <p className="text-[11px] text-muted">{t("No tools selected")}</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {activeAgentInfos.map((agent) => (
+                  <label key={agent.name} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-[12px] text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={mirrorAgents.includes(agent.name)}
+                      onChange={() =>
+                        toggleAgentSelection(mirrorAgents, setMirrorAgents, "sync.mirrorAgents", agent.name)
+                      }
+                    />
+                    <span className="truncate">{agent.displayName}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 

@@ -24,7 +24,10 @@ function subscribe<T>(
 
 contextBridge.exposeInMainWorld("electronAPI", {
   // Agents
-  detectAgents: () => ipcRenderer.invoke("agents:detect"),
+  agentsList: () => ipcRenderer.invoke("agents:list"),
+  agentsSetActive: (names: string[]) =>
+    ipcRenderer.invoke("agents:set-active", names),
+  agentsResetActive: () => ipcRenderer.invoke("agents:reset-active"),
 
   // Skills
   listInstalled: () => ipcRenderer.invoke("skills:list-installed"),

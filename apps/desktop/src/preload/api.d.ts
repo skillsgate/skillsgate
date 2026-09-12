@@ -1,10 +1,22 @@
 export {}
 
 declare global {
-  interface DetectedAgent {
+  /**
+   * A registry agent plus whether this machine looks like it has that tool.
+   * `detected` is directory existence only — it says nothing about whether the
+   * user actually installs skills there, which is what `active` tracks.
+   */
+  interface AgentInfo {
     name: string
     displayName: string
     shortCode: string
+    detected: boolean
+  }
+
+  interface AgentListResult {
+    registry: AgentInfo[]
+    /** Registry keys the user has chosen to see, in registry order. */
+    active: string[]
   }
 
   interface InstalledSkill {
@@ -97,7 +109,9 @@ declare global {
   }
 
   interface ElectronAPI {
-    detectAgents: () => Promise<DetectedAgent[]>
+    agentsList: () => Promise<AgentListResult>
+    agentsSetActive: (names: string[]) => Promise<string[]>
+    agentsResetActive: () => Promise<string[]>
     listInstalled: () => Promise<InstalledSkill[]>
     rescanSkills: () => Promise<InstalledSkill[]>
     installSkill: (

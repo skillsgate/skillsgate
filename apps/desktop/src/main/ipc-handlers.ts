@@ -273,6 +273,8 @@ interface SupportingFile {
 const CUSTOM_SCAN_PATHS_KEY = "scan.customPaths"
 const DEFAULT_AGENTS_KEY = "install.defaultAgents"
 const MIRROR_AGENTS_KEY = "sync.mirrorAgents"
+/** User-curated set of visible tools. `null`/absent means "not yet derived". */
+const ACTIVE_AGENTS_KEY = "agents.active"
 
 const PROJECT_PROBES = [
   { subpath: ".claude/skills" },
@@ -447,22 +449,57 @@ function isSkillPathAllowed(resolvedPath: string): boolean {
   }
 }
 
-function getExpandedTargetAgents(requestedAgentNames: string[]): AgentEntry[] {
+/**
+ * The effective install targets for one request.
+ *
+ * Resolution order, each tier used only when the one before it is empty:
+ *   1. the targets the caller explicitly asked for
+ *   2. `install.defaultAgents` narrowed to the active set
+ *   3. the whole active set
+ * Mirror targets (`sync.mirrorAgents`, also narrowed to active) are unioned on
+ * top. Narrowing every tier to `active` is what stops an empty request from
+ * reaching a tool the user has hidden -- the old whole-registry fallback did
+ * exactly that.
+ *
+ * Detection filters the fallback tiers only. A tool the caller named is one the
+ * user opted into from a picker that lists active tools, so it is installed to
+ * whether or not a config directory exists yet; `installSkillToAgent` creates
+ * the directory. Filtering those by detection made an install into, say, an
+ * active-but-not-yet-created Zed write nothing while still reporting success.
+ *
+ * Entries for hidden tools are ignored at read time, never deleted, so
+ * re-enabling a tool restores its default and mirror rules untouched.
+ */
+async function resolveInstallTargets(
+  requestedAgentNames: string[],
+): Promise<AgentEntry[]> {
   ensureStores()
-  const configuredDefaultAgents = settingsStore?.get<string[]>(DEFAULT_AGENTS_KEY, []) ?? []
-  const configuredMirrorAgents = settingsStore?.get<string[]>(MIRROR_AGENTS_KEY, []) ?? []
+  const activeNames = await getActiveAgentNames()
+  const activeSet = new Set(activeNames)
 
-  const baseNames =
-    requestedAgentNames.length > 0
-      ? requestedAgentNames
-      : configuredDefaultAgents.length > 0
-        ? configuredDefaultAgents
-        : []
+  const configuredDefaultAgents = (
+    settingsStore?.get<string[]>(DEFAULT_AGENTS_KEY, []) ?? []
+  ).filter((name) => activeSet.has(name))
+  const configuredMirrorAgents = (
+    settingsStore?.get<string[]>(MIRROR_AGENTS_KEY, []) ?? []
+  ).filter((name) => activeSet.has(name))
 
-  const resolvedBaseNames = baseNames.length > 0 ? baseNames : Object.keys(agentRegistry)
-  const finalNames = Array.from(
-    new Set([...resolvedBaseNames, ...configuredMirrorAgents]),
+  const explicit = requestedAgentNames.length > 0
+  const baseNames = explicit
+    ? requestedAgentNames
+    : configuredDefaultAgents.length > 0
+      ? configuredDefaultAgents
+      : activeNames
+
+  let finalNames = Array.from(
+    new Set([...baseNames, ...configuredMirrorAgents]),
   )
+
+  if (!explicit) {
+    const detected = await detectAgents()
+    const detectedNames = new Set(detected.map((agent) => agent.name))
+    finalNames = finalNames.filter((name) => detectedNames.has(name))
+  }
 
   return finalNames
     .map((name) => agentRegistry[name])
@@ -630,6 +667,95 @@ async function getDetectedAgentEntries(): Promise<AgentEntry[]> {
   return detected
     .map((agent) => agentRegistry[agent.name])
     .filter((value): value is AgentEntry => Boolean(value))
+}
+
+// ---------------------------------------------------------------------------
+// Active agents ("My Tools")
+//
+// `active` is the user-curated subset of the registry that every agent-facing
+// surface in the renderer lists. It is a display and picker filter only:
+// scanning still covers every detected agent, so counts and drag targets stay
+// truthful.
+// ---------------------------------------------------------------------------
+
+/** Registry keys in registry order, filtered to the ones that still exist. */
+function normalizeAgentNames(names: unknown): string[] {
+  if (!Array.isArray(names)) return []
+  const wanted = new Set(
+    names.filter((name): name is string => typeof name === "string"),
+  )
+  return Object.keys(agentRegistry).filter((name) => wanted.has(name))
+}
+
+/** Reads `agents.active` without deriving it. `null` = not configured yet. */
+function readStoredActiveAgents(): string[] | null {
+  ensureStores()
+  const stored = settingsStore?.get<string[] | null>(ACTIVE_AGENTS_KEY, null) ?? null
+  return Array.isArray(stored) ? normalizeAgentNames(stored) : null
+}
+
+/**
+ * Derivation rule, run exactly once and persisted (see the `my-tools` plan):
+ * detected tools that already hold at least one skill, minus Universal, with
+ * two fallbacks so a fresh machine still ends up with something selected.
+ *
+ * Persisting on first derivation is deliberate. A tool detected later does not
+ * silently join the active set; it shows up in the "+" popover instead.
+ */
+async function deriveActiveAgents(detectedNames: string[]): Promise<string[]> {
+  let skills: Array<{ agents: string[] }> = loadCachedSkills()
+  if (skills.length === 0) {
+    try {
+      // Go through rescanAndCache rather than scanning directly: on first launch
+      // `skills:list-installed` is already running this exact scan, and the
+      // single-flight map lets this call join it instead of walking the whole
+      // filesystem a second time. It also leaves the cache populated.
+      skills = await rescanAndCache({ broadcast: false })
+    } catch {
+      skills = []
+    }
+  }
+
+  const displayNamesWithSkills = new Set<string>()
+  for (const skill of skills) {
+    for (const displayName of skill.agents) displayNamesWithSkills.add(displayName)
+  }
+
+  const withoutUniversal = detectedNames.filter((name) => name !== "universal")
+  let candidate = withoutUniversal.filter((name) =>
+    displayNamesWithSkills.has(agentRegistry[name]?.displayName ?? ""),
+  )
+  if (candidate.length === 0) candidate = withoutUniversal
+  if (candidate.length === 0) candidate = ["universal"]
+
+  ensureStores()
+  settingsStore.set(ACTIVE_AGENTS_KEY, candidate)
+  return candidate
+}
+
+/**
+ * Single-flight derivation. Several surfaces (`agents:list`, an install that
+ * lands before the renderer has asked) can race on first launch; without this
+ * each one starts its own scan and its own write.
+ */
+let deriveActiveAgentsPromise: Promise<string[]> | null = null
+
+/** Active registry keys, deriving and persisting them on first call. */
+async function getActiveAgentNames(): Promise<string[]> {
+  const stored = readStoredActiveAgents()
+  if (stored) return stored
+
+  if (!deriveActiveAgentsPromise) {
+    const task = (async () => {
+      const detected = await detectAgents()
+      return deriveActiveAgents(detected.map((agent) => agent.name))
+    })().finally(() => {
+      if (deriveActiveAgentsPromise === task) deriveActiveAgentsPromise = null
+    })
+    deriveActiveAgentsPromise = task
+  }
+
+  return deriveActiveAgentsPromise
 }
 
 /** Scan all detected agents for installed skills, merging with lock file data.
@@ -1450,9 +1576,45 @@ function buildNpxInstallCommand(
 
 export function registerIpcHandlers(): void {
   console.log("[ipc] registerIpcHandlers initialized")
-  // Detect which agents are installed on this machine
-  ipcMain.handle("agents:detect", async () => {
-    return detectAgents()
+  // The full registry plus the user's active ("My Tools") subset. Runs the
+  // one-time derivation on first call and persists the result.
+  ipcMain.handle("agents:list", async () => {
+    const detected = await detectAgents()
+    const detectedNames = new Set(detected.map((agent) => agent.name))
+    const active = await getActiveAgentNames()
+
+    return {
+      registry: Object.values(agentRegistry).map((agent) => ({
+        name: agent.name,
+        displayName: agent.displayName,
+        shortCode: agent.shortCode,
+        detected: detectedNames.has(agent.name),
+      })),
+      active,
+    }
+  })
+
+  // Replace the active set. Unknown keys are dropped and the stored order
+  // always follows the registry so the tools panel stays stable. An empty array
+  // is a legitimate value: the user removed every tool on purpose.
+  ipcMain.handle("agents:set-active", (_event, names: unknown) => {
+    ensureStores()
+    const next = normalizeAgentNames(names)
+    settingsStore.set(ACTIVE_AGENTS_KEY, next)
+    return next
+  })
+
+  // Clear the stored set and re-run the derivation, fallbacks included.
+  //
+  // This exists because the renderer cannot reproduce the rule safely. Doing
+  // "detected minus Universal" in Settings stores [] on a machine where
+  // Universal is the only detected tool -- and [] reads as "configured", so the
+  // fallbacks never get a chance to run again.
+  ipcMain.handle("agents:reset-active", async () => {
+    ensureStores()
+    settingsStore.set(ACTIVE_AGENTS_KEY, null)
+    deriveActiveAgentsPromise = null
+    return getActiveAgentNames()
   })
 
   // List all installed skills across all detected agents.
@@ -1589,11 +1751,24 @@ export function registerIpcHandlers(): void {
       }
 
       // Determine target agents
-      const detected = await detectAgents()
-      const detectedNames = new Set(detected.map((agent) => agent.name))
-      const targetAgents = getExpandedTargetAgents(agentNames).filter((agent) =>
-        detectedNames.has(agent.name),
-      )
+      const targetAgents = await resolveInstallTargets(agentNames)
+
+      // Nothing to install into. Bail before touching the lock file: writing a
+      // lock entry here is what used to make an install that wrote zero files
+      // still report as installed.
+      if (targetAgents.length === 0) {
+        if (tmpDir) {
+          await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
+        }
+        return [
+          {
+            skillName: source,
+            agent: "unknown",
+            success: false,
+            error: "No install targets selected. Enable a tool in Settings > My Tools.",
+          },
+        ]
+      }
 
       const results: Array<{
         skillName: string
@@ -1849,6 +2024,13 @@ export function registerIpcHandlers(): void {
         throw new Error(`Skill "${trimmedName}" already exists`)
       }
 
+      // Resolved up front: failing after the canonical dir is written would
+      // leave a half-created skill behind.
+      const targetAgents = await resolveInstallTargets(data.agentNames ?? [])
+      if (targetAgents.length === 0) {
+        throw new Error("No install targets selected. Enable a tool in Settings > My Tools.")
+      }
+
       await fs.mkdir(canonicalDir, { recursive: true })
       const content = (data.content?.trim() || `---
 name: ${safeName}
@@ -1862,12 +2044,6 @@ description: ${(data.description?.trim() || trimmedName).replace(/\n/g, " ")}
 Add your skill instructions here.
 `).trimEnd() + "\n"
       await fs.writeFile(skillFilePath, content, "utf-8")
-
-      const detected = await detectAgents()
-      const detectedNames = new Set(detected.map((agent) => agent.name))
-      const targetAgents = getExpandedTargetAgents(data.agentNames ?? []).filter((agent) =>
-        detectedNames.has(agent.name),
-      )
 
       for (const agent of targetAgents) {
         await installSkillToAgent(canonicalDir, trimmedName, agent)

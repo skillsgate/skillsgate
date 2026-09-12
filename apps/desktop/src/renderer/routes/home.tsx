@@ -13,6 +13,8 @@ import { marked } from "marked"
 import { electronAPI } from "../lib/electron-api"
 import { SkillEditor, type SkillEditorHandle } from "../components/skill-editor"
 import { AgentLogo, AgentLogoRow } from "../components/agent-logo"
+import { useResizablePane } from "../lib/use-resizable-pane"
+import { intersectActive, useActiveAgents } from "../lib/use-active-agents"
 
 // Map display names to registry keys
 const DISPLAY_NAME_TO_KEY: Record<string, string> = {
@@ -158,13 +160,49 @@ interface DragToast {
 }
 
 // --------------------------------------------------------------------------
+// Pane resize handle
+// --------------------------------------------------------------------------
+
+/**
+ * Sits between two panes as a flex sibling rather than inside either one: both
+ * panes scroll, and an absolutely positioned handle would scroll with them.
+ */
+function PaneResizeHandle({
+  label,
+  onPointerDown,
+  onDoubleClick,
+}: {
+  label: string
+  onPointerDown: (event: React.PointerEvent) => void
+  onDoubleClick: () => void
+}) {
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={label}
+      title={label}
+      onPointerDown={onPointerDown}
+      onDoubleClick={onDoubleClick}
+      className="relative z-10 w-1 flex-shrink-0 -ml-0.5 cursor-col-resize bg-transparent hover:bg-accent/40 active:bg-accent/60 transition-colors"
+    />
+  )
+}
+
+// --------------------------------------------------------------------------
 // Left Sidebar Panel
 // --------------------------------------------------------------------------
 
 interface LeftSidebarProps {
+  width: number
   totalSkillCount: number
   favoritesCount: number
-  agentsWithSkills: DetectedAgent[]
+  activeAgents: AgentInfo[]
+  hiddenAgents: AgentInfo[]
+  onAddAgent: (name: string) => void
+  onRemoveAgent: (name: string) => void
+  showSetupBanner: boolean
+  onDismissSetupBanner: () => void
   agentSkillCounts: Record<string, number>
   selectedAgent: string | null
   onSelectAgent: (agent: string | null) => void
@@ -185,9 +223,15 @@ interface LeftSidebarProps {
 }
 
 function LeftSidebar({
+  width,
   totalSkillCount,
   favoritesCount,
-  agentsWithSkills,
+  activeAgents,
+  hiddenAgents,
+  onAddAgent,
+  onRemoveAgent,
+  showSetupBanner,
+  onDismissSetupBanner,
   agentSkillCounts,
   selectedAgent,
   onSelectAgent,
@@ -206,8 +250,37 @@ function LeftSidebar({
   onDropOnAgent,
   onDropOnCollection,
 }: LeftSidebarProps) {
+  const [showToolPicker, setShowToolPicker] = useState(false)
+  const toolPickerRef = useRef<HTMLDivElement>(null)
+
+  // Detected tools first: they are the ones the user is most likely adding.
+  const pickerAgents = useMemo(
+    () =>
+      [...hiddenAgents].sort(
+        (a, b) => Number(b.detected) - Number(a.detected),
+      ),
+    [hiddenAgents],
+  )
+
+  useEffect(() => {
+    if (!showToolPicker) return
+    const handleClick = (e: MouseEvent) => {
+      if (
+        toolPickerRef.current &&
+        !toolPickerRef.current.contains(e.target as Node)
+      ) {
+        setShowToolPicker(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [showToolPicker])
+
   return (
-    <aside className="w-48 flex-shrink-0 flex flex-col bg-surface border-r border-border overflow-y-auto">
+    <aside
+      style={{ width }}
+      className="flex-shrink-0 flex flex-col bg-surface border-r border-border overflow-y-auto"
+    >
       {/* Library section */}
       <div className="px-3 pt-4 pb-2">
         <h3 className="text-[10px] uppercase tracking-widest font-semibold text-muted mb-2 px-2">
@@ -256,61 +329,154 @@ function LeftSidebar({
         </nav>
       </div>
 
-      {/* Tools / Agents section */}
-      {agentsWithSkills.length > 0 && (
-        <div className="px-3 pt-3 pb-2">
-          <h3 className="text-[10px] uppercase tracking-widest font-semibold text-muted mb-2 px-2">
+      {/* Tools / Agents section — lists the user's active tools, including ones
+          with no skills yet, so they exist as drop targets. */}
+      <div className="px-3 pt-3 pb-2" ref={toolPickerRef}>
+        <div className="flex items-center justify-between px-2 mb-2">
+          <h3 className="text-[10px] uppercase tracking-widest font-semibold text-muted">
             {t("Tools")}
           </h3>
-          <nav className="flex flex-col gap-0.5">
-            {agentsWithSkills.map((agent) => (
+          <button
+            onClick={() => setShowToolPicker((open) => !open)}
+            className="text-[11px] text-muted hover:text-foreground"
+            title={t("Add tool")}
+          >
+            +
+          </button>
+        </div>
+
+        {showSetupBanner && activeAgents.length > 0 && (
+          <div className="mb-2 flex items-start gap-1 rounded-md border border-border bg-background px-2 py-1.5">
+            <p className="flex-1 text-[10px] leading-snug text-muted">
+              {t("Showing the {n} tools you use.").replace(
+                "{n}",
+                String(activeAgents.length),
+              )}{" "}
               <button
-                key={agent.name}
-                onClick={() => {
-                  onFilterChange("all")
-                  onSelectAgent(
-                    selectedAgent === agent.displayName
-                      ? null
-                      : agent.displayName,
-                  )
-                }}
-                className={`flex items-center justify-between px-2 py-1.5 rounded-md text-[12px] tracking-wide font-medium transition-colors text-left ${
-                  selectedAgent === agent.displayName
-                    ? "bg-surface-hover text-foreground"
-                    : dragOverTarget === `agent:${agent.displayName}`
-                      ? "bg-surface-hover/70 ring-1 ring-accent text-foreground"
-                    : "text-muted hover:text-foreground hover:bg-surface-hover"
-                }`}
-                onDragOver={(e) => {
-                  if (!dragSkill) return
-                  e.preventDefault()
-                  onDragEnterTarget(`agent:${agent.displayName}`)
-                }}
-                onDragLeave={() => {
-                  if (dragOverTarget === `agent:${agent.displayName}`) onDragEnterTarget(null)
-                }}
-                onDrop={(e) => {
-                  if (!dragSkill) return
-                  e.preventDefault()
-                  onDropOnAgent(agent.displayName)
-                }}
+                onClick={() => setShowToolPicker(true)}
+                className="text-accent hover:text-foreground"
               >
-                <AgentLogo name={agent.displayName} shortCode={agent.shortCode} size={14} />
-                <span className="truncate ml-1.5">{agent.displayName}</span>
-                <span
-                  className={`text-[10px] font-mono ml-auto ${
-                    selectedAgent === agent.displayName
-                      ? "text-foreground"
-                      : "text-muted"
-                  }`}
-                >
-                  {agentSkillCounts[agent.displayName] || 0}
-                </span>
+                {t("Adjust")}
               </button>
+            </p>
+            <button
+              onClick={onDismissSetupBanner}
+              className="flex-shrink-0 text-[10px] text-muted hover:text-foreground"
+              title={t("Dismiss")}
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {showToolPicker && (
+          <div className="mb-2 rounded-md border border-border bg-background py-1 shadow-lg">
+            {pickerAgents.length === 0 ? (
+              <p className="px-2.5 py-1.5 text-[11px] text-muted italic">
+                {t("All tools added")}
+              </p>
+            ) : (
+              <div className="max-h-56 overflow-y-auto">
+                {pickerAgents.map((agent) => (
+                  <button
+                    key={agent.name}
+                    onClick={() => onAddAgent(agent.name)}
+                    className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-[11px] text-muted hover:bg-surface-hover hover:text-foreground transition-colors"
+                  >
+                    <AgentLogo
+                      name={agent.displayName}
+                      shortCode={agent.shortCode}
+                      size={13}
+                    />
+                    <span className="truncate">{agent.displayName}</span>
+                    {agent.detected && (
+                      <span className="ml-auto flex-shrink-0 text-[9px] uppercase tracking-wide text-muted">
+                        {t("detected")}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="mt-1 border-t border-border pt-1">
+              <a
+                href="#/settings#tools"
+                className="block px-2.5 py-1.5 text-[11px] text-accent hover:text-foreground transition-colors"
+              >
+                {t("Manage tools...")}
+              </a>
+            </div>
+          </div>
+        )}
+
+        {activeAgents.length === 0 ? (
+          <p className="px-2 text-[11px] leading-snug text-muted">
+            {t("No tools selected.")}{" "}
+            <button
+              onClick={() => setShowToolPicker(true)}
+              className="text-accent hover:text-foreground"
+            >
+              {t("Add tools")}
+            </button>
+          </p>
+        ) : (
+          <nav className="flex flex-col gap-0.5">
+            {activeAgents.map((agent) => (
+              <div key={agent.name} className="group flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    onFilterChange("all")
+                    onSelectAgent(
+                      selectedAgent === agent.displayName
+                        ? null
+                        : agent.displayName,
+                    )
+                  }}
+                  className={`flex flex-1 min-w-0 items-center justify-between px-2 py-1.5 rounded-md text-[12px] tracking-wide font-medium transition-colors text-left ${
+                    selectedAgent === agent.displayName
+                      ? "bg-surface-hover text-foreground"
+                      : dragOverTarget === `agent:${agent.displayName}`
+                        ? "bg-surface-hover/70 ring-1 ring-accent text-foreground"
+                      : "text-muted hover:text-foreground hover:bg-surface-hover"
+                  }`}
+                  onDragOver={(e) => {
+                    if (!dragSkill) return
+                    e.preventDefault()
+                    onDragEnterTarget(`agent:${agent.displayName}`)
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverTarget === `agent:${agent.displayName}`) onDragEnterTarget(null)
+                  }}
+                  onDrop={(e) => {
+                    if (!dragSkill) return
+                    e.preventDefault()
+                    onDropOnAgent(agent.displayName)
+                  }}
+                >
+                  <AgentLogo name={agent.displayName} shortCode={agent.shortCode} size={14} />
+                  <span className="truncate ml-1.5">{agent.displayName}</span>
+                  <span
+                    className={`text-[10px] font-mono ml-auto ${
+                      selectedAgent === agent.displayName
+                        ? "text-foreground"
+                        : "text-muted"
+                    }`}
+                  >
+                    {agentSkillCounts[agent.displayName] || 0}
+                  </span>
+                </button>
+                <button
+                  onClick={() => onRemoveAgent(agent.name)}
+                  className="hidden group-hover:inline text-[10px] text-muted hover:text-foreground"
+                  title={t("Hide tool")}
+                >
+                  ×
+                </button>
+              </div>
             ))}
           </nav>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="px-3 pt-3 pb-2">
         <div className="flex items-center justify-between px-2 mb-2">
@@ -505,9 +671,6 @@ const SkillListRow = memo(function SkillListRow({
         >
           <StarIcon size={13} filled={isFavorited} />
         </span>
-        <span className="ml-2 flex-shrink-0">
-          <AgentLogoRow agents={skill.agents} size={14} />
-        </span>
       </button>
     </div>
   )
@@ -544,6 +707,7 @@ interface MiddlePanelProps {
   onBulkCreateCollection: () => void
   onBulkDelete: () => void
   listRef: React.RefObject<HTMLDivElement | null>
+  width: number
 }
 
 function MiddlePanel({
@@ -573,6 +737,7 @@ function MiddlePanel({
   onBulkCreateCollection,
   onBulkDelete,
   listRef,
+  width,
 }: MiddlePanelProps) {
   const [showCollectionDropdown, setShowCollectionDropdown] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -619,7 +784,10 @@ function MiddlePanel({
   }, [showCollectionDropdown])
 
   return (
-    <div className="w-72 flex-shrink-0 flex flex-col border-r border-border bg-background relative">
+    <div
+      style={{ width }}
+      className="flex-shrink-0 flex flex-col border-r border-border bg-background relative"
+    >
       {/* Search input */}
       <div className="p-3 border-b border-border">
         <div className="mb-2 flex items-center justify-between">
@@ -984,6 +1152,8 @@ interface RightPanelProps {
   onSkillRemoved: () => void
   onToggleCollection: (collectionName: string, skill: InstalledSkill) => void
   onCreateCollection: () => void
+  /** Display names of registry tools the user has hidden from My Tools. */
+  hiddenToolNames: string[]
 }
 
 function RightPanel({
@@ -996,6 +1166,7 @@ function RightPanel({
   onSkillRemoved,
   onToggleCollection,
   onCreateCollection,
+  hiddenToolNames,
 }: RightPanelProps) {
   const [editMode, setEditMode] = useState(false)
   const [supportingPreview, setSupportingPreview] = useState("")
@@ -1044,6 +1215,13 @@ function RightPanel({
   }, [skill?.path, supportingFiles])
 
   const isLocalSkill = !!(skill?.path)
+
+  // A skill can live in a tool the user has hidden. It still shows here, dimmed,
+  // rather than disappearing from the header — visibility is a display filter.
+  const dimmedAgents = useMemo(() => {
+    if (!skill || hiddenToolNames.length === 0) return []
+    return skill.agents.filter((agent) => hiddenToolNames.includes(agent))
+  }, [skill, hiddenToolNames])
 
   useEffect(() => {
     if (!editMode) return
@@ -1253,7 +1431,11 @@ function RightPanel({
               <p className="text-sm text-muted mb-3">{skill.description}</p>
             )}
             <div className="flex items-center gap-1.5">
-              <AgentLogoRow agents={skill.agents} size={16} />
+              <AgentLogoRow
+                agents={skill.agents}
+                size={16}
+                dimmed={dimmedAgents}
+              />
             </div>
             <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted">
               <span className="rounded border border-border px-2 py-0.5">
@@ -1388,7 +1570,9 @@ function CreateSkillDialog({
 }: {
   open: boolean
   onClose: () => void
-  agents: DetectedAgent[]
+  /** Active tools only. Empty means the user has hidden everything. */
+  agents: AgentInfo[]
+  /** install.defaultAgents already intersected with the active set. */
   defaultTargets: string[]
   onCreate: (data: { name: string; description: string; content: string; targets: string[] }) => void
 }) {
@@ -1406,10 +1590,17 @@ function CreateSkillDialog({
     }
   }, [open, defaultTargets, agents])
 
+  const allSelected = agents.length > 0 && targets.length === agents.length
+  const someSelected = targets.length > 0 && !allSelected
+
   if (!open) return null
 
   const toggleTarget = (name: string) => {
     setTargets((prev) => (prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name]))
+  }
+
+  const toggleAll = () => {
+    setTargets(allSelected ? [] : agents.map((agent) => agent.name))
   }
 
   return (
@@ -1447,24 +1638,47 @@ Add your skill instructions here.`}
           />
           <div>
             <p className="text-[12px] font-medium text-foreground mb-2">{t("Targets")}</p>
-            <div className="grid grid-cols-2 gap-2">
-              {agents.map((agent) => (
-                <label key={agent.name} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-[12px] text-foreground">
+            {agents.length === 0 ? (
+              <p className="text-[11px] text-muted">
+                {t("No tools selected.")}{" "}
+                <a href="#/settings#tools" className="text-accent hover:text-foreground">
+                  {t("Manage tools...")}
+                </a>
+              </p>
+            ) : (
+              <>
+                <label className="mb-2 flex items-center gap-2 rounded-md border border-border px-3 py-2 text-[12px] text-foreground">
                   <input
                     type="checkbox"
-                    checked={targets.includes(agent.name)}
-                    onChange={() => toggleTarget(agent.name)}
+                    checked={allSelected}
+                    ref={(node) => {
+                      if (node) node.indeterminate = someSelected
+                    }}
+                    onChange={toggleAll}
                   />
-                  <span>{agent.displayName}</span>
+                  <span>{t("All my tools")}</span>
+                  <span className="ml-auto text-[10px] text-muted">{agents.length}</span>
                 </label>
-              ))}
-            </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {agents.map((agent) => (
+                    <label key={agent.name} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-[12px] text-foreground">
+                      <input
+                        type="checkbox"
+                        checked={targets.includes(agent.name)}
+                        onChange={() => toggleTarget(agent.name)}
+                      />
+                      <span className="truncate">{agent.displayName}</span>
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
           <div className="flex items-center justify-end gap-2">
             <button onClick={onClose} className="px-4 py-2 text-[12px] text-muted">{t("Cancel")}</button>
             <button
               onClick={() => onCreate({ name: name.trim(), description: description.trim(), content, targets })}
-              disabled={!name.trim()}
+              disabled={!name.trim() || targets.length === 0}
               className="rounded-lg bg-foreground px-4 py-2 text-[12px] text-background disabled:opacity-40"
             >
               {t("Create")}
@@ -1546,7 +1760,13 @@ function CollectionDialog({
 // --------------------------------------------------------------------------
 
 export function Home() {
-  const [agents, setAgents] = useState<DetectedAgent[]>([])
+  const {
+    registry: agentRegistry,
+    activeNames: activeAgentNames,
+    activeAgents,
+    setActive: setActiveAgents,
+  } = useActiveAgents()
+  const [setupBannerDismissed, setSetupBannerDismissed] = useState(true)
   const [skills, setSkills] = useState<InstalledSkill[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -1600,19 +1820,19 @@ export function Home() {
     async function load() {
       try {
         const [
-          detectedAgents,
           installedSkills,
           savedCollections,
           savedDefaultAgents,
           savedFavorites,
+          bannerDismissed,
         ] = await Promise.all([
-          electronAPI.detectAgents(),
           electronAPI.listInstalled(),
           electronAPI.settingsGet("collections.skills", {} as Record<string, string[]>),
           electronAPI.settingsGet("install.defaultAgents", [] as string[]),
           electronAPI.favoritesList(),
+          electronAPI.settingsGet("agents.setupBannerDismissed", false),
         ])
-        setAgents(detectedAgents)
+        setSetupBannerDismissed(Boolean(bannerDismissed))
         setSkills(installedSkills)
         setCollections(savedCollections || {})
         setDefaultAgents(savedDefaultAgents || [])
@@ -1768,10 +1988,63 @@ export function Home() {
     return counts
   }, [collections, skills])
 
-  // Only show agents that actually have skills
-  const agentsWithSkills = useMemo(() => {
-    return agents.filter((a) => (agentSkillCounts[a.displayName] || 0) > 0)
-  }, [agents, agentSkillCounts])
+  // The tools panel and every install picker list the user's active tools,
+  // including ones with no skills yet so they stay drop targets.
+  const hiddenAgents = useMemo(
+    () => agentRegistry.filter((agent) => !activeAgentNames.includes(agent.name)),
+    [agentRegistry, activeAgentNames],
+  )
+
+  const hiddenToolNames = useMemo(
+    () => hiddenAgents.map((agent) => agent.displayName),
+    [hiddenAgents],
+  )
+
+  // Preselection for the New Skill dialog: configured defaults narrowed to the
+  // active set, and every active tool when that leaves nothing.
+  const activeDefaultTargets = useMemo(
+    () => intersectActive(defaultAgents, activeAgentNames),
+    [defaultAgents, activeAgentNames],
+  )
+
+  const handleAddAgent = useCallback(
+    (name: string) => {
+      if (activeAgentNames.includes(name)) return
+      void setActiveAgents([...activeAgentNames, name])
+    },
+    [activeAgentNames, setActiveAgents],
+  )
+
+  const handleRemoveAgent = useCallback(
+    (name: string) => {
+      // Drop the library filter with the tool it points at, in the same commit.
+      // Waiting for the effect below leaves one render where the list is
+      // filtered by a row that is no longer on screen.
+      const removed = agentRegistry.find((agent) => agent.name === name)
+      if (removed && removed.displayName === selectedAgent) {
+        setSelectedAgent(null)
+      }
+      void setActiveAgents(activeAgentNames.filter((item) => item !== name))
+    },
+    [activeAgentNames, agentRegistry, selectedAgent, setActiveAgents],
+  )
+
+  const handleDismissSetupBanner = useCallback(() => {
+    setSetupBannerDismissed(true)
+    void electronAPI.settingsSet("agents.setupBannerDismissed", true)
+  }, [])
+
+  // Backstop for every other route to an inactive filter (Settings, a reset, a
+  // stale selection restored on mount). Deliberately unguarded by
+  // `activeAgents.length`: removing the last tool is exactly the case where the
+  // filter must be cleared, and an empty registry is covered by `agentRegistry`
+  // still being empty while the hook loads.
+  useEffect(() => {
+    if (agentRegistry.length === 0 || !selectedAgent) return
+    if (!activeAgents.some((agent) => agent.displayName === selectedAgent)) {
+      setSelectedAgent(null)
+    }
+  }, [selectedAgent, activeAgents, agentRegistry.length])
 
   // Count favorites that are currently installed (orphan favorites are
   // preserved in the DB but not shown in the sidebar count).
@@ -1944,15 +2217,28 @@ export function Home() {
   }, [dragToast])
 
   const handleCreateSkill = useCallback(async (data: { name: string; description: string; content: string; targets: string[] }) => {
-    await electronAPI.createSkill({
-      name: data.name,
-      description: data.description,
-      content: data.content,
-      agentNames: data.targets,
-    })
-    setShowCreateDialog(false)
-    const installedSkills = await electronAPI.listInstalled()
-    setSkills(installedSkills)
+    try {
+      const created = await electronAPI.createSkill({
+        name: data.name,
+        description: data.description,
+        content: data.content,
+        agentNames: data.targets,
+      })
+      // Main throws when it resolves no targets, but a zero-length `targets`
+      // coming back means the same thing: nothing was written anywhere.
+      if (created.targets.length === 0) {
+        throw new Error("No install targets selected.")
+      }
+      setShowCreateDialog(false)
+      const installedSkills = await electronAPI.listInstalled()
+      setSkills(installedSkills)
+    } catch (err) {
+      console.error("Failed to create skill:", err)
+      setDragToast({
+        type: "error",
+        message: err instanceof Error ? err.message : `Failed to create "${data.name}"`,
+      })
+    }
   }, [])
 
   const handleCollectionDialogSubmit = useCallback((name: string) => {
@@ -2198,13 +2484,22 @@ export function Home() {
     setDragOverTarget(null)
   }, [])
 
+  const toolsPane = useResizablePane("layout.toolsPaneWidth", 192, 160, 320)
+  const libraryPane = useResizablePane("layout.libraryPaneWidth", 288, 220, 560)
+
   return (
     <div className="flex h-full">
       {/* Column 1: Left sidebar (filter panel) */}
       <MemoizedLeftSidebar
+        width={toolsPane.width}
         totalSkillCount={skills.length}
         favoritesCount={installedFavoritesCount}
-        agentsWithSkills={agentsWithSkills}
+        activeAgents={activeAgents}
+        hiddenAgents={hiddenAgents}
+        onAddAgent={handleAddAgent}
+        onRemoveAgent={handleRemoveAgent}
+        showSetupBanner={!setupBannerDismissed}
+        onDismissSetupBanner={handleDismissSetupBanner}
         agentSkillCounts={agentSkillCounts}
         selectedAgent={selectedAgent}
         onSelectAgent={setSelectedAgent}
@@ -2223,9 +2518,15 @@ export function Home() {
         onDropOnAgent={handleDropOnAgent}
         onDropOnCollection={handleDropOnCollection}
       />
+      <PaneResizeHandle
+        label={t("Resize tools pane")}
+        onPointerDown={toolsPane.startResize}
+        onDoubleClick={toolsPane.reset}
+      />
 
       {/* Column 2: Skill list */}
       <MemoizedMiddlePanel
+        width={libraryPane.width}
         loading={loading}
         skills={skills}
         filteredSkills={filteredSkills}
@@ -2253,6 +2554,11 @@ export function Home() {
         onBulkDelete={handleBulkDelete}
         listRef={skillListRef}
       />
+      <PaneResizeHandle
+        label={t("Resize library pane")}
+        onPointerDown={libraryPane.startResize}
+        onDoubleClick={libraryPane.reset}
+      />
 
       {/* Column 3: Skill detail */}
       <MemoizedRightPanel
@@ -2265,13 +2571,14 @@ export function Home() {
         onSkillRemoved={handleSkillRemoved}
         onToggleCollection={handleToggleCollection}
         onCreateCollection={handleCreateCollection}
+        hiddenToolNames={hiddenToolNames}
       />
 
       <CreateSkillDialog
         open={showCreateDialog}
         onClose={() => setShowCreateDialog(false)}
-        agents={agents}
-        defaultTargets={defaultAgents}
+        agents={activeAgents}
+        defaultTargets={activeDefaultTargets}
         onCreate={handleCreateSkill}
       />
 

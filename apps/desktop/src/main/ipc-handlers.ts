@@ -224,7 +224,7 @@ const agentRegistry: Record<string, AgentEntry> = {
     name: "qwenpaw",
     displayName: "QwenPaw",
     shortCode: "QP",
-    globalSkillsDir: path.join(home, ".qwenpaw", "skill_pool", "skills"),
+    globalSkillsDir: path.join(home, ".qwenpaw", "skill_pool"),
     detectInstalled: () => dirExists(path.join(home, ".qwenpaw")),
   },
   zcode: {

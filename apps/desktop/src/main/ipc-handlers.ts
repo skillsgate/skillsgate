@@ -206,6 +206,34 @@ const agentRegistry: Record<string, AgentEntry> = {
     globalSkillsDir: path.join(configHome, "zed", "skills"),
     detectInstalled: () => dirExists(path.join(configHome, "zed")),
   },
+  qoder: {
+    name: "qoder",
+    displayName: "Qoder",
+    shortCode: "QD",
+    globalSkillsDir: path.join(home, ".qoder", "skills"),
+    detectInstalled: () => dirExists(path.join(home, ".qoder")),
+  },
+  "qoder-cn": {
+    name: "qoder-cn",
+    displayName: "Qoder CN",
+    shortCode: "QC",
+    globalSkillsDir: path.join(home, ".qoder-cn", "skills"),
+    detectInstalled: () => dirExists(path.join(home, ".qoder-cn")),
+  },
+  qwenpaw: {
+    name: "qwenpaw",
+    displayName: "QwenPaw",
+    shortCode: "QP",
+    globalSkillsDir: path.join(home, ".qwenpaw", "skill_pool", "skills"),
+    detectInstalled: () => dirExists(path.join(home, ".qwenpaw")),
+  },
+  zcode: {
+    name: "zcode",
+    displayName: "ZCode",
+    shortCode: "ZC",
+    globalSkillsDir: path.join(home, ".zcode", "skills"),
+    detectInstalled: () => dirExists(path.join(home, ".zcode")),
+  },
   universal: {
     name: "universal",
     displayName: "Universal (.agents/skills)",
@@ -294,6 +322,8 @@ const PROJECT_PROBES = [
   { subpath: ".roo-code/skills" },
   { subpath: ".trae/skills" },
   { subpath: ".zed/skills" },
+  { subpath: ".qoder/skills" },
+  { subpath: ".zcode/skills" },
   { subpath: ".agents/skills" },
 ]
 

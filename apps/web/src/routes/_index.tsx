@@ -80,6 +80,10 @@ const AGENTS = [
 	"Roo Code",
 	"Trae",
 	"Zed",
+	"Qoder",
+	"Qoder CN",
+	"QwenPaw",
+	"ZCode",
 ];
 
 const AGENT_LIST = `${AGENTS.slice(0, -1).join(", ")}, and ${AGENTS[AGENTS.length - 1]}`;

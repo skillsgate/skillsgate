@@ -35,6 +35,10 @@ const DISPLAY_NAME_TO_KEY: Record<string, string> = {
   "Roo Code": "roo-code",
   Trae: "trae",
   Zed: "zed",
+  Qoder: "qoder",
+  "Qoder CN": "qoder-cn",
+  QwenPaw: "qwenpaw",
+  ZCode: "zcode",
   "Universal (.agents/skills)": "universal",
 }
 

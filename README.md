@@ -15,7 +15,7 @@
 <p align="center">
   <img src="https://img.shields.io/github/v/release/skillsgate/skillsgate?color=a8a29e&label=release" alt="latest release" />
   <img src="https://img.shields.io/badge/powered_by-skills.sh-a8a29e" alt="powered by skills.sh" />
-  <img src="https://img.shields.io/badge/agents-20-a8a29e" alt="20 agents" />
+  <img src="https://img.shields.io/badge/agents-24-a8a29e" alt="24 agents" />
   <img src="https://img.shields.io/badge/license-MIT-a8a29e" alt="MIT license" />
 </p>
 
@@ -41,7 +41,7 @@ Available as a **desktop app** for macOS, Windows, and Linux.
 
 ## Supported Agents
 
-Claude Code, Cursor, Windsurf, GitHub Copilot, Cline, Continue, Codex CLI, Droid CLI, OB-1, Amp, Goose, Junie, Kilo Code, OpenCode, OpenClaw, Pear AI, Roo Code, Trae, Zed, and Universal.
+Claude Code, Cursor, Windsurf, GitHub Copilot, Cline, Continue, Codex CLI, Droid CLI, OB-1, Amp, Goose, Junie, Kilo Code, OpenCode, OpenClaw, Pear AI, Roo Code, Trae, Zed, Qoder, Qoder CN, QwenPaw, ZCode, and Universal.
 
 ## Features
 

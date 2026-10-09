@@ -27,13 +27,13 @@ export const meta: MetaFunction = () => [
 	{
 		name: "description",
 		content:
-			"Free, open-source desktop app to browse, install, edit, and organize AI agent skills across Claude Code, Cursor, Codex, and 16 more tools. macOS, Windows, Linux.",
+			"Free, open-source desktop app to browse, install, edit, and organize AI agent skills across Claude Code, Cursor, Codex, and 20 more tools. macOS, Windows, Linux.",
 	},
 	{ property: "og:title", content: "SkillsGate" },
 	{
 		property: "og:description",
 		content:
-			"Browse, install, and edit AI agent skills across 19 coding tools. Free and open source for macOS, Windows, and Linux.",
+			"Browse, install, and edit AI agent skills across 23 coding tools. Free and open source for macOS, Windows, and Linux.",
 	},
 	{ property: "og:url", content: "https://skillsgate.ai" },
 	{ property: "og:site_name", content: "SkillsGate" },
@@ -43,7 +43,7 @@ export const meta: MetaFunction = () => [
 	{
 		name: "twitter:description",
 		content:
-			"Browse, install, and edit AI agent skills across 19 coding tools. Free and open source for macOS, Windows, and Linux.",
+			"Browse, install, and edit AI agent skills across 23 coding tools. Free and open source for macOS, Windows, and Linux.",
 	},
 ];
 

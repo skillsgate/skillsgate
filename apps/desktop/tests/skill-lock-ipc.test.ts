@@ -155,6 +155,25 @@ test("skill mutations preflight the lock and preserve supported entries", async 
       )
     }
   }
+  if (process.platform !== "win32" && process.getuid?.() !== 0) {
+    await t.test(
+      "a missing lock in an unwritable parent refuses before skill changes",
+      async () => {
+        await fs.unlink(lockPath)
+        await fs.chmod(agents, 0o500)
+        try {
+          await assert.rejects(
+            call("skills:create", { name: "new", agentNames: ["universal"] }),
+            { code: "EACCES" },
+          )
+          assert.deepEqual(await fs.readdir(canonical), ["kept"])
+        } finally {
+          await fs.chmod(agents, 0o700)
+          await fs.writeFile(lockPath, JSON.stringify(original))
+        }
+      },
+    )
+  }
   await call("skills:create", { name: "new", agentNames: ["universal"] })
   const created = JSON.parse(await fs.readFile(lockPath, "utf-8"))
   assert.deepEqual(created.skills.kept, original.skills.kept)

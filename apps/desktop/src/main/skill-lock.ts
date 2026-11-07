@@ -32,6 +32,24 @@ export async function readSkillLock({
     if (forWrite && (error as NodeJS.ErrnoException).code !== "ENOENT") {
       throw error
     }
+    if (forWrite) {
+      let parent = path.dirname(filePath)
+      while (true) {
+        try {
+          await fs.access(parent, constants.W_OK | constants.X_OK)
+          break
+        } catch (parentError) {
+          const ancestor = path.dirname(parent)
+          if (
+            (parentError as NodeJS.ErrnoException).code !== "ENOENT" ||
+            ancestor === parent
+          ) {
+            throw parentError
+          }
+          parent = ancestor
+        }
+      }
+    }
     return { version: LOCK_FILE_VERSION, skills: {} }
   }
   if (forWrite) await fs.access(filePath, constants.W_OK)

@@ -42,6 +42,20 @@ test("a missing lock permits first installation", async (t) => {
   })
 })
 
+test("missing lock directories permit initialization under a writable ancestor", async (t) => {
+  const filePath = path.join(
+    path.dirname(await fixture(t)),
+    "missing",
+    ".agents",
+    ".skill-lock.json",
+  )
+  assert.deepEqual(await readSkillLock({ forWrite: true, filePath }), {
+    version: 1,
+    skills: {},
+  })
+  await assert.rejects(fs.stat(path.dirname(filePath)), { code: "ENOENT" })
+})
+
 for (const [label, raw] of [
   [
     "unsupported version",

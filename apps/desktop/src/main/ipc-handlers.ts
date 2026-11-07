@@ -5,6 +5,7 @@ import fs from "node:fs/promises"
 import { execFile, spawn } from "node:child_process"
 import matter from "gray-matter"
 import { app } from "electron"
+import { readSkillLock, writeSkillLock, type SkillLockFile } from "./skill-lock"
 import { openDb } from "./db/index"
 import { SettingsStore } from "./db/settings"
 import { RemoteServerStore } from "./db/servers"
@@ -253,44 +254,10 @@ const agentRegistry: Record<string, AgentEntry> = {
 }
 
 // ---------------------------------------------------------------------------
-// Lock file reading (canonical; adapted from vercel-labs/skills, see THIRD_PARTY_NOTICES.md)
+// Canonical skill storage
 // ---------------------------------------------------------------------------
 
-const LOCK_FILE_VERSION = 1
-const LOCK_FILE_PATH = path.join(home, ".agents", ".skill-lock.json")
 const CANONICAL_SKILLS_DIR = path.join(home, ".agents", "skills")
-
-interface SkillLockEntry {
-  source: string
-  sourceType: string
-  originalUrl: string
-  skillFolderHash: string
-  installedAt: string
-  updatedAt: string
-}
-
-interface SkillLockFile {
-  version: number
-  skills: Record<string, SkillLockEntry>
-}
-
-async function readSkillLock(): Promise<SkillLockFile> {
-  try {
-    const raw = await fs.readFile(LOCK_FILE_PATH, "utf-8")
-    const data = JSON.parse(raw) as SkillLockFile
-    if (data.version !== LOCK_FILE_VERSION) {
-      return { version: LOCK_FILE_VERSION, skills: {} }
-    }
-    return data
-  } catch {
-    return { version: LOCK_FILE_VERSION, skills: {} }
-  }
-}
-
-async function writeSkillLock(lock: SkillLockFile): Promise<void> {
-  await fs.mkdir(path.dirname(LOCK_FILE_PATH), { recursive: true })
-  await fs.writeFile(LOCK_FILE_PATH, JSON.stringify(lock, null, 2), "utf-8")
-}
 
 // ---------------------------------------------------------------------------
 // SKILL.md parsing
@@ -1771,6 +1738,8 @@ export function registerIpcHandlers(): void {
         ]
       }
 
+      const lock = await readSkillLock({ forWrite: true })
+
       let sourceDir: string
       let tmpDir: string | null = null
 
@@ -1837,7 +1806,6 @@ export function registerIpcHandlers(): void {
         error?: string
       }> = []
 
-      const lock = await readSkillLock()
       const now = new Date().toISOString()
 
       for (const skill of discovered) {
@@ -2086,6 +2054,8 @@ export function registerIpcHandlers(): void {
         throw new Error(`Skill "${trimmedName}" already exists`)
       }
 
+      const lock = await readSkillLock({ forWrite: true })
+
       // Resolved up front: failing after the canonical dir is written would
       // leave a half-created skill behind.
       const targetAgents = await resolveInstallTargets(data.agentNames ?? [])
@@ -2111,7 +2081,6 @@ Add your skill instructions here.
         await installSkillToAgent(canonicalDir, trimmedName, agent)
       }
 
-      const lock = await readSkillLock()
       const now = new Date().toISOString()
       lock.skills[safeName] = {
         source: canonicalDir,
@@ -2134,6 +2103,7 @@ Add your skill instructions here.
   // Remove a skill from all agents + canonical dir + lock file
   ipcMain.handle("skills:remove", async (_event, name: string) => {
     const safeName = sanitizeName(name)
+    const lock = await readSkillLock({ forWrite: true })
 
     // Remove from all agent directories
     for (const agent of Object.values(agentRegistry)) {
@@ -2159,7 +2129,6 @@ Add your skill instructions here.
     }
 
     // Remove from lock file
-    const lock = await readSkillLock()
     delete lock.skills[safeName]
     await writeSkillLock(lock)
   })
@@ -2167,7 +2136,7 @@ Add your skill instructions here.
   // Update a skill (re-install from source)
   ipcMain.handle("skills:update", async (_event, name: string) => {
     const safeName = sanitizeName(name)
-    const lock = await readSkillLock()
+    const lock = await readSkillLock({ forWrite: true })
     const entry = lock.skills[safeName]
 
     if (!entry?.originalUrl) {

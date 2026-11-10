@@ -16,7 +16,8 @@
     "package:win": "electron-vite build && electron-builder --config electron-builder.yml --win",
     "package:linux": "electron-vite build && electron-builder --config electron-builder.yml --linux",
     "postinstall": "node scripts/postinstall.mjs",
-    "rebuild:native": "electron-rebuild -f -w better-sqlite3"
+    "rebuild:native": "electron-rebuild -f -w better-sqlite3",
+    "test:lock": "node --experimental-strip-types --test tests/skill-lock.test.ts tests/skill-lock-ipc.test.ts"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",

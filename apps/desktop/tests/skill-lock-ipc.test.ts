@@ -38,7 +38,7 @@ test("skill mutations preflight the lock and preserve supported entries", async 
     "./db/servers": `export class RemoteServerStore {}`,
     "./db/skills": `export class RemoteSkillStore {}`,
     "./db/favorites": `export class FavoritesStore {}`,
-    "./db/skills-cache": `export const loadCachedSkills = () => []; export const saveCachedSkills = () => {};`,
+    "./db/skills-cache": `export const loadCachedSkills = () => []; export const loadCachedSkillPaths = () => []; export const saveCachedSkills = () => {};`,
     "./db/trending-cache": `export const loadTrendingCache = () => []; export const saveTrendingCache = () => {};`,
     "./db/ssh": `export const testConnection = () => {}; export const syncRemoteServer = () => {};
       export const readRemoteFile = () => {}; export const writeRemoteFile = () => {};`,

@@ -4,6 +4,16 @@ on:
   push:
     tags:
       - "desktop-v*"
+  # Dry runs: build, sign and package every platform without publishing, so a
+  # change to the release pipeline is tested before a version is spent on it.
+  # Only a desktop-v* tag push creates a GitHub release (see the last step).
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/desktop-publish.yml"
+      - ".github/scripts/merge-mac-manifests.mjs"
+      - "apps/desktop/electron-builder.yml"
+      - "apps/desktop/package.json"
 
 permissions:
   contents: write
@@ -14,16 +24,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macos-15, not macos-26/macos-latest: electron-builder 26.8.1 passes the
-          # certificate password to `security set-key-partition-list -k`, which
-          # expects its temporary keychain's password. macOS 15 accepts that;
-          # macOS 26 rejects it and signing fails. Fixed in electron-builder
-          # 26.16.1 -- upgrade before moving these to macos-26. (macos-14 was
-          # retired on 2026-11-02.)
-          - os: macos-15
+          # Signing on macos-26 needs electron-builder 26.16.1 or later. Older
+          # versions pass the certificate password to
+          # `security set-key-partition-list -k` instead of the temporary
+          # keychain's password, which macOS 26 rejects.
+          - os: macos-26
             platform: mac
             arch: arm64
-          - os: macos-15
+          - os: macos-26
             platform: mac
             arch: x64
           - os: ubuntu-latest
@@ -100,9 +108,19 @@ jobs:
           done
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS code signing
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # macOS code signing. Mac jobs only: electron-builder also signs
+          # Windows builds with CSC_LINK when it is set. Windows does not trust
+          # an Apple Developer ID certificate, and electron-builder writes its
+          # name into the app's update config as the required publisher, so the
+          # Windows app then rejects every update as "not signed by the
+          # application owner".
+          CSC_LINK: ${{ matrix.platform == 'mac' && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.CSC_KEY_PASSWORD || '' }}
+          # electron-builder skips signing on pull request builds unless this is
+          # true, and a dry run that does not sign proves little. Only branches
+          # of this repository get it. Pull requests from forks receive no
+          # secrets, so they could not sign anyway.
+          CSC_FOR_PULL_REQUEST: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
           # macOS notarization
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -178,6 +196,7 @@ jobs:
           MAC_MINIMUM_SYSTEM_VERSION: "21.0.0"
 
       - name: Create GitHub Release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/desktop-v')
         uses: softprops/action-gh-release@v2
         with:
           files: |

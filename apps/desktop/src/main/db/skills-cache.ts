@@ -95,6 +95,21 @@ export function loadCachedSkills(): InstalledSkillWithFolder[] {
 }
 
 /**
+ * Real paths of every cached skill folder. Returns an empty array on error.
+ */
+export function loadCachedSkillPaths(): string[] {
+  try {
+    const db: Database.Database = openDb()
+    const rows = db.prepare("SELECT canonical_path FROM cached_skills").all() as Array<
+      Pick<CachedSkillRow, "canonical_path">
+    >
+    return rows.map((row) => row.canonical_path)
+  } catch {
+    return []
+  }
+}
+
+/**
  * Replace the entire cache with a fresh set of skills.
  * Uses a transaction for atomicity and speed (one disk sync instead of N).
  */

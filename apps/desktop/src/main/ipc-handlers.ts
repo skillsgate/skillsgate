@@ -11,7 +11,7 @@ import { SettingsStore } from "./db/settings"
 import { RemoteServerStore } from "./db/servers"
 import { RemoteSkillStore } from "./db/skills"
 import { FavoritesStore } from "./db/favorites"
-import { loadCachedSkills, saveCachedSkills } from "./db/skills-cache"
+import { loadCachedSkillPaths, loadCachedSkills, saveCachedSkills } from "./db/skills-cache"
 import {
   loadTrendingCache,
   saveTrendingCache,
@@ -446,13 +446,28 @@ function isSkillPathAllowed(resolvedPath: string): boolean {
   try {
     ensureStores()
     const customScanPaths = settingsStore?.get<string[]>(CUSTOM_SCAN_PATHS_KEY, []) ?? []
-    return customScanPaths.some((custom) => {
+    const inScanPath = customScanPaths.some((custom) => {
       const base = path.resolve(custom.replace(/^~(?=$|\/|\\)/, home))
       return resolvedPath === base || resolvedPath.startsWith(base + path.sep)
     })
+    if (inScanPath) return true
   } catch {
-    return false
+    // Fall through to the listed skill folders.
   }
+
+  // The folders of listed skills are allowed wherever they are. A skill folder can
+  // be a symlink to somewhere outside every root above (a dotfiles repo, a shared
+  // checkout), and the scanner lists such a skill under the link's target. Global
+  // skills always carry that real path, and scan-path skills do once they are read
+  // back from the cache, so without this the skill is listed but opening it is
+  // denied. Every scan saves the cache before returning its list, so the cache
+  // holds the folders the renderer can be showing. A filesystem root or the home
+  // folder is never treated as a skill folder.
+  return loadCachedSkillPaths().some((skillPath) => {
+    const base = path.resolve(skillPath)
+    if (base === path.parse(base).root || base === path.resolve(home)) return false
+    return resolvedPath === base || resolvedPath.startsWith(base + path.sep)
+  })
 }
 
 /**

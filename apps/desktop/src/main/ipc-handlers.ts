@@ -1258,7 +1258,7 @@ function parseSource(source: string): ParsedSource | null {
   if (
     source.startsWith("./") ||
     source.startsWith("../") ||
-    source.startsWith("/") ||
+    path.isAbsolute(source) ||
     source.startsWith("~/")
   ) {
     let resolved = source

@@ -591,8 +591,11 @@ async function collectSkillsFromRoot(
     return results
   }
 
+  // Skill folders may be symlinks (a project linking a skill kept elsewhere).
+  // maybeCollectSkillDir follows the link and skips it unless it leads to a
+  // folder with a SKILL.md, so broken links and links to files drop out there.
   for (const entry of rootEntries) {
-    if (!entry.isDirectory()) continue
+    if (!entry.isDirectory() && !entry.isSymbolicLink()) continue
     const full = path.join(resolvedRoot, entry.name)
     await maybeCollectSkillDir(full, scopeHint)
   }
@@ -609,7 +612,7 @@ async function collectSkillsFromRoot(
         continue
       }
       for (const skillEntry of entries) {
-        if (!skillEntry.isDirectory()) continue
+        if (!skillEntry.isDirectory() && !skillEntry.isSymbolicLink()) continue
         await maybeCollectSkillDir(path.join(probeDir, skillEntry.name), "project")
       }
     }
@@ -990,13 +993,10 @@ function getCachedSkillsFingerprint(): string {
   return cachedSkillsFingerprint
 }
 
-function persistCachedSkills(
-  raw: InternalSkill[],
-  preserveCustomScope = false,
-): string {
+function persistCachedSkills(raw: InternalSkill[]): string {
   const fingerprint = createSkillsFingerprint(raw)
   if (fingerprint !== getCachedSkillsFingerprint()) {
-    saveCachedSkills(raw, { preserveCustomScope })
+    saveCachedSkills(raw)
     cachedSkillsFingerprint = fingerprint
   }
   return fingerprint
@@ -1021,7 +1021,7 @@ async function runRescan(
   key: string,
   run: () => Promise<InternalSkill[]>,
   broadcast: boolean,
-  preserveCustomScope = false,
+  preserveScanPathSkills = false,
 ): Promise<Array<Omit<InternalSkill, "folderName">>> {
   const inFlight = rescanInFlight.get(key)
   if (inFlight) {
@@ -1030,21 +1030,28 @@ async function runRescan(
 
   const task = (async () => {
     let raw = await run()
-    // A quick rescan skips the custom paths. Persisting and broadcasting that result
-    // as-is drops the custom-path skills from both the cache and the UI. Merge the
-    // custom entries already in the cache back in first, so the cache, the broadcast
-    // and the return value all stay consistent.
-    if (preserveCustomScope) {
-      const preserved = loadCachedSkills().filter((s) => s.scope === "custom")
-      if (preserved.length > 0) {
-        const seen = new Set(raw.map((s) => s.canonicalPath))
-        raw = raw.concat(
-          (preserved as InternalSkill[]).filter((s) => !seen.has(s.canonicalPath)),
-        )
+    // A quick rescan walks only the tools' global folders, so it can never find a
+    // skill that lives only under a scan path. Those are exactly the entries with no
+    // agents: anything in a tool's folder is listed with that tool. Carry the cached
+    // ones over, or the cache, the broadcast and the return value all lose them.
+    //
+    // This used to match scope === "custom", which missed the skills found in a
+    // project's .claude/skills (or similar) under a scan path: those are scoped
+    // "project", so every quick rescan dropped them right after a full scan listed
+    // them. Entries whose SKILL.md is gone are dropped here rather than lingering
+    // until the next full scan.
+    if (preserveScanPathSkills) {
+      const seen = new Set(raw.map((s) => s.canonicalPath))
+      const carried: InternalSkill[] = []
+      for (const cached of loadCachedSkills() as InternalSkill[]) {
+        if (cached.agents.length > 0 || seen.has(cached.canonicalPath)) continue
+        if (!(await fileExists(path.join(cached.canonicalPath, "SKILL.md")))) continue
+        carried.push(cached)
       }
+      raw = raw.concat(carried)
     }
     clearSupportingFilesCache()
-    const fingerprint = persistCachedSkills(raw, preserveCustomScope)
+    const fingerprint = persistCachedSkills(raw)
     maybeBroadcastSkills(raw, fingerprint, broadcast)
     return toRendererSkills(raw)
   })().finally(() => {
@@ -1091,7 +1098,7 @@ async function rescanAndCache(
       })
     },
     opts.broadcast ?? true,
-    // This pass did not scan the custom paths -> keep the cached custom entries.
+    // This pass did not scan the custom paths -> keep the cached scan-path skills.
     opts.skipCustomPaths === true,
   )
 }
@@ -1112,9 +1119,14 @@ async function rescanSingleSkill(changedPath: string): Promise<void> {
     return
   }
 
-  // Load current cache
+  // Load current cache. Only entries a tool holds can be the one that changed:
+  // this rescan looks in the tools' global folders. A scan-path skill (no agents)
+  // can share the folder name -- a project's own copy of a global skill -- and
+  // matching it here would overwrite or delete it.
   const cached = loadCachedSkills()
-  const existingIdx = cached.findIndex((s) => s.folderName === skillFolderName)
+  const existingIdx = cached.findIndex(
+    (s) => s.folderName === skillFolderName && s.agents.length > 0,
+  )
 
   // Re-scan just this skill across all agents
   const [lock, agentsToScan] = await Promise.all([

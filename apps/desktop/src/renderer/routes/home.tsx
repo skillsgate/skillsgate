@@ -1447,8 +1447,10 @@ function RightPanel({
                   </button>
                 )}
 
-                {/* Delete */}
-                {isLocalSkill && (
+                {/* Delete. Not for a skill found only under a scan path (no
+                    agents): removal works by name in the tools' global folders,
+                    so it would miss this skill and could delete a same-named one. */}
+                {isLocalSkill && skill.agents.length > 0 && (
                   <button
                     onClick={handleDeleteClick}
                     title={t("Remove skill")}
@@ -2412,11 +2414,25 @@ export function Home() {
     setShowBulkDeleteDialog(true)
   }, [])
 
+  // What the bulk dialog will act on: selected skills a tool holds. Skills found
+  // only under a scan path are skipped (see handleBulkDeleteConfirm).
+  const bulkRemovableCount = useMemo(
+    () =>
+      skills.filter((s) => multiSelected.has(s.canonicalPath) && s.agents.length > 0)
+        .length,
+    [skills, multiSelected],
+  )
+
   const handleBulkDeleteConfirm = useCallback(async () => {
-    const pathsToDelete = new Set(multiSelected)
-    const skillNames = skills
-      .filter((s) => pathsToDelete.has(s.canonicalPath))
-      .map((s) => s.name)
+    // removeSkill deletes by name from the tools' global folders. A skill found
+    // only under a scan path (no agents) is not in any of them: calling it would
+    // leave that skill in place and delete an unrelated global skill that shares
+    // its name. Those are skipped; the count in the dialog already excludes them.
+    const deletable = skills.filter(
+      (s) => multiSelected.has(s.canonicalPath) && s.agents.length > 0,
+    )
+    const pathsToDelete = new Set(deletable.map((s) => s.canonicalPath))
+    const skillNames = deletable.map((s) => s.name)
 
     for (const name of skillNames) {
       try {
@@ -2450,9 +2466,11 @@ export function Home() {
     const registryKey =
       DISPLAY_NAME_TO_KEY[selectedAgent] ||
       selectedAgent.toLowerCase().replace(/\s+/g, "-")
+    // Only skills this tool holds; see handleBulkDeleteConfirm for why acting by
+    // name on any other skill can hit an unrelated one.
     const pathsToRemove = new Set(multiSelected)
     const skillNames = skills
-      .filter((s) => pathsToRemove.has(s.canonicalPath))
+      .filter((s) => pathsToRemove.has(s.canonicalPath) && s.agents.includes(selectedAgent))
       .map((s) => s.name)
 
     for (const name of skillNames) {
@@ -2631,7 +2649,7 @@ export function Home() {
 
       {showBulkDeleteDialog && (
         <BulkDeleteDialog
-          count={multiSelected.size}
+          count={bulkRemovableCount}
           selectedAgent={selectedAgent}
           onConfirm={handleBulkDeleteConfirm}
           onRemoveFromAgent={handleBulkRemoveFromAgent}

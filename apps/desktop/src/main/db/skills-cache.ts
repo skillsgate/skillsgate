@@ -98,10 +98,7 @@ export function loadCachedSkills(): InstalledSkillWithFolder[] {
  * Replace the entire cache with a fresh set of skills.
  * Uses a transaction for atomicity and speed (one disk sync instead of N).
  */
-export function saveCachedSkills(
-  skills: InstalledSkillWithFolder[],
-  opts: { preserveCustomScope?: boolean } = {},
-): void {
+export function saveCachedSkills(skills: InstalledSkillWithFolder[]): void {
   const db: Database.Database = openDb()
   const now = new Date().toISOString()
 
@@ -122,15 +119,10 @@ export function saveCachedSkills(
   `)
 
   const txn = db.transaction(() => {
-    // preserveCustomScope: a quick rescan (skipCustomPaths: true) never walks the
-    // custom scan paths. Deleting the whole table would then let a result set that
-    // does not contain them silently wipe them out -- which shows up as "I configured
-    // scan.customPaths but those skills are not in the list".
-    if (opts.preserveCustomScope) {
-      db.prepare("DELETE FROM cached_skills WHERE scope != 'custom'").run()
-    } else {
-      db.prepare("DELETE FROM cached_skills").run()
-    }
+    // Callers pass the complete list. A quick rescan, which never walks the scan
+    // paths, merges the cached scan-path skills into its result before saving
+    // (see runRescan), so replacing the whole table cannot wipe them out.
+    db.prepare("DELETE FROM cached_skills").run()
 
     for (const skill of skills) {
       insert.run(

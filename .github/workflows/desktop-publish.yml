@@ -24,16 +24,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macos-15, not macos-26/macos-latest: electron-builder 26.8.1 passes the
-          # certificate password to `security set-key-partition-list -k`, which
-          # expects its temporary keychain's password. macOS 15 accepts that;
-          # macOS 26 rejects it and signing fails. Fixed in electron-builder
-          # 26.16.1 -- upgrade before moving these to macos-26. (macos-14 was
-          # retired on 2026-11-02.)
-          - os: macos-15
+          # Signing on macos-26 needs electron-builder 26.16.1 or later. Older
+          # versions pass the certificate password to
+          # `security set-key-partition-list -k` instead of the temporary
+          # keychain's password, which macOS 26 rejects.
+          - os: macos-26
             platform: mac
             arch: arm64
-          - os: macos-15
+          - os: macos-26
             platform: mac
             arch: x64
           - os: ubuntu-latest

@@ -46,7 +46,7 @@
     "@types/react-window": "^1.8.8",
     "@vitejs/plugin-react": "4.7.0",
     "electron": "42.11.3",
-    "electron-builder": "26.8.1",
+    "electron-builder": "26.18.1",
     "electron-vite": "3.1.0",
     "tailwindcss": "4.2.2",
     "typescript": "5.9.3",

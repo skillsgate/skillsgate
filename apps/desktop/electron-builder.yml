@@ -45,6 +45,12 @@ linux:
     - AppImage
     - deb
   category: Development
+  # Without this the Linux executable is named after the npm package
+  # (@skillsgate/desktop -> "@skillsgatedesktop"), which electron-builder 26.15
+  # and later reject. On upgrade, the old deb's postrm removes the
+  # /usr/bin/@skillsgatedesktop link and AppArmor profile, and the new postinst
+  # installs these under the new name.
+  executableName: skillsgate
   artifactName: "SkillsGate-${version}-${arch}.${ext}"
 
 publish:

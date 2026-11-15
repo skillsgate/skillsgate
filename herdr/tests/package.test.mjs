@@ -15,6 +15,172 @@ test("registry matches the desktop app", () => {
   assert.equal(TOOLS.at(-1).name, UNIVERSAL);
 });
 
+// ---- The registry's folders, read from the desktop app's source ----
+//
+// The desktop app writes each tool's folders as TypeScript:
+//   globalSkillsDir: path.join(home, ".cursor", "skills"),
+//   detectInstalled: () => dirExists(path.join(home, ".cursor")),
+// This reads those expressions and writes them as the `sh` expressions the
+// registry uses. It knows only the shapes the app uses today and throws on any
+// other, so a new shape fails the test instead of being skipped.
+
+// The expression's tokens: names (dotted), strings, and punctuation.
+function tokens(text) {
+  const out = [];
+  const re = /\s+|\/\/[^\n]*|("(?:[^"\\]|\\.)*")|([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)|(\|\||=>|[(),])|(.)/g;
+  for (const m of text.matchAll(re)) {
+    if (m[1]) out.push({ type: "string", value: JSON.parse(m[1]) });
+    else if (m[2]) out.push({ type: "name", value: m[2] });
+    else if (m[3]) out.push({ type: "punct", value: m[3] });
+    else if (m[4]) throw new Error(`unexpected "${m[4]}" in: ${text}`);
+  }
+  return out;
+}
+
+// Reads one TypeScript expression from `text` and returns what `read(p)` makes
+// of it, where `p` gives the parse steps below; throws unless every token is used.
+function parse(text, read) {
+  const list = tokens(text);
+  let i = 0;
+  const p = {
+    // Whether the next token is this name or punctuation (never a string).
+    peek: (value) => list[i] !== undefined && list[i].type !== "string" && list[i].value === value,
+    type: () => list[i]?.type,
+    take(value) {
+      if (!p.peek(value)) throw new Error(`expected "${value}" at "${list[i]?.value}" in: ${text}`);
+      i++;
+    },
+    next(type) {
+      if (list[i]?.type !== type) throw new Error(`expected a ${type} at "${list[i]?.value}" in: ${text}`);
+      return list[i++].value;
+    },
+  };
+  const value = read(p);
+  if (i !== list.length) throw new Error(`unread "${list[i].value}" in: ${text}`);
+  return value;
+}
+
+// A path expression as `sh`: path.join(a, "b") is a/b, `process.env.X || e` is
+// ${X:-e}, and a name is what `names` maps it to.
+function shPath(p, names) {
+  let left;
+  if (p.peek("path.join")) {
+    p.take("path.join");
+    p.take("(");
+    const parts = [shPath(p, names)];
+    while (p.peek(",")) {
+      p.take(",");
+      if (p.peek(")")) break; // a trailing comma
+      parts.push(shPath(p, names));
+    }
+    p.take(")");
+    left = parts.join("/");
+  } else if (p.peek("(")) {
+    p.take("(");
+    left = shPath(p, names);
+    p.take(")");
+  } else if (p.type() === "string") {
+    left = p.next("string");
+  } else {
+    const name = p.next("name");
+    if (name.startsWith("process.env.")) {
+      const variable = name.slice("process.env.".length);
+      if (!/^[A-Z_][A-Z0-9_]*$/.test(variable) || !p.peek("||")) throw new Error(`process.env.${variable} without a fallback`);
+      p.take("||");
+      return `\${${variable}:-${shPath(p, names)}}`;
+    }
+    if (!Object.hasOwn(names, name)) throw new Error(`unknown name "${name}"`);
+    left = names[name];
+  }
+  if (p.peek("||")) throw new Error("|| after something other than process.env");
+  return left;
+}
+
+// detectInstalled as a list of `sh` folders: one dirExists, several awaited
+// dirExists joined by ||, or `async () => true` (always present: $HOME).
+function shDetect(p, names) {
+  const isAsync = p.peek("async");
+  if (isAsync) p.take("async");
+  p.take("(");
+  p.take(")");
+  p.take("=>");
+  if (isAsync && p.peek("true")) {
+    p.take("true");
+    return ["$HOME"];
+  }
+  const one = () => {
+    p.take("dirExists");
+    p.take("(");
+    const dir = shPath(p, names);
+    p.take(")");
+    return dir;
+  };
+  if (!isAsync) return [one()];
+  const dirs = [];
+  do {
+    if (dirs.length) p.take("||");
+    p.take("(");
+    p.take("await");
+    dirs.push(one());
+    p.take(")");
+  } while (p.peek("||"));
+  return dirs;
+}
+
+// The desktop app's registry as `{ name, dir, detect }`, in order, with its
+// folder names (home, configHome, ...) read from their definitions.
+function desktopFolders(src) {
+  if (!/\nconst home = os\.homedir\(\)\n/.test(src)) throw new Error("home is not os.homedir()");
+  const names = { home: "$HOME" };
+  for (const name of ["configHome", "factoryHome", "ob1Home"]) {
+    const m = new RegExp(`\\nconst ${name} = ([^\\n]+)\\n`).exec(src);
+    if (!m) throw new Error(`no definition of ${name}`);
+    names[name] = parse(m[1], (p) => shPath(p, names));
+  }
+  const block = src.slice(src.indexOf("const agentRegistry"), src.indexOf("// Canonical skill storage"));
+  const entry = /\n {2}(?:"[^"]+"|[A-Za-z][\w-]*): \{\n {4}name: "([^"]+)",\n {4}displayName: "[^"]+",\n {4}shortCode: "[^"]+",\n {4}globalSkillsDir: ([\s\S]*?),\n {4}detectInstalled: ([\s\S]*?),?\n {2}\},/g;
+  const tools = [...block.matchAll(entry)].map(([, name, dir, detect]) => ({
+    name,
+    dir: parse(dir, (p) => shPath(p, names)),
+    detect: parse(detect, (p) => shDetect(p, names)),
+  }));
+  // Every entry was read: an entry of any other shape fails here.
+  const keys = [...block.matchAll(/\n {4}name: "/g)].length;
+  if (tools.length !== keys) throw new Error(`read ${tools.length} of ${keys} entries`);
+  return tools;
+}
+
+test("the registry's folders and detect folders match the desktop app's, for every tool", () => {
+  const desktop = desktopFolders(readFileSync("apps/desktop/src/main/ipc-handlers.ts", "utf8"));
+  assert.equal(desktop.length, 25);
+  assert.deepEqual(
+    TOOLS.map(({ name, dir, detect }) => ({ name, dir, detect })),
+    desktop,
+  );
+});
+test("the folder comparison catches a changed folder and fails on a shape it does not know", () => {
+  const src = readFileSync("apps/desktop/src/main/ipc-handlers.ts", "utf8");
+  const mine = (from, to) => {
+    assert.ok(src.includes(from), from);
+    return src.replace(from, to);
+  };
+  const compare = (text) => assert.deepEqual(TOOLS.map(({ name, dir, detect }) => ({ name, dir, detect })), desktopFolders(text));
+  // A different folder or detect folder no longer matches.
+  assert.throws(() => compare(mine('path.join(home, ".cursor", "skills")', 'path.join(home, ".cursor", "skillz")')), /skillz/);
+  assert.throws(() => compare(mine('dirExists(path.join(home, ".amp"))', 'dirExists(path.join(home, ".ampx"))')), /ampx/);
+  assert.throws(() => compare(mine('const configHome = process.env.XDG_CONFIG_HOME || path.join(home, ".config")', 'const configHome = path.join(home, ".cfg")')), /\.cfg/);
+  // Shapes the reader does not know: each throws, nothing is skipped.
+  for (const [from, to] of [
+    ['globalSkillsDir: path.join(home, ".cline", "skills")', 'globalSkillsDir: resolveHome(".cline", "skills")'],
+    ['detectInstalled: () => dirExists(path.join(home, ".trae"))', 'detectInstalled: () => fileExists(path.join(home, ".trae"))'],
+    ['detectInstalled: () => dirExists(path.join(home, ".zcode"))', 'detectInstalled: () => dirExists(path.join(home, ".zcode")) && true'],
+    ['shortCode: "GO",\n', 'shortCode: "GO",\n    hidden: true,\n'],
+    ['path.join(home, ".junie", "skills")', 'path.join(os.tmpdir(), ".junie", "skills")'],
+  ]) {
+    assert.throws(() => desktopFolders(mine(from, to)), Error, to);
+  }
+});
+
 test("tool folders that are not $HOME/.<name>/skills", () => {
   const dir = (n) => TOOLS.find((t) => t.name === n).dir;
   assert.equal(dir("claude-code"), "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills");

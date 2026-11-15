@@ -387,7 +387,11 @@ test("a request with an unknown op or a malformed shape is refused without touch
     { id: "19", op: "install", on: null, source: "acme/skills", skillId: "alpha", name: "alpha", tools: "claude-code" },
     { id: "20", op: "install", on: null, source: "acme/skills", skillId: "alpha", name: "alpha", tools: [7] },
     { id: "21", op: "install", on: null, source: "acme/skills", skillId: "alpha", name: "alpha", tools: [""] },
-    { id: "22", op: "install", on: "", source: "acme/skills", skillId: "alpha", name: "alpha", tools: [] },
+    { id: "22", op: "install", on: "", source: "acme/skills", skillId: "alpha", name: "alpha", tools: [], replace: false },
+    // install: what the dialog showed (replace) is missing or not a boolean
+    { id: "23", op: "install", on: null, source: "acme/skills", skillId: "alpha", name: "alpha", tools: [] },
+    { id: "24", op: "install", on: null, source: "acme/skills", skillId: "alpha", name: "alpha", tools: [], replace: "false" },
+    { id: "25", op: "install", on: null, source: "acme/skills", skillId: "alpha", name: "alpha", tools: [], replace: null },
   ];
   for (const req of bad) {
     assert.equal(await runRequest(req, s.deps), null, JSON.stringify(req));
@@ -435,7 +439,7 @@ test("remove acts on the skill the request names and no other", async () => {
 
 const withGit = { skip: hasGit ? false : "git is not installed on this computer" };
 const lockEntry = (h, folder) => JSON.parse(fs.readFileSync(h.path(".agents/.skill-lock.json"), "utf8")).skills[folder];
-const install = (skillId, extra = {}) => ({ id: "i", op: "install", on: null, source: "acme/skills", skillId, name: skillId, tools: [], ...extra });
+const install = (skillId, extra = {}) => ({ id: "i", op: "install", on: null, source: "acme/skills", skillId, name: skillId, tools: [], replace: false, ...extra });
 
 test("a first install says Installed, and the folder, links and lock entry exist", withGit, async () => {
   const s = setup({ files: {} });
@@ -461,7 +465,7 @@ test("a second install of the same skill says Updated", withGit, async () => {
   const s = setup({ files: {} });
   await runRequest(install("beta"), s.deps);
   assert.deepEqual(notice(s.channel), { kind: "done", text: "Installed beta" });
-  await runRequest(install("beta"), s.deps);
+  await runRequest(install("beta", { replace: true }), s.deps);
   assert.deepEqual(notice(s.channel), { kind: "done", text: "Updated beta" });
   assert.deepEqual(s.claims.map((c) => c.text), ["Installing beta…", "Installing beta…"]);
   assert.equal(exists(s.h.path(".agents/skills/beta/SKILL.md")), true);
@@ -471,7 +475,7 @@ test("a second install of the same skill says Updated", withGit, async () => {
 
 test("Updated means the shared store had the folder; a folder inside one tool does not count", withGit, async () => {
   const s = setup(); // the fixture's shared store has alpha
-  await runRequest(install("alpha", { name: "Alpha Skill" }), s.deps);
+  await runRequest(install("alpha", { name: "Alpha Skill", replace: true }), s.deps);
   assert.deepEqual(notice(s.channel), { kind: "done", text: "Updated Alpha Skill" });
   const t = setup({ files: { ".claude/skills/beta/SKILL.md": SKILL("mine") } });
   await runRequest(install("beta"), t.deps);
@@ -499,6 +503,47 @@ test("a skill the repo does not have says the not-found error and changes nothin
   assert.equal(exists(s.h.path(".agents/.skill-lock.json")), false);
   assert.equal(s.channel.busyAt(null), false);
   assert.equal(s.channel.rev(null), 1);
+});
+
+// The dialog showed Install or Update from its own scan; under the lock the
+// fresh scan must agree, or nothing runs.
+test("an install the dialog showed as new is refused when the skill appeared since, and nothing runs", withGit, async () => {
+  const s = setup(); // the fixture's shared store has alpha, which the dialog did not see
+  const before = fs.readdirSync(s.h.path(".agents/skills/alpha")).sort();
+  assert.equal(await runRequest(install("alpha", { tools: ["cursor"] }), s.deps), null);
+  assert.deepEqual(notice(s.channel), {
+    kind: "error",
+    text: "The shared store on this computer changed after the dialog was opened. Open alpha again.",
+  });
+  assert.deepEqual(s.during, [], "no install ran");
+  assert.equal(s.calls.length, 1, "only the fresh scan ran on the machine");
+  assert.deepEqual(fs.readdirSync(s.h.path(".agents/skills/alpha")).sort(), before);
+  assert.equal(fs.readFileSync(s.h.path(".agents/skills/alpha/SKILL.md"), "utf8"), SKILL("alpha"));
+  assert.equal(exists(s.h.path(".cursor/skills/alpha")), false);
+  assert.equal(exists(s.h.path(".agents/.skill-lock.json")), false);
+  assert.equal(s.channel.busyAt(null), false);
+  assert.equal(s.channel.rev(null), 1, "an open dialog reads the store again");
+});
+test("an install the dialog showed as an update is refused when the skill is gone since, and nothing runs", withGit, async () => {
+  const s = setup({ files: {} });
+  assert.equal(await runRequest(install("beta", { on: "vps", name: "Beta", replace: true }), s.deps), null);
+  assert.deepEqual(notice(s.channel), {
+    kind: "error",
+    text: "The shared store on vps changed after the dialog was opened. Open Beta again.",
+  });
+  assert.deepEqual(s.during, []);
+  assert.equal(s.calls.length, 1);
+  assert.equal(exists(s.h.path(".agents/skills/beta")), false);
+  assert.equal(s.channel.busyAt("vps"), false);
+});
+test("an install over a folder that is not a shared-store skill is refused by the script and changes nothing", withGit, async () => {
+  const files = { ".agents/skills/beta/notes.txt": "mine", ".agents/skills/beta/sub/SKILL.md": SKILL("sub") };
+  const s = setup({ files });
+  assert.deepEqual(await runRequest(install("beta"), s.deps), { ok: false, error: '"beta" already exists in the shared store on this computer and was not replaced' });
+  assert.deepEqual(notice(s.channel), { kind: "error", text: '"beta" already exists in the shared store on this computer and was not replaced' });
+  assert.equal(fs.readFileSync(s.h.path(".agents/skills/beta/notes.txt"), "utf8"), "mine");
+  assert.equal(fs.readFileSync(s.h.path(".agents/skills/beta/sub/SKILL.md"), "utf8"), SKILL("sub"));
+  assert.deepEqual(fs.readdirSync(s.h.path(".agents/skills")), ["beta"]);
 });
 
 test("an install whose lock file can't be rewritten says so as a warning", withGit, async () => {

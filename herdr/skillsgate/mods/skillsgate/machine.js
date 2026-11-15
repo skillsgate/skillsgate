@@ -121,11 +121,15 @@ export function createMachine({
   }
 
   // Installs a skill from a GitHub repository into the shared store, adds it to
-  // the chosen tools, and records its source in the lock file. `onStep()`, if
-  // given, is called before each step that runs on the machine after the copy
-  // (each link, the lock read, the lock write): the request loop refreshes the
-  // machine's lock with it. A throwing onStep does not stop the install.
-  async function install(on, scanResult, { source, skillId, tools: toolNames = [], onStep }) {
+  // the chosen tools, and records its source in the lock file. `replace` is
+  // what the person was shown: true for an update of the shared-store skill of
+  // that folder, false for a new install. The script replaces nothing else: a
+  // new install refuses anything at all at that folder, and an update refuses
+  // anything but a real skill folder there. `onStep()`, if given, is called
+  // before each step that runs on the machine after the copy (each link, the
+  // lock read, the lock write): the request loop refreshes the machine's lock
+  // with it. A throwing onStep does not stop the install.
+  async function install(on, scanResult, { source, skillId, tools: toolNames = [], replace, onStep }) {
     const step = () => {
       try {
         onStep?.();
@@ -134,7 +138,7 @@ export function createMachine({
       }
     };
     const folder = sanitizeName(skillId);
-    if (!validSource(source) || !validSkillId(skillId) || unsafeFolder(folder)) {
+    if (!validSource(source) || !validSkillId(skillId) || unsafeFolder(folder) || typeof replace !== "boolean") {
       return { ok: false, error: `Can't install "${skillId}" from ${source}` };
     }
     const gitMissing = { ok: false, error: `git is not installed on ${machineInSentence(on)}` };
@@ -142,8 +146,9 @@ export function createMachine({
     const store = scanResult.tools.find((t) => t.name === UNIVERSAL)?.dir;
     if (!store) return { ok: false, error: `Could not find the shared skills folder on ${machineInSentence(on)}` };
 
-    const r = await exec(INSTALL, [cloneUrl(source), skillId, store, folder], on, INSTALL_TIMEOUT_MS);
+    const r = await exec(INSTALL, [cloneUrl(source), skillId, store, folder, replace ? "replace" : "new"], on, INSTALL_TIMEOUT_MS);
     if (r.code === 127) return gitMissing;
+    if (r.code === 3) return { ok: false, error: `"${folder}" already exists in the shared store on ${machineInSentence(on)} and was not replaced` };
     if (r.code === 2) return { ok: false, error: `Could not download ${source}` };
     if (r.code === 5) return { ok: false, error: `Could not find "${skillId}" in ${source}` };
     if (r.code === 7) return { ok: false, error: `"${skillId}" in ${source} contains symbolic links and was not installed` };

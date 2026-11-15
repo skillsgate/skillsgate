@@ -8,7 +8,8 @@
 // operation acts on the disk as it is now and not on an older scan (a machine
 // that can't be read runs nothing); find what it acts on in that scan (a skill
 // by `key`, or for an install whether its folder is already in the shared
-// store); refresh the lock and run the operation; release the lock (also when
+// store, which must be what the dialog showed: Update or Install); refresh the
+// lock and run the operation; release the lock (also when
 // the operation throws); re-scan; raise the machine's revision so open dialogs
 // read again; and say the outcome as a notice.
 //
@@ -68,25 +69,27 @@ const OPS = {
     running: (s, r) => `Installing ${s.name}${where(r.on)}…`,
     done: (s) => `${s.updating ? "Updated" : "Installed"} ${s.name}`,
     run: (machine, r, scan, _s, touch) =>
-      machine.install(r.on, scan, { source: r.source, skillId: r.skillId, tools: r.tools, onStep: touch }),
+      machine.install(r.on, scan, { source: r.source, skillId: r.skillId, tools: r.tools, replace: r.replace, onStep: touch }),
   },
 };
 
 // The request in the shape the ops read, or null when it is not one this
 // module runs. `on` is null for this computer or a machine's name; "" would
 // share this computer's lock key while naming another machine, so it is
-// refused. An install's source and skill id must pass the catalog's checks and
-// its tools must be a list of names; its `name` is only shown (the skill id
-// stands in for a missing one).
+// refused. An install's source and skill id must pass the catalog's checks,
+// its tools must be a list of names, and `replace` must say what the dialog
+// showed (true: Update, false: Install); its `name` is only shown (the skill
+// id stands in for a missing one).
 function readRequest(req) {
   if (!isRecord(req) || typeof req.op !== "string" || !Object.hasOwn(OPS, req.op)) return null;
   const op = OPS[req.op];
   const on = req.on === undefined ? null : req.on;
   if (on !== null && !filled(on)) return null;
   if (op === OPS.install) {
-    const { source, skillId, tools } = req;
+    const { source, skillId, tools, replace } = req;
     if (!validSource(source) || !validSkillId(skillId) || !Array.isArray(tools) || !tools.every(filled)) return null;
-    return { op, on, source, skillId, tools: [...tools], name: filled(req.name) ? req.name : skillId };
+    if (typeof replace !== "boolean") return null;
+    return { op, on, source, skillId, tools: [...tools], replace, name: filled(req.name) ? req.name : skillId };
   }
   if (!filled(req.key)) return null;
   if (op.tool && !filled(req.tool)) return null;
@@ -116,6 +119,11 @@ function freshSubject(r, skills) {
   if (r.op === OPS.install) return { name: r.name, updating: inStore(skills, r.skillId) };
   return skills.find((s) => s.key === r.key) ?? null;
 }
+
+// An install whose dialog showed Install while the fresh scan has that folder
+// in the shared store, or Update while it has not: the person was shown
+// something else, so nothing runs.
+const staleInstall = (on, name) => `The shared store on ${machineInSentence(on)} changed after the dialog was opened. Open ${name} again.`;
 
 // A scan Result that never rejects.
 async function scanNow(scan, on) {
@@ -150,6 +158,8 @@ export async function runRequest(req, { channel, machine, known, scan = (on) => 
       const subject = freshSubject(r, Array.isArray(fresh.skills) ? fresh.skills : []);
       if (!subject) {
         outcome = { gone: true };
+      } else if (op === OPS.install && subject.updating !== r.replace) {
+        outcome = { stale: true };
       } else {
         touch(); // the scan may have taken a while
         let result;
@@ -172,6 +182,11 @@ export async function runRequest(req, { channel, machine, known, scan = (on) => 
   if (outcome.gone) {
     channel.say("error", `That skill is no longer on ${machineInSentence(on)}.`);
     channel.bump(on); // a dialog that still shows it reads again and closes
+    return null;
+  }
+  if (outcome.stale) {
+    channel.say("error", staleInstall(on, r.name));
+    channel.bump(on); // an open dialog reads the store again
     return null;
   }
   const { subject, result } = outcome;

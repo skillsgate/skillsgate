@@ -543,27 +543,36 @@ test("installAction: the primary button's label and why it is disabled", () => {
   const read = { scan: dialogScan, skills: [sk("alpha", "store", ["universal"])] };
   const pdfInStore = [sk("pdf", "store", ["universal"])];
   const replaces = "pdf is already in the shared store. Installing replaces it.";
-  assert.deepEqual(installAction({ on: null, row, read, busy: null }), { label: "Install on this computer", reason: null, working: false, note: null });
+  assert.deepEqual(installAction({ on: null, row, read, busy: null }), { label: "Install on this computer", reason: null, working: false, note: null, replace: false });
   assert.deepEqual(installAction({ on: "vps", row, read: { ...read, skills: pdfInStore }, busy: null }), {
     label: "Update on vps",
     reason: null,
     working: false,
     note: replaces,
+    replace: true,
   });
   assert.equal(installAction({ on: null, row, read: { ...read, skills: [sk("pdf", "tool", ["claude-code"])] }, busy: null }).label, "Install on this computer");
   // Disabled, with the reason beside it.
-  assert.deepEqual(installAction({ on: null, row, read: {}, busy: null }), { label: "Install on this computer", reason: "Checking this computer…", working: true, note: null });
+  assert.deepEqual(installAction({ on: null, row, read: {}, busy: null }), {
+    label: "Install on this computer",
+    reason: "Checking this computer…",
+    working: true,
+    note: null,
+    replace: false,
+  });
   assert.deepEqual(installAction({ on: "vps", row, read: { error: "machine vps is unreachable" }, busy: null }), {
     label: "Install on vps",
     reason: "Can't check vps: machine vps is unreachable",
     working: false,
     note: null,
+    replace: false,
   });
   assert.deepEqual(installAction({ on: "vps", row, read: { ...read, scan: { ...dialogScan, git: false } }, busy: null }), {
     label: "Install on vps",
     reason: "git is not installed on vps",
     working: false,
     note: null,
+    replace: false,
   });
   assert.equal(installAction({ on: null, row, read: { ...read, scan: { ...dialogScan, git: false } }, busy: null }).reason, "git is not installed on this computer");
   assert.deepEqual(installAction({ on: "vps", row, read: { ...read, skills: pdfInStore }, busy: "Installing pdf on vps…" }), {
@@ -571,6 +580,7 @@ test("installAction: the primary button's label and why it is disabled", () => {
     reason: "Installing pdf on vps…",
     working: true,
     note: replaces,
+    replace: true,
   });
   assert.equal(installAction({ on: null, row: { ...row, installable: false }, read, busy: null }).reason, "This skill can't be installed");
 });
@@ -588,6 +598,19 @@ test("installAction says what an install replaces when the shared store has the 
   // Not known before the dialog's scan; never for a skill that can't be installed.
   assert.equal(installAction({ on: null, row: row("pdf"), read: {}, busy: null }).note, null);
   assert.equal(installAction({ on: null, row: row("pdf", false), read: read([sk("pdf", "store", ["universal"])]), busy: null }).note, null);
+});
+test("installAction: the label, the replace line and the request's replace are one decision", () => {
+  const read = (skills) => ({ scan: dialogScan, skills });
+  const row = { source: "a/b", skillId: "My-Skill", installable: true };
+  const stores = [[], [sk("my-skill", "store", ["universal"])], [sk("my-skill", "tool", ["claude-code"])], [sk("My-Skill", "store", ["universal"])]];
+  for (const skills of stores) {
+    const a = installAction({ on: null, row, read: read(skills), busy: null });
+    assert.equal(a.label.startsWith("Update"), a.replace, JSON.stringify(skills));
+    assert.equal(a.note !== null, a.replace, JSON.stringify(skills));
+  }
+  // A folder that differs only in case is not the one an install makes: Install, not Update.
+  assert.equal(installAction({ on: null, row, read: read(stores[3]), busy: null }).replace, false);
+  assert.equal(installAction({ on: null, row, read: read(stores[1]), busy: null }).replace, true);
 });
 test("searchErrorText: a failed request can't reach skills.sh; a status keeps its text", () => {
   assert.equal(searchErrorText("skills.sh search failed (HTTP 404)"), "skills.sh search failed (HTTP 404)");

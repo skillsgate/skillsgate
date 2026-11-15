@@ -170,10 +170,9 @@ fi
 exit 0
 `;
 
-// INSTALL <clone URL> <skill id> <store folder> <folder name>
+// INSTALL <clone URL> <skill id> <store folder> <folder name> <new|replace>
 // Clones the repository into a temp folder, finds the skill, and copies it to
-// `<store>/<folder name>`, replacing a folder that is already there. Prints the
-// installed folder.
+// `<dest>` = `<store>/<folder name>`. Prints the installed folder.
 // Every value is checked before anything is touched; a bad one exits 64:
 //   - the URL starts with https:// or file:/// (never an option or a git
 //     transport such as ext::);
@@ -181,8 +180,18 @@ exit 0
 //     start with "." or "-";
 //   - the store is an absolute path;
 //   - the folder name is not empty, ".", "..", does not contain "/" and does not
-//     start with "." or "-". So `rm -rf` below can only reach a direct child of
-//     the store.
+//     start with "." or "-", so `<dest>` is a direct child of the store;
+//   - the last argument is `new` or `replace`: what the caller was shown.
+//
+// What it replaces. Nothing but what the caller said, checked before anything
+// is made and again just before the swap; otherwise it exits 3 and `<dest>`
+// is left as it was:
+//   - `new`: nothing at all may be at `<dest>`: no folder, file, link or
+//     dangling link (on a disk that ignores case, no name that differs only in
+//     case either);
+//   - `replace`: `<dest>` must be a real folder, not a link, listed under exactly
+//     that name, holding a regular SKILL.md.
+//
 // Where the skill is looked for, first match wins: skills/<id>,
 // skills/.curated/<id>, skills/.experimental/<id>, <id>, then any
 // <dir>/<id>/SKILL.md, then any SKILL.md whose frontmatter has `name: <id>`,
@@ -190,22 +199,36 @@ exit 0
 // folder with pwd -P and requires the clone's real root or a real path inside
 // it (a path with a newline in it, or ending in "." or "..", is refused) before
 // it reads or copies anything. A SKILL.md counts only as a regular file, never
-// as a symlink. A repository's symlinks are never followed or installed: if the
-// copy holds any, the install stops with exit 7. The skill folder itself may be
-// a link to a folder inside the clone; it is resolved and copied by content.
-// The copy is made in `<store>/.skillsgate-new.<folder name>`, checked, and only
-// then does it replace `<dest>`. That name is hidden (a scan skips it) and no
-// valid folder name starts with ".", so it never equals a real skill's folder.
-// A stale one left by a killed run is removed before the copy. A failure
-// anywhere removes the staging folder and the temp folder and leaves `<dest>`
-// as it was.
-// Exit: 0 installed; 1 failed; 64 bad arguments; 127 no git; 2 the clone
-// failed; 5 the skill is not in the repository; 7 the skill holds symbolic links.
+// as a symlink. A repository's symlinks are never followed (`cp -RP`) or
+// installed: if the copy holds any, or the walk that looks for them fails, the
+// install stops (exit 7, or 1). The skill folder itself may be a link to a
+// folder inside the clone; it is resolved and copied by content.
+//
+// The swap. The copy is made in `<staging>/new`, where `<staging>` is
+// `<store>/.skillsgate-new.<folder name>` (hidden, so a scan skips it, and no
+// valid folder name starts with ".", so it never equals a real skill's
+// folder). With `replace` the old `<dest>` is renamed to `<staging>/old`; then
+// `<staging>/new` is renamed to `<dest>`. Renames in one folder, so nothing is
+// copied or deleted at `<dest>`, and at every moment the old copy or the new
+// one is whole. If the last rename fails, or the script is stopped (HUP, INT,
+// TERM) between the two, the old copy is renamed back. The old copy is removed
+// only with the staging folder, and only once the new copy is in place: when
+// the new copy is not in place, the old copy is renamed back if nothing is at
+// `<dest>`, and otherwise (or if that rename fails) the staging folder is
+// kept. A staging folder left by a run that was killed outright is settled
+// the same way at the start of the next install of that folder, then removed;
+// one that can't be settled or removed stops the install (exit 1).
+// The last check and the rename are two steps: something made at `<dest>` in
+// that instant would receive the copy inside it; nothing is deleted either way.
+//
+// Exit: 0 installed; 1 failed; 2 the clone failed; 3 `<dest>` is not what the
+// caller said (nothing changed); 5 the skill is not in the repository; 7 the
+// skill holds symbolic links; 64 bad arguments; 127 no git.
 //
 // `rm -rf` runs only on: the temp folder this script made with mktemp -d (its
-// name is checked); `<store>/.skillsgate-new.<folder>` and the `.git` inside
-// it; and `<store>/<folder>`, once the folder name has passed the checks above.
-// A symlink at `<dest>` is removed with `rm -f`, never followed.
+// name is checked); `<store>/.skillsgate-new.<folder>` (with the replaced copy
+// in it, once the new copy is in place) and the `.git` inside its copy. Never
+// on `<dest>`.
 export const INSTALL = String.raw`unset CDPATH
 PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"
 export PATH
@@ -213,25 +236,80 @@ GIT_TERMINAL_PROMPT=0
 GIT_ALLOW_PROTOCOL=https:file
 export GIT_TERMINAL_PROMPT GIT_ALLOW_PROTOCOL
 bad() { printf 'Bad arguments\n' >&2; exit 64; }
-[ "$#" -ge 4 ] || bad
+taken() { printf 'The destination is not what the install was told to expect\n' >&2; exit 3; }
+[ "$#" -ge 5 ] || bad
 url=$1
 id=$2
 store=$3
 folder=$4
+mode=$5
 case "$url" in https://?*|file:///?*) ;; *) bad ;; esac
 case "$id" in ""|.*|-*|*[!A-Za-z0-9._-]*) bad ;; esac
 case "$store" in /?*) ;; *) bad ;; esac
 case "$folder" in ""|.|..|.*|-*|*/*) bad ;; esac
+case "$mode" in new|replace) ;; *) bad ;; esac
 command -v git >/dev/null 2>&1 || { printf 'git is not installed\n' >&2; exit 127; }
+
+# regular <file>: a regular file that is not a symlink.
+regular() {
+  [ -f "$1" ] && [ ! -L "$1" ]
+}
+# listed <folder> <name>: the folder lists an entry of exactly this name (a disk
+# that ignores case lets [ -d ] find a name that differs in case).
+listed() {
+  for e in "$1"/*; do
+    case "$e" in */"$2") return 0 ;; esac
+  done
+  return 1
+}
+# expected: <dest> is what the caller said it is (see the header).
+expected() {
+  if [ "$mode" = new ]; then
+    [ ! -e "$dest" ] && [ ! -L "$dest" ]
+  else
+    [ -d "$dest" ] && [ ! -L "$dest" ] && regular "$dest/SKILL.md" && listed "$realstore" "$folder"
+  fi
+}
+# settle <staging folder>: succeeds when the staging folder may be removed.
+# A swap that stopped half way (the old copy in it and nothing at <dest>) is
+# undone first; the old copy otherwise goes only once the new one is in place.
+settle() {
+  [ -d "$1/old" ] && [ ! -L "$1/old" ] || return 0
+  if [ ! -e "$dest" ] && [ ! -L "$dest" ]; then
+    mv -- "$1/old" "$dest"
+    return
+  fi
+  [ ! -e "$1/new" ] && [ ! -L "$1/new" ]
+}
 
 tmp=
 staged=
+dest=
+realstore=
 cleanup() {
   case "$tmp" in */skillsgate-herdr.??????) rm -rf -- "$tmp" ;; esac
-  case "$staged" in /?*/.skillsgate-new.?*) rm -rf -- "$staged" ;; esac
+  case "$staged" in /?*/.skillsgate-new.?*) settle "$staged" && rm -rf -- "$staged" ;; esac
 }
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
+
+# The destination, before anything is made: a staging folder left by a killed
+# run is settled and removed, then <dest> must be what the caller said.
+if [ -d "$store" ]; then
+  realstore=$(cd -P -- "$store" && pwd -P) || exit 1
+  case "$realstore" in /?*) ;; *) bad ;; esac
+  dest="$realstore/$folder"
+  stage="$realstore/.skillsgate-new.$folder"
+  if [ -e "$stage" ] || [ -L "$stage" ]; then
+    if [ -d "$stage" ] && [ ! -L "$stage" ]; then
+      settle "$stage" || { printf 'An earlier install left %s with a copy in it\n' "$stage" >&2; exit 1; }
+    fi
+    rm -rf -- "$stage" || { printf 'Could not remove %s, left by an earlier install\n' "$stage" >&2; exit 1; }
+  fi
+  expected || taken
+elif [ "$mode" = replace ]; then
+  taken
+fi
 
 tmpbase=$TMPDIR
 case "$tmpbase" in /?*) ;; *) tmpbase=/tmp ;; esac
@@ -257,10 +335,6 @@ inside() {
   case "$here" in */.|*/..) return 1 ;; esac
   case "$here" in "$root"|"$root"/*) return 0 ;; esac
   return 1
-}
-# regular <file>: a regular file that is not a symlink.
-regular() {
-  [ -f "$1" ] && [ ! -L "$1" ]
 }
 # try <dir>: sets src when <dir> is inside the clone and holds a regular SKILL.md.
 try() {
@@ -321,25 +395,27 @@ mkdir -p -- "$store" || exit 1
 realstore=$(cd -P -- "$store" && pwd -P) || exit 1
 case "$realstore" in /?*) ;; *) bad ;; esac
 dest="$realstore/$folder"
-new="$realstore/.skillsgate-new.$folder"
-if [ -e "$new" ] || [ -L "$new" ]; then rm -rf -- "$new" || exit 1; fi
-mkdir -- "$new" || exit 1
-staged=$new
-cp -R -- "$src"/. "$new"/ || exit 1
-rm -rf -- "$new/.git"
-regular "$new/SKILL.md" || { printf 'The copy has no SKILL.md\n' >&2; exit 1; }
-# A repository's symbolic links are never installed.
-if [ -n "$(find "$new" -type l -print | head -n 1)" ]; then
+stage="$realstore/.skillsgate-new.$folder"
+# A staging folder that is there now belongs to another run: leave it alone.
+mkdir -- "$stage" || exit 1
+staged=$stage
+mkdir -- "$stage/new" || exit 1
+cp -RP -- "$src"/. "$stage/new"/ || exit 1
+rm -rf -- "$stage/new/.git"
+regular "$stage/new/SKILL.md" || { printf 'The copy has no SKILL.md\n' >&2; exit 1; }
+# A repository's symbolic links are never installed, and a walk that fails is
+# a failed install.
+find "$stage/new" -type l -print > "$tmp/links" || { printf 'Could not check the copy for symbolic links\n' >&2; exit 1; }
+if [ -s "$tmp/links" ]; then
   printf 'The skill contains symbolic links\n' >&2
   exit 7
 fi
-if [ -L "$dest" ]; then
-  rm -f -- "$dest" || exit 1
-elif [ -e "$dest" ]; then
-  rm -rf -- "$dest" || exit 1
+# The swap (see the header), after checking <dest> once more.
+expected || taken
+if [ "$mode" = replace ]; then
+  mv -- "$dest" "$stage/old" || exit 1
 fi
-mv -- "$new" "$dest" || exit 1
-staged=
+mv -- "$stage/new" "$dest" || exit 1
 printf '%s\n' "$dest"
 exit 0
 `;

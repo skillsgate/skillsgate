@@ -88,7 +88,37 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
     }
   };
   const lockOf = (h) => JSON.parse(read(h.path(".agents/.skill-lock.json")));
-  const installed = (id, tools = []) => ({ source: SOURCE, skillId: id, tools });
+  // `replace` is what the dialog showed: Update (true) or Install (false).
+  const installed = (id, tools = [], replace = false) => ({ source: SOURCE, skillId: id, tools, replace });
+  const updated = (id, tools = []) => installed(id, tools, true);
+  // Every entry under `dir`, in order: its path and its text, its link target, or "dir".
+  const snapshot = (dir) => {
+    const out = [];
+    const into = (rel) => {
+      for (const name of fs.readdirSync(path.join(dir, rel)).sort()) {
+        const r = path.join(rel, name);
+        const st = fs.lstatSync(path.join(dir, r));
+        if (st.isSymbolicLink()) out.push([r, "link", fs.readlinkSync(path.join(dir, r))]);
+        else if (st.isDirectory()) {
+          out.push([r, "dir"]);
+          into(r);
+        } else out.push([r, "file", fs.readFileSync(path.join(dir, r), "utf8")]);
+      }
+    };
+    into("");
+    return out;
+  };
+  const NOT_REPLACED = (folder, where = "this computer") => ({
+    ok: false,
+    error: `"${folder}" already exists in the shared store on ${where} and was not replaced`,
+  });
+  // Whether the disk under `dir` ignores case (macOS by default).
+  const ignoresCase = (dir) => {
+    fs.writeFileSync(path.join(dir, "CaseProbe"), "");
+    const ignores = fs.existsSync(path.join(dir, "caseprobe"));
+    fs.rmSync(path.join(dir, "CaseProbe"));
+    return ignores;
+  };
 
   it("install copies the skill, links it and records the source", async () => {
     const { h, m, r, leftovers } = await setup();
@@ -246,7 +276,7 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
     for (const [label, files] of Object.entries(variants)) {
       const s = await setup({ ".agents/skills/alpha/SKILL.md": SKILL("old"), ".agents/skills/alpha/old.txt": "old" }, fromRepo(buildRepo(files)));
       assert.deepEqual(
-        await s.m.install(null, s.r.scan, installed("alpha")),
+        await s.m.install(null, s.r.scan, updated("alpha")),
         { ok: false, error: '"alpha" in acme/skills contains symbolic links and was not installed' },
         label,
       );
@@ -278,7 +308,7 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
       ".agents/skills/alpha/old.txt": "old",
       ".agents/.skill-lock.json": JSON.stringify(lock),
     });
-    assert.deepEqual(await m.install(null, r.scan, installed("alpha")), { ok: true, folder: "alpha" });
+    assert.deepEqual(await m.install(null, r.scan, updated("alpha")), { ok: true, folder: "alpha" });
     assert.equal(exists(h.path(".agents/skills/alpha/old.txt")), false);
     assert.equal(read(h.path(".agents/skills/alpha/extra.txt")), "extra");
     assert.equal(lockOf(h).skills.alpha.installedAt, "2026-01-01T00:00:00.000Z");
@@ -286,6 +316,176 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
     assert.equal(lockOf(h).skills.alpha.source, SOURCE);
     assert.deepEqual(lockOf(h).skills.keep, { source: "k/k" });
     assert.deepEqual(leftovers(), []);
+  });
+  // ---- An install replaces only what the dialog said it would ----
+
+  // A store that holds `files`, a repo with skills/<id>, and an install the
+  // dialog showed as `replace`. Returns the result; every file in the home must
+  // be as it was, and nothing may be left in TMPDIR or the store.
+  async function refusedInstall(files, id, replace = false) {
+    const s = await setup(files, fromRepo(buildRepo({ [`skills/${id}/SKILL.md`]: SKILL(id), [`skills/${id}/new.txt`]: "new" })));
+    const before = snapshot(s.h.path(""));
+    const result = await s.m.install(null, s.r.scan, installed(id, ["claude-code"], replace));
+    assert.deepEqual(snapshot(s.h.path("")), before, "every file is as it was");
+    assert.deepEqual(s.leftovers(), []);
+    return { ...s, result };
+  }
+  it("an install the dialog showed as new refuses a grouping folder of that name and changes nothing", async () => {
+    const files = {
+      ".agents/skills/tools/one/SKILL.md": SKILL("one"),
+      ".agents/skills/tools/two/SKILL.md": SKILL("two"),
+      ".agents/skills/tools/notes.txt": "my notes",
+      ".claude/skills/one": { link: "../../.agents/skills/tools/one" },
+    };
+    const { h, result } = await refusedInstall(files, "tools");
+    assert.deepEqual(result, NOT_REPLACED("tools"));
+    assert.equal(read(h.path(".claude/skills/one/SKILL.md")), SKILL("one"), "the tool's link still leads to the skill");
+  });
+  it("an install the dialog showed as new refuses a folder without SKILL.md and changes nothing", async () => {
+    const files = { ".agents/skills/drafts/wip/notes.md": "half-written", ".agents/skills/drafts/idea.txt": "idea" };
+    assert.deepEqual((await refusedInstall(files, "drafts")).result, NOT_REPLACED("drafts"));
+  });
+  it("an install the dialog showed as new refuses a file, a link and a dangling link of that name", async () => {
+    for (const value of ["a file", { link: "../../elsewhere" }, { link: "../../ext/mine" }]) {
+      const files = { ".agents/skills/alpha": value, "ext/mine/SKILL.md": SKILL("mine") };
+      assert.deepEqual((await refusedInstall(files, "alpha")).result, NOT_REPLACED("alpha"), JSON.stringify(value));
+    }
+  });
+  it("an install the dialog showed as new never replaces a folder that differs only in case", async () => {
+    const files = { ".agents/skills/Alpha/SKILL.md": SKILL("mine"), ".agents/skills/Alpha/mine.txt": "mine" };
+    const s = await setup(files, fromRepo(buildRepo({ "skills/Alpha/SKILL.md": SKILL("Alpha"), "skills/Alpha/new.txt": "new" })));
+    const result = await s.m.install(null, s.r.scan, installed("Alpha"));
+    assert.equal(read(s.h.path(".agents/skills/Alpha/mine.txt")), "mine");
+    assert.equal(read(s.h.path(".agents/skills/Alpha/SKILL.md")), SKILL("mine"));
+    assert.deepEqual(s.leftovers(), []);
+    if (ignoresCase(s.h.path(""))) {
+      // `alpha` is the same entry as `Alpha` here: refused, and nothing changed.
+      assert.deepEqual(result, NOT_REPLACED("alpha"));
+      assert.deepEqual(fs.readdirSync(s.h.path(".agents/skills")), ["Alpha"]);
+      assert.equal(exists(s.h.path(".agents/.skill-lock.json")), false);
+    } else {
+      // Two different folders: `alpha` is new and `Alpha` is left alone.
+      assert.deepEqual(result, { ok: true, folder: "alpha" });
+      assert.deepEqual(fs.readdirSync(s.h.path(".agents/skills")).sort(), ["Alpha", "alpha"]);
+      assert.equal(read(s.h.path(".agents/skills/alpha/new.txt")), "new");
+    }
+  });
+  it("an install the dialog showed as an update refuses anything but a real skill folder", async () => {
+    const cases = {
+      "nothing there": {},
+      "a link to a skill elsewhere": { ".agents/skills/alpha": { link: "../../ext/alpha" }, "ext/alpha/SKILL.md": SKILL("mine") },
+      "a folder without SKILL.md": { ".agents/skills/alpha/notes.txt": "notes" },
+      "a SKILL.md that is a link": { ".agents/skills/alpha/SKILL.md": { link: "../../../ext/SKILL.md" }, "ext/SKILL.md": SKILL("mine") },
+      "a file": { ".agents/skills/alpha": "a file" },
+    };
+    for (const [label, files] of Object.entries(cases)) {
+      assert.deepEqual((await refusedInstall(files, "alpha", true)).result, NOT_REPLACED("alpha"), label);
+    }
+  });
+  it("the refusal names a remote machine in its sentence", async () => {
+    const { h } = await setup({ ".agents/skills/alpha/notes.txt": "notes" });
+    const m = createMachine({ exec: (script, args, _on, ms) => h.exec(script, args, null, ms), readText: h.readText, ...sources() });
+    const scan = (await m.scan(null)).scan;
+    assert.deepEqual(await m.install("remote-box", scan, installed("alpha")), NOT_REPLACED("alpha", "remote-box"));
+  });
+  it("an update whose old copy can't be fully removed puts the new copy in place and never half-deletes it there", async () => {
+    const s = await setup({ ".agents/skills/alpha/SKILL.md": SKILL("old"), ".agents/skills/alpha/keep/data.txt": "data", ".agents/skills/alpha/old.txt": "old" });
+    fs.chmodSync(s.h.path(".agents/skills/alpha/keep"), 0o555);
+    try {
+      assert.deepEqual(await s.m.install(null, s.r.scan, updated("alpha")), { ok: true, folder: "alpha" });
+      // The new copy, whole; nothing of the old one at the destination.
+      assert.deepEqual(fs.readdirSync(s.h.path(".agents/skills/alpha")).sort(), ["SKILL.md", "extra.txt"]);
+      assert.equal(read(s.h.path(".agents/skills/alpha/SKILL.md")), SKILL("alpha"));
+      assert.deepEqual(s.leftovers(), []);
+      const staging = s.h.path(".agents/skills/.skillsgate-new.alpha");
+      if (process.getuid?.() === 0) {
+        assert.equal(exists(staging), false, "root removes everything");
+      } else {
+        // The old copy was moved aside whole before anything was removed, so
+        // what could not be removed is inside the staging folder.
+        assert.deepEqual(snapshot(staging).filter(([, type]) => type === "file"), [[path.join("old", "keep", "data.txt"), "file", "data"]]);
+        // The next install of that skill says what is in the way.
+        const again = await s.m.install(null, (await s.m.scan(null)).scan, updated("alpha"));
+        assert.equal(again.ok, false);
+        assert.match(again.error, /^Could not remove .+\.skillsgate-new\.alpha, left by an earlier install$/);
+        assert.equal(read(s.h.path(".agents/skills/alpha/SKILL.md")), SKILL("alpha"));
+      }
+    } finally {
+      // Writable again wherever the folder ended up, so the temp home can be removed.
+      for (const rel of [".agents/skills/alpha/keep", ".agents/skills/.skillsgate-new.alpha/old/keep"]) {
+        try {
+          fs.chmodSync(s.h.path(rel), 0o755);
+        } catch {
+          // not there
+        }
+      }
+    }
+  });
+  it("an update whose last move fails puts the old copy back whole", async () => {
+    const { h, tmp, leftovers } = await setup({ ".agents/skills/alpha/SKILL.md": SKILL("old"), ".agents/skills/alpha/old.txt": "old", ".agents/skills/alpha/deep/er.txt": "er" });
+    const before = snapshot(h.path(""));
+    // An `mv` that refuses to move the new copy into place, first on the PATH.
+    const shim = path.join(tmp, "shim");
+    fs.mkdirSync(shim);
+    const realMv = execFileSync("sh", ["-c", "command -v mv"], { encoding: "utf8" }).trim();
+    fs.writeFileSync(
+      path.join(shim, "mv"),
+      `#!/bin/sh\nfor a in "$@"; do src=$prev; prev=$a; done\ncase "$src" in */.skillsgate-new.*/new) exit 1 ;; esac\nexec ${realMv} "$@"\n`,
+      { mode: 0o755 },
+    );
+    const env = { HOME: h.path(""), PATH: shim + ":" + process.env.PATH, TMPDIR: tmp };
+    const r = await run(INSTALL, ["file://" + repo, "alpha", h.path(".agents/skills"), "alpha", "replace"], env);
+    assert.equal(r.code, 1, r.stderr);
+    assert.equal(r.stdout, "");
+    assert.deepEqual(snapshot(h.path("")), before, "the old copy is back, whole, and nothing else is left");
+    assert.deepEqual(leftovers(), []);
+  });
+  it("a staging folder left half way through a swap gives the old copy back", async () => {
+    // A run killed after it moved the old copy aside and before the new one went in.
+    const s = await setup({
+      ".agents/skills/.skillsgate-new.alpha/old/SKILL.md": SKILL("old"),
+      ".agents/skills/.skillsgate-new.alpha/old/mine.txt": "mine",
+      ".agents/skills/.skillsgate-new.alpha/new/SKILL.md": SKILL("half"),
+    });
+    // The panel saw no alpha, so the dialog showed Install; the old copy is back
+    // first, so the install refuses to replace it.
+    assert.deepEqual(await s.m.install(null, s.r.scan, installed("alpha")), NOT_REPLACED("alpha"));
+    assert.deepEqual(fs.readdirSync(s.h.path(".agents/skills")), ["alpha"]);
+    assert.equal(read(s.h.path(".agents/skills/alpha/mine.txt")), "mine");
+    assert.equal(read(s.h.path(".agents/skills/alpha/SKILL.md")), SKILL("old"));
+  });
+  it("a staging folder left after a finished swap is removed and the update goes on", async () => {
+    const s = await setup({
+      ".agents/skills/.skillsgate-new.alpha/old/SKILL.md": SKILL("older"),
+      ".agents/skills/alpha/SKILL.md": SKILL("old"),
+    });
+    assert.deepEqual(await s.m.install(null, s.r.scan, updated("alpha")), { ok: true, folder: "alpha" });
+    assert.deepEqual(fs.readdirSync(s.h.path(".agents/skills")), ["alpha"]);
+    assert.equal(read(s.h.path(".agents/skills/alpha/extra.txt")), "extra");
+  });
+  it("a failed walk for symbolic links is a failed install", async () => {
+    const { h, tmp, leftovers } = await setup({ ".agents/skills/alpha/SKILL.md": SKILL("old") });
+    const before = snapshot(h.path(""));
+    // A `find` that fails when asked for links, first on the PATH.
+    const shim = path.join(tmp, "shim");
+    fs.mkdirSync(shim);
+    const realFind = execFileSync("sh", ["-c", "command -v find"], { encoding: "utf8" }).trim();
+    fs.writeFileSync(path.join(shim, "find"), `#!/bin/sh\ncase " $* " in *" -type l "*) exit 1 ;; esac\nexec ${realFind} "$@"\n`, { mode: 0o755 });
+    const env = { HOME: h.path(""), PATH: shim + ":" + process.env.PATH, TMPDIR: tmp };
+    const r = await run(INSTALL, ["file://" + repo, "alpha", h.path(".agents/skills"), "alpha", "replace"], env);
+    assert.equal(r.code, 1);
+    assert.match(r.stderr, /Could not check the copy for symbolic links\n$/);
+    assert.deepEqual(snapshot(h.path("")), before);
+    assert.deepEqual(leftovers(), []);
+  });
+  it("the INSTALL script copies with cp -RP, so links are never followed", () => {
+    assert.match(INSTALL, /\bcp -RP -- "\$src"\/\. /);
+    assert.doesNotMatch(INSTALL, /\bcp -R -- /);
+  });
+  it("the INSTALL script has no rm -rf of the destination", () => {
+    for (const line of INSTALL.split("\n").filter((l) => /\brm -rf\b/.test(l))) {
+      assert.doesNotMatch(line, /\$dest\b/, line);
+    }
   });
   it("install leaves an invalid lock untouched and warns", async () => {
     const { h, m, r } = await setup({ ".agents/.skill-lock.json": "{nope" });
@@ -318,6 +518,11 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
     }
     assert.deepEqual(await m.install(null, r.scan, { source: "a b/c", skillId: "x", tools: [] }), { ok: false, error: `Can't install "x" from a b/c` });
     assert.deepEqual(await m.install(null, r.scan, { source: "-x/y", skillId: "x", tools: [] }), { ok: false, error: `Can't install "x" from -x/y` });
+    // What the dialog showed must come with it: replace is true or false.
+    for (const replace of [undefined, null, "true", 1]) {
+      const bad = { source: SOURCE, skillId: "alpha", tools: [], replace };
+      assert.deepEqual(await m.install(null, r.scan, bad), { ok: false, error: `Can't install "alpha" from acme/skills` }, String(replace));
+    }
     assert.equal(calls.length, before);
   });
   it("install refuses when git is missing without running anything", async () => {
@@ -435,7 +640,7 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
     fs.mkdirSync(shim);
     fs.writeFileSync(path.join(shim, "cp"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
     const env = { HOME: h.path(""), PATH: shim + ":" + process.env.PATH, TMPDIR: tmp };
-    const r = await run(INSTALL, ["file://" + repo, "alpha", h.path(".agents/skills"), "alpha"], env);
+    const r = await run(INSTALL, ["file://" + repo, "alpha", h.path(".agents/skills"), "alpha", "replace"], env);
     assert.notEqual(r.code, 0);
     assert.equal(r.stdout, "");
     assert.equal(read(h.path(".agents/skills/alpha/SKILL.md")), SKILL("old"));
@@ -445,7 +650,7 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
   });
   it("an install that fails leaves the existing folder's files exactly as they were", async () => {
     const { h, m, r, leftovers } = await setup({ ".agents/skills/nope/SKILL.md": SKILL("mine"), ".agents/skills/nope/notes.txt": "keep" });
-    assert.equal((await m.install(null, r.scan, installed("nope"))).ok, false);
+    assert.equal((await m.install(null, r.scan, updated("nope"))).ok, false);
     assert.equal(read(h.path(".agents/skills/nope/SKILL.md")), SKILL("mine"));
     assert.equal(read(h.path(".agents/skills/nope/notes.txt")), "keep");
     assert.deepEqual(fs.readdirSync(h.path(".agents/skills")), ["nope"]);
@@ -457,7 +662,7 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
       ".agents/skills/alpha.new/SKILL.md": SKILL("a skill of its own"),
       ".agents/skills/alpha.new/own.txt": "mine",
     });
-    assert.deepEqual(await m.install(null, r.scan, installed("alpha")), { ok: true, folder: "alpha" });
+    assert.deepEqual(await m.install(null, r.scan, updated("alpha")), { ok: true, folder: "alpha" });
     assert.equal(read(h.path(".agents/skills/alpha.new/SKILL.md")), SKILL("a skill of its own"));
     assert.equal(read(h.path(".agents/skills/alpha.new/own.txt")), "mine");
     assert.equal(read(h.path(".agents/skills/alpha/extra.txt")), "extra");
@@ -494,23 +699,29 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
     const store = h.path(".agents/skills");
     const url = "file://" + repo;
     const cases = [
-      [url, "alpha", store, ""],
-      [url, "alpha", store, "."],
-      [url, "alpha", store, ".."],
-      [url, "alpha", store, "a/b"],
-      [url, "alpha", store, "../precious"],
-      [url, "alpha", store, ".hidden"],
-      [url, "alpha", store, "-x"],
-      [url, "alpha", "", "alpha"],
-      [url, "alpha", "relative/skills", "alpha"],
-      [url, "", store, "alpha"],
-      [url, "a/b", store, "alpha"],
-      [url, "..", store, "alpha"],
-      [url, "-x", store, "alpha"],
-      [url, "a b", store, "alpha"],
-      ["", "alpha", store, "alpha"],
-      ["ext::sh -c touch pwned", "alpha", store, "alpha"],
-      ["--upload-pack=x", "alpha", store, "alpha"],
+      [url, "alpha", store, "", "new"],
+      [url, "alpha", store, ".", "new"],
+      [url, "alpha", store, "..", "new"],
+      [url, "alpha", store, "a/b", "new"],
+      [url, "alpha", store, "../precious", "replace"],
+      [url, "alpha", store, ".hidden", "new"],
+      [url, "alpha", store, "-x", "new"],
+      [url, "alpha", "", "alpha", "new"],
+      [url, "alpha", "relative/skills", "alpha", "new"],
+      [url, "", store, "alpha", "new"],
+      [url, "a/b", store, "alpha", "new"],
+      [url, "..", store, "alpha", "new"],
+      [url, "-x", store, "alpha", "new"],
+      [url, "a b", store, "alpha", "new"],
+      ["", "alpha", store, "alpha", "new"],
+      ["ext::sh -c touch pwned", "alpha", store, "alpha", "new"],
+      ["--upload-pack=x", "alpha", store, "alpha", "new"],
+      // what the caller expects at the destination: only `new` or `replace`
+      [url, "precious", store, "precious"],
+      [url, "precious", store, "precious", ""],
+      [url, "precious", store, "precious", "NEW"],
+      [url, "precious", store, "precious", "update"],
+      [url, "precious", store, "precious", "replace "],
       [url, "alpha", store],
       [],
     ];
@@ -526,7 +737,7 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
   it("the INSTALL script prints the installed folder and takes a store that does not exist yet", async () => {
     const { h, tmp } = await setup();
     const env = { HOME: h.path(""), PATH: process.env.PATH, TMPDIR: tmp };
-    const r = await run(INSTALL, ["file://" + repo, "beta", h.path("deep/er/skills"), "beta"], env);
+    const r = await run(INSTALL, ["file://" + repo, "beta", h.path("deep/er/skills"), "beta", "new"], env);
     assert.equal(r.code, 0, r.stderr);
     assert.equal(r.stdout, h.home + "/deep/er/skills/beta\n"); // the real path
     assert.equal(exists(h.path("deep/er/skills/beta/SKILL.md")), true);
@@ -538,7 +749,7 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
     const { h, tmp } = await setup();
     const bin = path.join(tmp, "empty-bin");
     fs.mkdirSync(bin);
-    const r = await run(INSTALL, ["file://" + repo, "beta", h.path(".agents/skills"), "beta"], { HOME: h.path(""), PATH: bin, TMPDIR: tmp });
+    const r = await run(INSTALL, ["file://" + repo, "beta", h.path(".agents/skills"), "beta", "new"], { HOME: h.path(""), PATH: bin, TMPDIR: tmp });
     assert.equal(r.code, 127);
     assert.equal(exists(h.path(".agents")), false);
   });

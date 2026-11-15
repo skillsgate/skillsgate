@@ -115,15 +115,18 @@ export default class CatalogDialog {
   }
 
   // Remembers the checked tools for this machine, hands the install to the
-  // panel and closes. Only the tools the checklist lists are sent.
+  // panel and closes. Only the tools the checklist lists are sent, and
+  // `replace` is the decision that drew the button's label and the replace
+  // line.
   install() {
-    if (this.action().reason) return;
+    const action = this.action();
+    if (action.reason) return;
     const tools = checklist(this.seen.scan, this.checked)
       .filter((r) => r.checked)
       .map((r) => r.name);
     setShared(TARGETS, withTargets(shared(TARGETS), this.on, tools));
     const { source, skillId, name } = this.row;
-    channel.request({ op: "install", on: this.on, source, skillId, name, tools });
+    channel.request({ op: "install", on: this.on, source, skillId, name, tools, replace: action.replace });
     this.close();
   }
 

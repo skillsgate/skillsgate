@@ -477,18 +477,20 @@ export function storeNote(scan) {
 
 // The catalog dialog's primary button: its label, why it is disabled (null
 // when it is not), whether that is work in progress (`working`, drawn with a
-// spinner), and `note`: the line saying the install replaces a folder already
-// in the shared store, or null. The match is by folder name only, so the copy
-// replaced may be the person's own; the label alone does not say so.
-// `read` is the dialog's own scan of the machine: `{ scan, skills }` once one
-// worked, `{ error }` when the first failed, `{}` while it runs. `busy` is the
-// machine's lock text, or null.
+// spinner), `note`: the line saying the install replaces a folder already in
+// the shared store, or null, and `replace`: what the install request says the
+// person was shown. The label, the note and `replace` come from one decision,
+// so the request never replaces what the dialog did not say it would. The
+// match is by folder name only, so the copy replaced may be the person's own;
+// the label alone does not say so. `read` is the dialog's own scan of the
+// machine: `{ scan, skills }` once one worked, `{ error }` when the first
+// failed, `{}` while it runs. `busy` is the machine's lock text, or null.
 export function installAction({ on, row, read, busy }) {
   const where = inSentence(on);
   const updating = inStore(read.skills, row.skillId);
   const label = `${updating ? "Update" : "Install"} on ${where}`;
   const note = row.installable && updating ? `${sanitizeName(row.skillId)} is already in the shared store. Installing replaces it.` : null;
-  const off = (reason, working = false) => ({ label, reason, working, note });
+  const off = (reason, working = false) => ({ label, reason, working, note, replace: updating });
   if (!row.installable) return off("This skill can't be installed");
   if (!read.scan) return read.error ? off(cantCheckText(on, read.error)) : off(`Checking ${where}…`, true);
   if (!read.scan.git) return off(`git is not installed on ${where}`);

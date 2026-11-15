@@ -187,8 +187,12 @@ exit 0
 // skills/.curated/<id>, skills/.experimental/<id>, <id>, then any
 // <dir>/<id>/SKILL.md, then any SKILL.md whose frontmatter has `name: <id>`,
 // and last the repo root (a single-skill repository). Every route resolves the
-// folder with pwd -P and requires it to be the clone or inside it before it
-// reads or copies anything; a folder name with a newline cannot steer it out.
+// folder with pwd -P and requires the clone's real root or a real path inside
+// it (a path with a newline in it, or ending in "." or "..", is refused) before
+// it reads or copies anything. A SKILL.md counts only as a regular file, never
+// as a symlink. A repository's symlinks are never followed or installed: if the
+// copy holds any, the install stops with exit 7. The skill folder itself may be
+// a link to a folder inside the clone; it is resolved and copied by content.
 // The copy is made in `<store>/.skillsgate-new.<folder name>`, checked, and only
 // then does it replace `<dest>`. That name is hidden (a scan skips it) and no
 // valid folder name starts with ".", so it never equals a real skill's folder.
@@ -196,7 +200,7 @@ exit 0
 // anywhere removes the staging folder and the temp folder and leaves `<dest>`
 // as it was.
 // Exit: 0 installed; 1 failed; 64 bad arguments; 127 no git; 2 the clone
-// failed; 5 the skill is not in the repository.
+// failed; 5 the skill is not in the repository; 7 the skill holds symbolic links.
 //
 // `rm -rf` runs only on: the temp folder this script made with mktemp -d (its
 // name is checked); `<store>/.skillsgate-new.<folder>` and the `.git` inside
@@ -239,18 +243,29 @@ if ! git clone -q --depth 1 -- "$url" "$repo" >/dev/null 2>&1; then
 fi
 root=$(cd -P -- "$repo" && pwd -P) || exit 1
 
-# inside <dir>: sets here to the real path of <dir>, and only when that is the
-# clone itself or a folder inside it. Every route below goes through it before
-# anything is read or copied.
+LF='
+'
+# inside <dir>: sets here to the real path of <dir>, and succeeds only when that
+# is the clone's real root or a real path inside it. Command substitution drops
+# trailing newlines, so the path is first printed with a sentinel after it: a
+# path that holds a newline anywhere (even a folder really named "..<newline>")
+# is refused, and so is one that ends in "." or "..".
 inside() {
+  probe=$(cd -P -- "$1" 2>/dev/null && pwd -P && printf x) || return 1
+  case "$probe" in *"$LF"*"$LF"*) return 1 ;; esac
   here=$(cd -P -- "$1" 2>/dev/null && pwd -P) || return 1
+  case "$here" in */.|*/..) return 1 ;; esac
   case "$here" in "$root"|"$root"/*) return 0 ;; esac
   return 1
 }
-# try <dir>: sets src when <dir> is inside the clone and holds SKILL.md.
+# regular <file>: a regular file that is not a symlink.
+regular() {
+  [ -f "$1" ] && [ ! -L "$1" ]
+}
+# try <dir>: sets src when <dir> is inside the clone and holds a regular SKILL.md.
 try() {
   inside "$1" || return 1
-  [ -f "$here/SKILL.md" ] || return 1
+  regular "$here/SKILL.md" || return 1
   src=$here
   return 0
 }
@@ -273,6 +288,7 @@ if [ -z "$src" ]; then
   while IFS= read -r f; do
     case "$f" in ./*/SKILL.md) ;; *) continue ;; esac
     inside "$root/$(dirname -- "$f")" || continue
+    regular "$here/SKILL.md" || continue
     if SG_ID="$id" awk '
       BEGIN { sq = sprintf("%c", 39) }
       NR == 1 && $0 !~ /^---[ \r]*$/ { exit }
@@ -311,7 +327,12 @@ mkdir -- "$new" || exit 1
 staged=$new
 cp -R -- "$src"/. "$new"/ || exit 1
 rm -rf -- "$new/.git"
-[ -f "$new/SKILL.md" ] || { printf 'The copy has no SKILL.md\n' >&2; exit 1; }
+regular "$new/SKILL.md" || { printf 'The copy has no SKILL.md\n' >&2; exit 1; }
+# A repository's symbolic links are never installed.
+if [ -n "$(find "$new" -type l -print | head -n 1)" ]; then
+  printf 'The skill contains symbolic links\n' >&2
+  exit 7
+fi
 if [ -L "$dest" ]; then
   rm -f -- "$dest" || exit 1
 elif [ -e "$dest" ]; then

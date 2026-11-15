@@ -16,14 +16,16 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
   let repo;
   let gitHome;
 
-  // Builds a repo from `{ "relative/path": "text" }` (a name may hold newlines)
-  // with an environment that never reads the maintainer's own git configuration.
+  // Builds a repo from `{ "relative/path": "text" | { link: target } }` (a name
+  // may hold newlines) with an environment that never reads the maintainer's own
+  // git configuration.
   let repoCount = 0;
   function buildRepo(files) {
     const dir = path.join(root, `repo-${++repoCount}`);
-    for (const [rel, text] of Object.entries(files)) {
+    for (const [rel, value] of Object.entries(files)) {
       fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
-      fs.writeFileSync(path.join(dir, rel), text);
+      if (typeof value === "string") fs.writeFileSync(path.join(dir, rel), value);
+      else fs.symlinkSync(value.link, path.join(dir, rel));
     }
     const env = { PATH: process.env.PATH, HOME: gitHome, GIT_CONFIG_NOSYSTEM: "1" };
     const git = (...args) => execFileSync("git", args, { cwd: dir, env, stdio: "pipe" });
@@ -181,6 +183,79 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
     assert.deepEqual(await m.install(null, r.scan, installed("whatever")), { ok: true, folder: "whatever" });
     assert.equal(read(h.path(".agents/skills/whatever/ROOT_MARKER.txt")), "root");
     assert.equal(exists(h.path(".agents/skills/whatever/.git")), false);
+  });
+  const NOT_FOUND = (id) => ({ ok: false, error: `Could not find "${id}" in acme/skills` });
+  // A store with one skill, and the repo built from `files`.
+  const withRepo = (files) => setup({ ".agents/skills/other/SKILL.md": SKILL("other") }, fromRepo(buildRepo(files)));
+  const storeUnchanged = (h) => {
+    assert.deepEqual(fs.readdirSync(h.path(".agents/skills")), ["other"]);
+    assert.equal(exists(h.path(".agents/.skill-lock.json")), false);
+  };
+  // A file outside every clone, and the layout that makes `find` print the line
+  // `./P/SKILL.md` for a real file named `z\n./P/SKILL.md`.
+  const outsideFile = (name, text) => {
+    const file = path.join(root, name);
+    fs.writeFileSync(file, text);
+    return file;
+  };
+  it("install ignores a SKILL.md that is a symlink to a file outside the clone", async () => {
+    const outside = outsideFile("outside-nope.md", "---\nname: nope\n---\n");
+    const { h, m, r, leftovers } = await withRepo({ "z\n./P/SKILL.md": SKILL("z"), "P/SKILL.md": { link: outside } });
+    assert.deepEqual(await m.install(null, r.scan, installed("nope")), NOT_FOUND("nope"));
+    storeUnchanged(h);
+    assert.deepEqual(leftovers(), []);
+  });
+  it("install does not read a SKILL.md that is a symlink to /dev/zero, so it returns promptly", async () => {
+    const dir = buildRepo({ "z\n./P/SKILL.md": SKILL("z"), "P/SKILL.md": { link: "/dev/zero" } });
+    const { h, r } = await setup({ ".agents/skills/other/SKILL.md": SKILL("other") }, fromRepo(dir));
+    // A machine whose scripts are killed after 15 seconds; a hang would fail the
+    // result, and the check below fails it after 10.
+    const m = createMachine({ exec: (script, args, on) => h.exec(script, args, on, 15000), readText: h.readText, ...sources("file://" + dir) });
+    const started = Date.now();
+    assert.deepEqual(await m.install(null, r.scan, installed("nope")), NOT_FOUND("nope"));
+    assert.ok(Date.now() - started < 10000, "the install took too long");
+    storeUnchanged(h);
+  });
+  it("install does not accept a folder whose real name ends in a newline", async () => {
+    // skills/alpha leads to the real folder `..\n` at the clone's root; command
+    // substitution would turn its path into `<clone>/..`.
+    const { h, m, r, leftovers } = await withRepo({
+      "skills/alpha": { link: "../..\n" },
+      "..\n/SKILL.md": SKILL("alpha"),
+      "..\n/inner.txt": "inner",
+    });
+    assert.deepEqual(await m.install(null, r.scan, installed("alpha")), NOT_FOUND("alpha"));
+    storeUnchanged(h);
+    assert.deepEqual(leftovers(), []);
+  });
+  it("install does not count a SKILL.md that is a symlink, even to a file inside the clone", async () => {
+    const { h, m, r } = await withRepo({
+      "decoy.md": SKILL("alpha"),
+      "skills/.curated/alpha/SKILL.md": { link: "../../../decoy.md" },
+      "skills/.curated/alpha/readme.txt": "readme",
+    });
+    assert.deepEqual(await m.install(null, r.scan, installed("alpha")), NOT_FOUND("alpha"));
+    storeUnchanged(h);
+  });
+  it("install refuses a skill that holds a symlink and leaves an installed copy as it was", async () => {
+    const base = { "secret.txt": "secret", "skills/alpha/SKILL.md": SKILL("alpha"), "skills/alpha/fine.txt": "fine" };
+    const variants = {
+      "a link at the top and one nested deeper": { ...base, "skills/alpha/notes": { link: "../../secret.txt" }, "skills/alpha/deep/er/more": { link: "../../../../secret.txt" } },
+      "only a link nested deeper": { ...base, "skills/alpha/deep/er/more": { link: "../../../../secret.txt" } },
+    };
+    for (const [label, files] of Object.entries(variants)) {
+      const s = await setup({ ".agents/skills/alpha/SKILL.md": SKILL("old"), ".agents/skills/alpha/old.txt": "old" }, fromRepo(buildRepo(files)));
+      assert.deepEqual(
+        await s.m.install(null, s.r.scan, installed("alpha")),
+        { ok: false, error: '"alpha" in acme/skills contains symbolic links and was not installed' },
+        label,
+      );
+      assert.equal(read(s.h.path(".agents/skills/alpha/SKILL.md")), SKILL("old"), label);
+      assert.equal(read(s.h.path(".agents/skills/alpha/old.txt")), "old", label);
+      assert.deepEqual(fs.readdirSync(s.h.path(".agents/skills")), ["alpha"], label); // no staging folder
+      assert.deepEqual(s.leftovers(), [], label);
+      assert.equal(exists(s.h.path(".agents/.skill-lock.json")), false, label);
+    }
   });
   it("install copies a skill folder that is a symlink in the repo as a real folder", async () => {
     const { h, m, r } = await setup();

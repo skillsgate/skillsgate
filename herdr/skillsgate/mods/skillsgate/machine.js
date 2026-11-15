@@ -136,6 +136,7 @@ export function createMachine({
     if (r.code === 127) return gitMissing;
     if (r.code === 2) return { ok: false, error: `Could not download ${source}` };
     if (r.code === 5) return { ok: false, error: `Could not find "${skillId}" in ${source}` };
+    if (r.code === 7) return { ok: false, error: `"${skillId}" in ${source} contains symbolic links and was not installed` };
     if (r.code === 64) return { ok: false, error: `Can't install "${skillId}" from ${source}` };
     if (r.code !== 0) return failure(r);
     const real = lastLine(r.stdout);

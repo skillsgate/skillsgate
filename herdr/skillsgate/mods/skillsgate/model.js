@@ -124,3 +124,58 @@ export function relativePath(fromDir, toPath) {
 }
 
 export const toolByName = (tools, name) => tools.find((tool) => tool.name === name);
+
+// `on` is a machine's name, or null for this computer.
+export const machineKey = (on) => on ?? "";
+export const machineLabel = (on) => on ?? "This computer";
+
+// The lock file the desktop app also reads and writes.
+export const lockPath = (scan) => scan.home + "/.agents/.skill-lock.json";
+
+// The lock text travels to the machine as one argument; a single argument is
+// capped at 128 KiB on Linux, so a bigger lock is left alone. Counted in UTF-8
+// bytes, since that is what the limit counts.
+const LOCK_LIMIT = 96 * 1024;
+const encoder = new TextEncoder();
+const tooLarge = (text) => encoder.encode(text).length > LOCK_LIMIT;
+
+// Reads a lock into `{ lock }`, or `{ skip }` when it is not a version 1 lock.
+// Absent or empty text is an empty lock (`empty: true`).
+function readLock(text) {
+  if (text == null || String(text).trim() === "") return { lock: { version: 1, skills: {} }, empty: true };
+  let lock;
+  try {
+    lock = JSON.parse(text);
+  } catch {
+    return { skip: "invalid" };
+  }
+  const plain = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+  if (!plain(lock) || lock.version !== 1 || !plain(lock.skills)) return { skip: "invalid" };
+  return { lock };
+}
+
+// Records a GitHub install in the lock, keeping `installedAt` of an existing
+// entry. Returns `{ text }` to write, or `{ skip }` when the file must be left
+// exactly as it is.
+export function mergeLock(text, folder, source, now) {
+  const read = readLock(text);
+  if (read.skip) return { skip: read.skip };
+  const { lock } = read;
+  const previous = Object.hasOwn(lock.skills, folder) ? lock.skills[folder] : null;
+  const installedAt = typeof previous?.installedAt === "string" ? previous.installedAt : now;
+  lock.skills[folder] = { source, sourceType: "github", originalUrl: source, skillFolderHash: "", installedAt, updatedAt: now };
+  const out = JSON.stringify(lock, null, 2);
+  if (tooLarge(out)) return { skip: "large" };
+  return { text: out };
+}
+
+// Removes a skill's entry. `{ skip: "absent" }` means there is nothing to change.
+export function dropFromLock(text, folder) {
+  const read = readLock(text);
+  if (read.skip) return { skip: read.skip };
+  if (read.empty || !Object.hasOwn(read.lock.skills, folder)) return { skip: "absent" };
+  delete read.lock.skills[folder];
+  const out = JSON.stringify(read.lock, null, 2);
+  if (tooLarge(out)) return { skip: "large" };
+  return { text: out };
+}

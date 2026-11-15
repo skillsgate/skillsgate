@@ -1,11 +1,27 @@
 // Operations on one machine. `exec` and `readText` are Herdr's functions,
 // passed in by main.js (and faked in tests), so this file imports no Herdr code.
 import { TOOLS, UNIVERSAL } from "./registry.js";
-import { LINK, REMOVE, UNLINK, scanScript } from "./scripts.js";
-import { buildSkills, parseScan, relativePath, toolByName } from "./model.js";
+import { INSTALL, LINK, REMOVE, UNLINK, WRITE, scanScript } from "./scripts.js";
+import {
+  buildSkills,
+  dropFromLock,
+  lockPath,
+  machineLabel,
+  mergeLock,
+  parseScan,
+  relativePath,
+  sanitizeName,
+  toolByName,
+} from "./model.js";
+import { cloneUrl as githubCloneUrl, validSkillId, validSource } from "./catalog.js";
 
 const SCAN_TIMEOUT_MS = 30000;
 const OP_TIMEOUT_MS = 30000;
+const INSTALL_TIMEOUT_MS = 120000;
+
+// The folder an install creates; the script checks the same things again.
+const unsafeFolder = (folder) =>
+  !folder || folder === "." || folder === ".." || folder.includes("/") || folder.startsWith(".") || folder.startsWith("-");
 
 const lastLine = (text) =>
   String(text ?? "")
@@ -21,7 +37,13 @@ const universalHolds = (skill) => ({
   error: `Universal holds the shared copy of "${skill.name}". Delete the skill to remove it everywhere.`,
 });
 
-export function createMachine({ exec, tools = TOOLS }) {
+export function createMachine({
+  exec,
+  readText,
+  tools = TOOLS,
+  cloneUrl = githubCloneUrl,
+  now = () => new Date().toISOString(),
+}) {
   async function scan(on) {
     const r = await exec(scanScript(tools), [], on, SCAN_TIMEOUT_MS);
     if (r.code !== 0) return failure(r);
@@ -79,10 +101,66 @@ export function createMachine({ exec, tools = TOOLS }) {
     }
     const links = skill.entries.filter((e) => e.link).map((e) => e.path);
     const r = await exec(REMOVE, [skill.real, base, ...links], on, OP_TIMEOUT_MS);
-    if (r.code === 0) return { ok: true };
     if (r.code === 4) return changed(skill);
-    return failure(r);
+    if (r.code !== 0) return failure(r);
+    // The lock records shared-store installs only. Whatever goes wrong here is
+    // not worth failing or warning about: the skill is already gone.
+    if (skill.home === "store") {
+      try {
+        const lock = lockPath(scanResult);
+        const dropped = dropFromLock(await readText(lock, on), skill.folder);
+        if (dropped.text !== undefined) await exec(WRITE, [lock, dropped.text], on, OP_TIMEOUT_MS);
+      } catch {
+        // see above
+      }
+    }
+    return { ok: true };
   }
 
-  return { scan, link, unlink, remove };
+  // Installs a skill from a GitHub repository into the shared store, adds it to
+  // the chosen tools, and records its source in the lock file.
+  async function install(on, scanResult, { source, skillId, tools: toolNames = [] }) {
+    const folder = sanitizeName(skillId);
+    if (!validSource(source) || !validSkillId(skillId) || unsafeFolder(folder)) {
+      return { ok: false, error: `Can't install "${skillId}" from ${source}` };
+    }
+    const gitMissing = { ok: false, error: `git is not installed on ${machineLabel(on)}` };
+    if (!scanResult.git) return gitMissing;
+    const store = scanResult.tools.find((t) => t.name === UNIVERSAL)?.dir;
+    if (!store) return { ok: false, error: `Could not find the shared skills folder on ${machineLabel(on)}` };
+
+    const r = await exec(INSTALL, [cloneUrl(source), skillId, store, folder], on, INSTALL_TIMEOUT_MS);
+    if (r.code === 127) return gitMissing;
+    if (r.code === 2) return { ok: false, error: `Could not download ${source}` };
+    if (r.code === 5) return { ok: false, error: `Could not find "${skillId}" in ${source}` };
+    if (r.code === 64) return { ok: false, error: `Can't install "${skillId}" from ${source}` };
+    if (r.code !== 0) return failure(r);
+    const real = lastLine(r.stdout);
+    if (!real?.startsWith("/")) return { ok: false, error: "Unreadable install result" };
+
+    const warnings = [];
+    const installed = { key: real, real, folder, name: folder, description: "", home: "store", tools: [], entries: [] };
+    for (const name of new Set(toolNames)) {
+      if (name === UNIVERSAL) continue;
+      const tool = toolByName(tools, name);
+      if (!tool) {
+        warnings.push(`Installed, but not added to ${name}: unknown tool`);
+        continue;
+      }
+      const linked = await link(on, scanResult, installed, name);
+      if (!linked.ok) warnings.push(`Installed, but not added to ${tool.displayName}: ${linked.error}`);
+    }
+
+    const lock = lockPath(scanResult);
+    const merged = mergeLock(await readText(lock, on), folder, source, now());
+    if (merged.skip) {
+      warnings.push(`Installed, but the skill lock was not updated (${merged.skip})`);
+    } else {
+      const w = await exec(WRITE, [lock, merged.text], on, OP_TIMEOUT_MS);
+      if (w.code !== 0) warnings.push(`Installed, but the skill lock was not updated (${lastLine(w.stderr) || "could not write it"})`);
+    }
+    return warnings.length ? { ok: true, folder, warn: warnings.join("; ") } : { ok: true, folder };
+  }
+
+  return { scan, link, unlink, remove, install };
 }

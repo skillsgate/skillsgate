@@ -169,3 +169,162 @@ if [ "$base" != - ]; then
 fi
 exit 0
 `;
+
+// INSTALL <clone URL> <skill id> <store folder> <folder name>
+// Clones the repository into a temp folder, finds the skill, and copies it to
+// `<store>/<folder name>`, replacing a folder that is already there. Prints the
+// installed folder.
+// Every value is checked before anything is touched; a bad one exits 64:
+//   - the URL starts with https:// or file:/// (never an option or a git
+//     transport such as ext::);
+//   - the skill id holds only letters, digits, ".", "_" and "-", and does not
+//     start with "." or "-";
+//   - the store is an absolute path;
+//   - the folder name is not empty, ".", "..", does not contain "/" and does not
+//     start with "." or "-". So `rm -rf` below can only reach a direct child of
+//     the store.
+// Where the skill is looked for, first match wins: skills/<id>,
+// skills/.curated/<id>, skills/.experimental/<id>, <id>, the repo root (each
+// must hold SKILL.md and stay inside the clone), then any <dir>/<id>/SKILL.md,
+// then any SKILL.md whose frontmatter has `name: <id>`.
+// The copy is made as `<dest>.new`, checked, and only then does it replace
+// `<dest>`. A failure anywhere removes `<dest>.new` and the temp folder and
+// leaves `<dest>` as it was. A folder that already has the `.new` name is not
+// ours to delete, so the install stops (exit 6) instead.
+// Exit: 0 installed; 1 failed; 6 the `.new` name is taken; 64 bad arguments;
+// 127 no git; 2 the clone failed; 5 the skill is not in the repository.
+//
+// `rm -rf` runs only on: the temp folder this script made with mktemp -d (its
+// name is checked), and `<store>/<folder>` and `<store>/<folder>.new` once the
+// folder name has passed the checks above. A symlink at `<dest>` is removed
+// with `rm -f`, never followed.
+export const INSTALL = String.raw`unset CDPATH
+PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"
+export PATH
+GIT_TERMINAL_PROMPT=0
+GIT_ALLOW_PROTOCOL=https:file
+export GIT_TERMINAL_PROMPT GIT_ALLOW_PROTOCOL
+bad() { printf 'Bad arguments\n' >&2; exit 64; }
+[ "$#" -ge 4 ] || bad
+url=$1
+id=$2
+store=$3
+folder=$4
+case "$url" in https://?*|file:///?*) ;; *) bad ;; esac
+case "$id" in ""|.*|-*|*[!A-Za-z0-9._-]*) bad ;; esac
+case "$store" in /?*) ;; *) bad ;; esac
+case "$folder" in ""|.|..|.*|-*|*/*) bad ;; esac
+command -v git >/dev/null 2>&1 || { printf 'git is not installed\n' >&2; exit 127; }
+
+tmp=
+staged=
+cleanup() {
+  case "$tmp" in */skillsgate-herdr.??????) rm -rf -- "$tmp" ;; esac
+  case "$staged" in /?*/?*.new) rm -rf -- "$staged" ;; esac
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
+tmpbase=$TMPDIR
+case "$tmpbase" in /?*) ;; *) tmpbase=/tmp ;; esac
+tmp=$(mktemp -d "$tmpbase/skillsgate-herdr.XXXXXX") || exit 1
+repo="$tmp/repo"
+if ! git clone -q --depth 1 -- "$url" "$repo" >/dev/null 2>&1; then
+  printf 'Could not download\n' >&2
+  exit 2
+fi
+root=$(cd -P -- "$repo" && pwd -P) || exit 1
+
+src=
+for cand in "$root/skills/$id" "$root/skills/.curated/$id" "$root/skills/.experimental/$id" "$root/$id" "$root"; do
+  [ -f "$cand/SKILL.md" ] || continue
+  here=$(cd -P -- "$cand" 2>/dev/null && pwd -P) || continue
+  case "$here" in "$root"|"$root"/*) src=$here; break ;; esac
+done
+if [ -z "$src" ]; then
+  found=$(cd -- "$root" && find . -path ./.git -prune -o -type f -path "*/$id/SKILL.md" -print | sort | head -n 1)
+  if [ -n "$found" ]; then
+    rel=$(printf '%s\n' "$found" | sed 's|^\./||; s|/SKILL\.md$||')
+    src="$root/$rel"
+  fi
+fi
+if [ -z "$src" ]; then
+  (cd -- "$root" && find . -path ./.git -prune -o -type f -name SKILL.md -print | sort) > "$tmp/list" || exit 1
+  while IFS= read -r f; do
+    rel=$(printf '%s\n' "$f" | sed 's|^\./||; s|/SKILL\.md$||')
+    if SG_ID="$id" awk '
+      BEGIN { sq = sprintf("%c", 39) }
+      NR == 1 && $0 !~ /^---[ \r]*$/ { exit }
+      NR > 1 && $0 ~ /^---[ \r]*$/ { exit }
+      NR > 1 && $0 ~ /^name:/ {
+        v = $0
+        sub(/^name:[ \t]*/, "", v)
+        sub(/[ \t\r]*$/, "", v)
+        q = substr(v, 1, 1)
+        if (length(v) >= 2 && (q == "\"" || q == sq) && substr(v, length(v), 1) == q) v = substr(v, 2, length(v) - 2)
+        if (v == ENVIRON["SG_ID"]) ok = 1
+        exit
+      }
+      NR >= 80 { exit }
+      END { exit ok ? 0 : 1 }
+    ' "$root/$rel/SKILL.md" 2>/dev/null; then
+      src="$root/$rel"
+      break
+    fi
+  done < "$tmp/list"
+fi
+if [ -z "$src" ]; then
+  printf 'Skill not found\n' >&2
+  exit 5
+fi
+
+mkdir -p -- "$store" || exit 1
+realstore=$(cd -P -- "$store" && pwd -P) || exit 1
+case "$realstore" in /?*) ;; *) bad ;; esac
+dest="$realstore/$folder"
+new="$dest.new"
+if [ -e "$new" ] || [ -L "$new" ]; then
+  printf 'A folder named %s is in the way\n' "$new" >&2
+  exit 6
+fi
+mkdir -- "$new" || exit 1
+staged=$new
+cp -R -- "$src"/. "$new"/ || exit 1
+rm -rf -- "$new/.git"
+[ -f "$new/SKILL.md" ] || { printf 'The copy has no SKILL.md\n' >&2; exit 1; }
+if [ -L "$dest" ]; then
+  rm -f -- "$dest" || exit 1
+elif [ -e "$dest" ]; then
+  rm -rf -- "$dest" || exit 1
+fi
+mv -- "$new" "$dest" || exit 1
+staged=
+printf '%s\n' "$dest"
+exit 0
+`;
+
+// WRITE <path> <text>
+// Writes the text to a temp file in the target's own folder, then moves it over
+// the target, so a reader sees the old file or the new one, never half of it.
+// Makes the parent folder. Exit: 0 written; 1 failed; 2 bad arguments (a
+// relative path, a path ending in "/", or empty text).
+export const WRITE = String.raw`unset CDPATH
+bad() { printf 'Bad arguments\n' >&2; exit 2; }
+[ "$#" -ge 2 ] || bad
+path=$1
+text=$2
+case "$path" in /?*) ;; *) bad ;; esac
+case "$path" in */) bad ;; esac
+[ -n "$text" ] || bad
+dir=$(dirname -- "$path")
+mkdir -p -- "$dir" || exit 1
+tmp=
+cleanup() { if [ -n "$tmp" ]; then rm -f -- "$tmp"; fi; }
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+tmp=$(mktemp "$dir/.skillsgate-herdr.XXXXXX") || exit 1
+printf '%s' "$text" > "$tmp" || exit 1
+mv -- "$tmp" "$path" || exit 1
+tmp=
+exit 0
+`;

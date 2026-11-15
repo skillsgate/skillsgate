@@ -98,6 +98,17 @@ const MIGRATIONS: Migration[] = [
       INSERT OR IGNORE INTO schema_version VALUES (4);
     `,
   },
+  {
+    version: 5,
+    up: `
+      -- JSON snapshot of the server's tool skills folders (links and what
+      -- they point to), read at the last refresh or push. Drives the tool
+      -- link part of the Servers page status.
+      ALTER TABLE remote_servers ADD COLUMN tool_links TEXT;
+
+      INSERT OR IGNORE INTO schema_version VALUES (5);
+    `,
+  },
 ]
 
 function getCurrentVersion(db: Database.Database): number {

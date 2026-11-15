@@ -204,6 +204,9 @@ declare global {
     ) => Promise<{ ok: boolean }>
     serversCount: () => Promise<number>
     serversLocalSkills: () => Promise<{ folderName: string; contentHash: string }[]>
+    serversLinkStatus: () => Promise<
+      Record<string, { toAdd: number; onlyOnRemote: number; blocked: number } | null>
+    >
     serversPushPreview: (serverId: string, mirror: boolean) => Promise<{
       toAdd: PushPlanEntry[]
       toUpdate: PushPlanEntry[]

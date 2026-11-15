@@ -145,6 +145,18 @@ export class RemoteServerStore {
     this.db.prepare("DELETE FROM remote_servers WHERE id = ?").run(id)
   }
 
+  /** Stored tool-folder state (JSON) from the last refresh or push, or null. */
+  getToolLinks(id: string): string | null {
+    const row = this.db
+      .prepare("SELECT tool_links FROM remote_servers WHERE id = ?")
+      .get(id) as { tool_links: string | null } | undefined
+    return row?.tool_links ?? null
+  }
+
+  setToolLinks(id: string, json: string | null): void {
+    this.db.prepare("UPDATE remote_servers SET tool_links = ? WHERE id = ?").run(json, id)
+  }
+
   updateSyncStatus(id: string, error: string | null): void {
     if (error) {
       this.db

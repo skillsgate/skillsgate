@@ -8,7 +8,7 @@ import { app } from "electron"
 import { readSkillLock, writeSkillLock, type SkillLockFile } from "./skill-lock"
 import { openDb } from "./db/index"
 import { SettingsStore } from "./db/settings"
-import { RemoteServerStore } from "./db/servers"
+import { RemoteServerStore, type RemoteServer } from "./db/servers"
 import { RemoteSkillStore } from "./db/skills"
 import { FavoritesStore } from "./db/favorites"
 import { loadCachedSkillPaths, loadCachedSkills, saveCachedSkills } from "./db/skills-cache"
@@ -18,7 +18,14 @@ import {
   type TrendingSkill,
 } from "./db/trending-cache"
 import { testConnection, syncRemoteServer, readRemoteFile, writeRemoteFile } from "./db/ssh"
-import { planPush, applyPush, listLocalPushCandidates } from "./db/push"
+import {
+  planPush,
+  applyPush,
+  listLocalPushCandidates,
+  readRemoteLinkState,
+  computeLinkStatuses,
+  type RemoteLinkState,
+} from "./db/push"
 import type { PushPreview } from "./db/push"
 import { checkForAppUpdates, getUpdateState, quitAndInstallUpdate } from "./auto-updater"
 
@@ -2249,8 +2256,22 @@ Add your skill instructions here.
 
   ipcMain.handle("servers:update", (_event, id: string, fields) => {
     ensureStores()
-    return serverStore.update(id, fields)
+    const updated = serverStore.update(id, fields)
+    // The stored tool-folder state may belong to another host or path now.
+    serverStore.setToolLinks(id, null)
+    return updated
   })
+
+  // Read the server's tool skills folders and store them for the status line.
+  // On failure the stored state is cleared, so the status falls back to skills.
+  async function refreshToolLinks(server: RemoteServer): Promise<void> {
+    try {
+      const state = await readRemoteLinkState(server)
+      serverStore.setToolLinks(server.id, JSON.stringify(state))
+    } catch {
+      serverStore.setToolLinks(server.id, null)
+    }
+  }
 
   ipcMain.handle("servers:delete", (_event, id: string) => {
     ensureStores()
@@ -2268,7 +2289,9 @@ Add your skill instructions here.
     ensureStores()
     const server = serverStore.get(id)
     if (!server) return { added: 0, updated: 0, removed: 0, unchanged: 0, error: "Server not found" }
-    return syncRemoteServer({ remoteServers: serverStore, remoteSkills: skillStore }, server)
+    const result = await syncRemoteServer({ remoteServers: serverStore, remoteSkills: skillStore }, server)
+    if (!result.error) await refreshToolLinks(server)
+    return result
   })
 
   ipcMain.handle("servers:skills", (_event, serverId: string) => {
@@ -2329,6 +2352,7 @@ Add your skill instructions here.
       } catch {
         // Non-fatal: push already happened; cache will refresh on next sync.
       }
+      await refreshToolLinks(server)
       return result
     },
   )
@@ -2336,6 +2360,26 @@ Add your skill instructions here.
   ipcMain.handle("servers:count", () => {
     ensureStores()
     return serverStore.count()
+  })
+
+  // Tool link differences per server, from the stored tool-folder state and
+  // the local links as they are now. Null for servers not refreshed since.
+  ipcMain.handle("servers:link-status", async () => {
+    ensureStores()
+    return computeLinkStatuses(
+      serverStore.list().map((server) => {
+        let state: RemoteLinkState | null = null
+        const raw = serverStore.getToolLinks(server.id)
+        if (raw) {
+          try {
+            state = JSON.parse(raw) as RemoteLinkState
+          } catch {
+            state = null
+          }
+        }
+        return { server, state }
+      }),
+    )
   })
 
   // The local skills Push sends, for the Servers page's "not yet pushed" count.

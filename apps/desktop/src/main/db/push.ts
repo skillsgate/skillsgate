@@ -12,6 +12,7 @@ import {
   probeRemoteToolDirs,
   applyRemoteLinkOps,
   type RemoteLinkOp,
+  type RemoteToolDirState,
 } from "./ssh"
 import { listInstalledSkillsInternal, agentRegistry } from "../ipc-handlers"
 
@@ -216,29 +217,55 @@ function absoluteRemoteBase(base: string, remoteHome: string): string {
   return path.posix.normalize(trimmed)
 }
 
+/** Tool folders that need links on this server (not its skills base itself). */
+function toolDirsFor(server: RemoteServer): ToolDir[] {
+  return listToolDirs().filter(
+    (d) => normalizeRemoteBase(server.skillsBasePath) !== d.remoteDir,
+  )
+}
+
+/**
+ * The remote's tool folders as read over SSH: its $HOME and, per home-relative
+ * tool skills folder, whether the tool is installed and what the folder holds.
+ * Plain JSON, so it can be stored after a refresh.
+ */
+export interface RemoteLinkState {
+  home: string
+  dirs: Record<string, RemoteToolDirState>
+}
+
+export async function readRemoteLinkState(server: RemoteServer): Promise<RemoteLinkState> {
+  const toolDirs = toolDirsFor(server)
+  const probe = await probeRemoteToolDirs(
+    server,
+    toolDirs.map((d) => d.remoteDir),
+  )
+  const dirs: Record<string, RemoteToolDirState> = {}
+  toolDirs.forEach((d, i) => {
+    dirs[d.remoteDir] = probe.dirs[i]
+  })
+  return { home: probe.home, dirs }
+}
+
+type LinkDiff = Pick<
+  PushPreview,
+  "linksToAdd" | "linksToRemove" | "linkConflicts" | "linksUnchanged" | "toolsNotOnServer"
+>
+
 /**
  * Compare local tool links with the remote's tool folders. Push adds missing
  * links for tools installed on the remote; Mirror also removes remote links
  * into the skills base that no local tool has. Anything else in a tool folder
  * (real folders such as a tool's own synced skills, links elsewhere) is never
- * changed.
+ * changed. A tool folder missing from `remote` (not read yet) is skipped.
  */
-async function planLinks(
+function diffLinks(
   server: RemoteServer,
-  candidates: LocalPushCandidate[],
+  toolDirs: ToolDir[],
+  localLinks: Map<string, Map<string, string>>,
+  remote: RemoteLinkState,
   mirror: boolean,
-): Promise<Pick<
-  PushPreview,
-  "linksToAdd" | "linksToRemove" | "linkConflicts" | "linksUnchanged" | "toolsNotOnServer"
->> {
-  const toolDirs = listToolDirs().filter(
-    (d) => normalizeRemoteBase(server.skillsBasePath) !== d.remoteDir,
-  )
-  const localLinks = await listLocalToolLinks(toolDirs, candidates)
-  const remote = await probeRemoteToolDirs(
-    server,
-    toolDirs.map((d) => d.remoteDir),
-  )
+): LinkDiff {
   const remoteBase = absoluteRemoteBase(server.skillsBasePath, remote.home)
 
   const linksToAdd: LinkPlanEntry[] = []
@@ -247,9 +274,10 @@ async function planLinks(
   const toolsNotOnServer: string[] = []
   let linksUnchanged = 0
 
-  toolDirs.forEach((dir, i) => {
+  toolDirs.forEach((dir) => {
     const wanted = localLinks.get(dir.localDir) ?? new Map<string, string>()
-    const state = remote.dirs[i]
+    const state = remote.dirs[dir.remoteDir]
+    if (!state) return
     if (!state.toolInstalled) {
       if (wanted.size > 0) toolsNotOnServer.push(dir.tool)
       return
@@ -295,6 +323,53 @@ async function planLinks(
   })
 
   return { linksToAdd, linksToRemove, linkConflicts, linksUnchanged, toolsNotOnServer }
+}
+
+/** Read the remote's tool folders now and compare them with local links. */
+async function planLinks(
+  server: RemoteServer,
+  candidates: LocalPushCandidate[],
+  mirror: boolean,
+): Promise<LinkDiff> {
+  const toolDirs = toolDirsFor(server)
+  const localLinks = await listLocalToolLinks(toolDirs, candidates)
+  const remote = await readRemoteLinkState(server)
+  return diffLinks(server, toolDirs, localLinks, remote, mirror)
+}
+
+export interface LinkStatus {
+  /** Local tool links the remote is missing (Push adds them). */
+  toAdd: number
+  /** Remote links into the skills base that no local tool has (Mirror removes them). */
+  onlyOnRemote: number
+  /** Something other than the expected link is in the way. */
+  blocked: number
+}
+
+/**
+ * Tool link differences for each server, from its stored tool-folder state
+ * (read at the last refresh or push) and the local links as they are now.
+ * Null for a server whose state has not been read yet.
+ */
+export async function computeLinkStatuses(
+  servers: Array<{ server: RemoteServer; state: RemoteLinkState | null }>,
+): Promise<Record<string, LinkStatus | null>> {
+  const out: Record<string, LinkStatus | null> = {}
+  const withState = servers.filter((s) => s.state)
+  for (const s of servers) out[s.server.id] = null
+  if (withState.length === 0) return out
+
+  const candidates = await listLocalPushCandidates()
+  const localLinks = await listLocalToolLinks(listToolDirs(), candidates)
+  for (const { server, state } of withState) {
+    const diff = diffLinks(server, toolDirsFor(server), localLinks, state!, true)
+    out[server.id] = {
+      toAdd: diff.linksToAdd.length,
+      onlyOnRemote: diff.linksToRemove.length,
+      blocked: diff.linkConflicts.length,
+    }
+  }
+  return out
 }
 
 /** Only apply link entries shaped like the ones planLinks produces. */

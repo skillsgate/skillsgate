@@ -200,3 +200,44 @@ test("something already in place of a link is reported and left alone", { skip }
     "a real folder\n",
   )
 })
+
+test("link status compares stored server state with local links", { skip }, async () => {
+  await makeRemote()
+  const before = await push.readRemoteLinkState(server)
+  assert.deepEqual((await push.computeLinkStatuses([{ server, state: before }]))[server.id], {
+    toAdd: 1,
+    onlyOnRemote: 1,
+    blocked: 0,
+  })
+  assert.equal((await push.computeLinkStatuses([{ server, state: null }]))[server.id], null)
+
+  await push.applyPush(server, await push.planPush(server, { mirror: false }))
+  const afterPush = await push.readRemoteLinkState(server)
+  assert.deepEqual((await push.computeLinkStatuses([{ server, state: afterPush }]))[server.id], {
+    toAdd: 0,
+    onlyOnRemote: 1,
+    blocked: 0,
+  })
+
+  await push.applyPush(server, await push.planPush(server, { mirror: true }))
+  const afterMirror = await push.readRemoteLinkState(server)
+  assert.deepEqual((await push.computeLinkStatuses([{ server, state: afterMirror }]))[server.id], {
+    toAdd: 0,
+    onlyOnRemote: 0,
+    blocked: 0,
+  })
+  // The stored state survives a JSON round trip, which is how it is saved.
+  assert.deepEqual(JSON.parse(JSON.stringify(afterMirror)), afterMirror)
+})
+
+test("link status counts an entry in the way as blocked", { skip }, async () => {
+  await makeRemote(async (home) => {
+    await write(path.join(home, ".claude", "skills", "anchormd"), "a real folder\n")
+  })
+  const state = await push.readRemoteLinkState(server)
+  assert.deepEqual((await push.computeLinkStatuses([{ server, state }]))[server.id], {
+    toAdd: 0,
+    onlyOnRemote: 1,
+    blocked: 1,
+  })
+})

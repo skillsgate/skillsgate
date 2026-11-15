@@ -8,6 +8,8 @@ on:
       - "apps/desktop/tests/ssh.test.ts"
       - "apps/desktop/tests/push.test.ts"
       - "apps/desktop/tests/push-links.test.ts"
+      - "apps/desktop/tests/server-status.test.ts"
+      - "apps/desktop/src/renderer/lib/server-status.ts"
       - "apps/desktop/package.json"
       - ".github/workflows/desktop-lock-tests.yml"
   push:
@@ -18,6 +20,8 @@ on:
       - "apps/desktop/tests/ssh.test.ts"
       - "apps/desktop/tests/push.test.ts"
       - "apps/desktop/tests/push-links.test.ts"
+      - "apps/desktop/tests/server-status.test.ts"
+      - "apps/desktop/src/renderer/lib/server-status.ts"
       - "apps/desktop/package.json"
       - ".github/workflows/desktop-lock-tests.yml"
 

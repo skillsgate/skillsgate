@@ -55,6 +55,10 @@ Claude Code, Cursor, Windsurf, GitHub Copilot, Cline, Continue, Codex CLI, Droid
 - **Favorites** -- star skills from the catalog for quick access
 - **Local-first** -- settings, favorites, and remote server configs live in a local SQLite database, no account required
 
+## SkillsGate for Herdr
+
+If you use [Herdr](https://herdr.dev), SkillsGate also ships as a mod for it: a button in Herdr's tab bar opens a panel that lists the skills on this computer and on every machine Herdr reaches over SSH. You can switch a skill on or off for each tool, delete it, and install new ones from skills.sh. See [`herdr/skillsgate/README.md`](herdr/skillsgate/README.md) to add it to your window.
+
 ## Development
 
 This is a monorepo managed with npm workspaces.

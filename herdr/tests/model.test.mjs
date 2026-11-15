@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  activeTool,
   ago,
   clockRegions,
   dropFromLock,
@@ -8,10 +9,15 @@ import {
   emptyText,
   filterSkills,
   footerText,
+  installedBody,
+  layoutNode,
   lockPath,
   machineKey,
   machineLabel,
   machineNames,
+  machineUnavailable,
+  scanNotice,
+  statusOf,
   mergeLock,
   noticeShown,
   parseFrontmatter,
@@ -123,6 +129,69 @@ test("machineNames with no machines or spaces is this computer only", () => {
   assert.deepEqual(machineNames([], []), [null]);
   assert.deepEqual(machineNames([{ name: "zz" }, { name: "aa" }], []), [null, "aa", "zz"]);
 });
+test("machineNames sorts without case, then by code unit", () => {
+  const list = [{ name: "Zed" }, { name: "alpha" }, { name: "beta" }, { name: "Alpha" }];
+  assert.deepEqual(machineNames(list, [{ machine: "box" }]), [null, "Alpha", "alpha", "beta", "box", "Zed"]);
+});
+test("machineUnavailable reads Herdr's machines() by machine key", () => {
+  const list = [{ name: null, layout: "ready" }, { name: "vps", layout: "unavailable" }, { name: "box", layout: "loading" }];
+  assert.equal(machineUnavailable(list, "vps"), true);
+  assert.equal(machineUnavailable(list, ""), false);
+  assert.equal(machineUnavailable(list, "box"), false);
+  assert.equal(machineUnavailable(list, "gone"), false);
+  assert.equal(machineUnavailable([{ name: null, layout: "unavailable" }], ""), true);
+});
+test("layoutNode finds a node by id anywhere in the layout", () => {
+  const tree = {
+    id: "root",
+    children: [
+      { id: "work", children: [{ id: "tabs" }, { id: "body", children: [{ id: "skillsgate-panel", hidden: true, children: [] }] }] },
+    ],
+  };
+  assert.equal(layoutNode(tree, "root"), tree);
+  assert.equal(layoutNode(tree, "tabs").id, "tabs");
+  assert.equal(layoutNode(tree, "skillsgate-panel").hidden, true);
+  assert.equal(layoutNode(tree, "missing"), null);
+  assert.equal(layoutNode(null, "root"), null);
+  assert.equal(layoutNode(undefined, "root"), null);
+});
+test("activeTool keeps a chip only while this machine has it", () => {
+  const chips = [{ name: "cursor" }, { name: "universal" }];
+  assert.equal(activeTool(chips, "cursor"), "cursor");
+  assert.equal(activeTool(chips, "zed"), null);
+  assert.equal(activeTool(chips, null), null);
+  assert.equal(activeTool([], "cursor"), null);
+});
+test("installedBody: rows once a scan worked, the error only before any good scan", () => {
+  const skills = [sk("a", "store", ["universal"])];
+  assert.equal(installedBody(undefined), "skeleton");
+  assert.equal(installedBody({ skills: null, error: null, loading: true }), "skeleton");
+  assert.equal(installedBody({ skills: null, error: "machine vps is unreachable" }), "error");
+  assert.equal(installedBody({ skills: null, error: "machine vps is unreachable", loading: true }), "error");
+  assert.equal(installedBody({ skills, error: null }), "rows");
+  assert.equal(installedBody({ skills, error: "machine vps is unreachable" }), "rows");
+  assert.equal(installedBody({ skills: [], error: null }), "empty");
+  assert.equal(installedBody({ skills: [], error: "machine vps is unreachable" }), "empty");
+});
+test("scanNotice reports a failed re-scan once per new error", () => {
+  const good = { skills: [sk("a", "store", ["universal"])], error: null };
+  assert.equal(scanNotice(null, good, "sh: timeout"), "Can't check this computer: sh: timeout");
+  assert.equal(scanNotice("vps", good, "machine vps is unreachable"), "Can't check vps: machine vps is unreachable");
+  // The same error again says nothing; a different one does.
+  assert.equal(scanNotice("vps", { ...good, error: "machine vps is unreachable" }, "machine vps is unreachable"), null);
+  assert.equal(scanNotice("vps", { ...good, error: "machine vps is unreachable" }, "Unreadable scan"), "Can't check vps: Unreadable scan");
+  // No good scan yet: the error view says it, not a notice.
+  assert.equal(scanNotice("vps", { skills: null, error: null }, "machine vps is unreachable"), null);
+  assert.equal(scanNotice("vps", undefined, "machine vps is unreachable"), null);
+});
+test("statusOf: work in progress, else a notice that has not run out", () => {
+  const done = { kind: "done", text: "Added", at: 0 };
+  assert.deepEqual(statusOf("Adding pdf to Cursor…", done, 1000), { kind: "busy", text: "Adding pdf to Cursor…" });
+  assert.deepEqual(statusOf(null, done, 1000), { kind: "done", text: "Added" });
+  assert.equal(statusOf(null, done, 4000), null);
+  assert.deepEqual(statusOf("", { kind: "error", text: "Failed", at: 0 }, 7000), { kind: "error", text: "Failed" });
+  assert.equal(statusOf(null, null, 0), null);
+});
 test("filterSkills by text and by tool", () => {
   const skills = [
     sk("docx", "store", ["cursor", "universal"], { description: "Word documents" }),
@@ -232,13 +301,18 @@ test("ago at the edges", () => {
 test("clockRegions is what the clock alone changes on screen", () => {
   const state = { scan: { tools: [{ name: "cursor" }] }, skills: [sk("a", "tool", ["cursor"])], at: 0 };
   const notice = { kind: "done", text: "Added", at: 0 };
-  assert.deepEqual(clockRegions(state, notice, 3000), { footer: "1 skill · 1 tool · checked just now", notice: "Added" });
-  assert.deepEqual(clockRegions(state, notice, 12000), { footer: "1 skill · 1 tool · checked 10s ago", notice: "" });
-  assert.deepEqual(clockRegions(undefined, null, 0), { footer: "", notice: "" });
+  assert.deepEqual(clockRegions(state, null, notice, 3000), {
+    footer: "1 skill · 1 tool · checked just now",
+    status: { kind: "done", text: "Added" },
+  });
+  assert.deepEqual(clockRegions(state, null, notice, 12000), { footer: "1 skill · 1 tool · checked 10s ago", status: null });
+  // Work in progress hides the notice, so the notice is not what is drawn.
+  assert.deepEqual(clockRegions(state, "Adding…", notice, 3000).status, { kind: "busy", text: "Adding…" });
+  assert.deepEqual(clockRegions(undefined, null, null, 0), { footer: "", status: null });
 });
 test("regionsChanged redraws only when a clock-driven text changes", () => {
   const state = { scan: { tools: [{ name: "cursor" }] }, skills: [sk("a", "tool", ["cursor"])], at: 0 };
-  const at = (now, notice = null) => clockRegions(state, notice, now);
+  const at = (now, notice = null, busy = null) => clockRegions(state, busy, notice, now);
   assert.equal(regionsChanged(null, at(0)), true); // nothing drawn yet
   assert.equal(regionsChanged(at(1000), at(9000)), false); // still "just now"
   assert.equal(regionsChanged(at(9000), at(10000)), true); // "10s ago"
@@ -248,4 +322,9 @@ test("regionsChanged redraws only when a clock-driven text changes", () => {
   assert.equal(regionsChanged(at(21000), at(21000, done)), true); // a notice appears
   assert.equal(regionsChanged(at(22000, done), at(24000, done)), false); // the same notice, same footer
   assert.equal(regionsChanged(at(24000, done), at(25000, done)), true); // it runs out after 4 s
+  // A notice hidden behind work in progress runs out without a redraw.
+  assert.equal(regionsChanged(at(24000, done, "Adding…"), at(25000, done, "Adding…")), false);
+  // A busy text that changes (a stale lock dropping) does redraw.
+  assert.equal(regionsChanged(at(22000, null, "Adding…"), at(22000)), true);
+  assert.equal(regionsChanged(at(22000, { kind: "warn", text: "Added", at: 21000 }), at(22000, done)), true);
 });

@@ -207,13 +207,64 @@ export function effectiveMachine(pref, shownSpaceMachine) {
   return typeof shownSpaceMachine === "string" ? shownSpaceMachine : null;
 }
 
+// By name without case, then by UTF-16 code unit so the order is total. Not
+// localeCompare: Herdr's runtime has no Intl and its localeCompare ignores
+// options, so the order would differ between node and Herdr.
+function byName(a, b) {
+  const x = a.toLowerCase();
+  const y = b.toLowerCase();
+  if (x !== y) return x < y ? -1 : 1;
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 // This computer (null) first, then every machine Herdr knows or a space lives
 // on, once each, by name.
 export function machineNames(machines, spaces) {
   const names = new Set();
   for (const m of machines ?? []) if (typeof m?.name === "string") names.add(m.name);
   for (const s of spaces ?? []) if (typeof s?.machine === "string") names.add(s.machine);
-  return [null, ...[...names].sort()];
+  return [null, ...[...names].sort(byName)];
+}
+
+// Whether Herdr's `machines()` reports the machine with this machine key as
+// unavailable (offline, or its layout could not be read).
+export function machineUnavailable(machines, key) {
+  return (machines ?? []).some((m) => machineKey(m?.name) === key && m.layout === "unavailable");
+}
+
+// The layout node with this id, searched depth first, or null.
+export function layoutNode(node, id) {
+  if (node?.id === id) return node;
+  for (const child of node?.children ?? []) {
+    const found = layoutNode(child, id);
+    if (found) return found;
+  }
+  return null;
+}
+
+// The chip that filters the list: the chosen tool while this machine has a
+// chip for it, else null (All).
+export function activeTool(chips, tool) {
+  return tool && chips.some((c) => c.name === tool) ? tool : null;
+}
+
+// What the Installed tab shows for a machine's state: its rows (or the empty
+// state) once any scan worked, even if a later one failed; the error only
+// while there has never been a good scan; skeleton rows until the first result.
+export function installedBody(state) {
+  if (state?.skills) return state.skills.length ? "rows" : "empty";
+  return state?.error ? "error" : "skeleton";
+}
+
+// "this computer" or the machine's name, inside a sentence.
+const inSentence = (on) => (on == null ? "this computer" : machineLabel(on));
+
+// The notice for a failed scan, given the machine's state before the result:
+// only when it had a good scan (otherwise the error view says it) and only
+// when the error is new or changed, so a repeating failure is said once.
+export function scanNotice(on, before, error) {
+  if (!before?.skills || before.error === error) return null;
+  return `Can't check ${inSentence(on)}: ${error}`;
 }
 
 // `query` matches a skill's name, folder or description, ignoring case;
@@ -277,7 +328,7 @@ export function footerText(state, now) {
 }
 
 export function emptyText(on) {
-  return `No skills on ${on == null ? "this computer" : on} yet`;
+  return `No skills on ${inSentence(on)} yet`;
 }
 
 // A done notice shows for 4 s, a warning or an error for 8 s.
@@ -286,16 +337,26 @@ export function noticeShown(notice, now) {
   return now - notice.at < (notice.kind === "done" ? 4000 : 8000);
 }
 
-// The texts on screen that change with the clock alone: the footer, and the
-// notice while it is shown ("" once it runs out).
-export function clockRegions(state, notice, now) {
-  return { footer: footerText(state, now), notice: noticeShown(notice, now) ? notice.text : "" };
+// What the status line shows: work running on the machine (`busy`, its lock
+// text), else a notice that has not run out, else nothing (null).
+export function statusOf(busy, notice, now) {
+  if (busy) return { kind: "busy", text: busy };
+  return noticeShown(notice, now) ? { kind: notice.kind, text: notice.text } : null;
+}
+
+// The parts of the panel that can change with the clock alone, exactly as
+// they are drawn: the footer text and the status line (a notice runs out; a
+// stale lock's busy text drops). A notice hidden behind busy text is not drawn.
+export function clockRegions(state, busy, notice, now) {
+  return { footer: footerText(state, now), status: statusOf(busy, notice, now) };
 }
 
 // Whether the panel's clock tick has anything new to draw. Herdr redraws the
 // whole window on every notify, so the tick notifies only when this is true.
 export function regionsChanged(drawn, next) {
-  return !drawn || drawn.footer !== next.footer || drawn.notice !== next.notice;
+  if (!drawn) return true;
+  const same = (a, b) => (a === null ? b === null : b !== null && a.kind === b.kind && a.text === b.text);
+  return drawn.footer !== next.footer || !same(drawn.status, next.status);
 }
 
 // `path` with the home folder written as `~`.

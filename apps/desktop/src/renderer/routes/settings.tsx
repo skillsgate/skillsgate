@@ -43,39 +43,6 @@ function SettingSelect({
   )
 }
 
-function SettingToggle({
-  label,
-  description,
-  value,
-  onChange,
-}: {
-  label: string
-  description: string
-  value: boolean
-  onChange: (value: boolean) => void
-}) {
-  return (
-    <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-surface">
-      <div>
-        <p className="text-sm text-foreground">{label}</p>
-        <p className="text-[11px] text-muted">{description}</p>
-      </div>
-      <button
-        onClick={() => onChange(!value)}
-        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-          value ? "bg-foreground" : "bg-border"
-        }`}
-      >
-        <span
-          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
-            value ? "translate-x-4" : "translate-x-0.5"
-          }`}
-        />
-      </button>
-    </div>
-  )
-}
-
 // ---------------------------------------------------------------------------
 // Settings page
 // ---------------------------------------------------------------------------
@@ -85,7 +52,6 @@ export function Settings() {
   const [installScope, setInstallScope] = useState("global")
   const [installMethod, setInstallMethod] = useState("symlink")
   const [searchPreference, setSearchPreference] = useState("semantic")
-  const [telemetryEnabled, setTelemetryEnabled] = useState(true)
   const [customScanPaths, setCustomScanPaths] = useState<string[]>([])
   const [newScanPath, setNewScanPath] = useState("")
   const [defaultAgents, setDefaultAgents] = useState<string[]>([])
@@ -115,8 +81,6 @@ export function Settings() {
         setSearchPreference(
           all["search.preferSemantic"] ? "semantic" : "keyword",
         )
-      if (all["telemetry.enabled"] !== undefined)
-        setTelemetryEnabled(all["telemetry.enabled"] as boolean)
       if (Array.isArray(all["scan.customPaths"]))
         setCustomScanPaths(all["scan.customPaths"] as string[])
       if (Array.isArray(all["install.defaultAgents"]))
@@ -285,26 +249,6 @@ export function Settings() {
                 onChange={(v) => {
                   setSearchPreference(v)
                   saveSetting("search.preferSemantic", v === "semantic")
-                }}
-              />
-            )}
-          </div>
-        </section>
-
-        {/* Privacy */}
-        <section>
-          <h3 className="text-sm font-semibold text-foreground mb-3">
-            {t("Privacy")}
-          </h3>
-          <div className="flex flex-col gap-3">
-            {settingsLoaded && (
-              <SettingToggle
-                label={t("Telemetry")}
-                description="Send anonymous usage data to help improve SkillsGate"
-                value={telemetryEnabled}
-                onChange={(v) => {
-                  setTelemetryEnabled(v)
-                  saveSetting("telemetry.enabled", v)
                 }}
               />
             )}

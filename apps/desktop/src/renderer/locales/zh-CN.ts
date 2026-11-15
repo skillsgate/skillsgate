@@ -23,8 +23,6 @@ export const zhCN: Record<string, string> = {
   Tools: "工具",
   Targets: "安装目标",
   About: "关于",
-  Privacy: "隐私",
-  Telemetry: "遥测",
   Updates: "更新",
   Update: "更新",
   Theme: "主题",

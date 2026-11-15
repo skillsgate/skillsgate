@@ -26,7 +26,8 @@
 //                      per-machine data (MachineData)
 //   installed-tab.js   the Installed tab
 //   discover-tab.js    the Discover tab (the catalog search)
-//   machines-tab.js    the Machines tab
+//   machines-tab.js    the Machines tab (a card per machine, the follow switch,
+//                      scanning every machine while it shows)
 //   skill-dialog.js    the skill dialog
 //   catalog-dialog.js  the catalog dialog (preview, tools, Install)
 // host.js and ui.js import no view. Logic (no Herdr imports, so node --test

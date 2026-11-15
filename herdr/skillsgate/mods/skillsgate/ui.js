@@ -1,9 +1,9 @@
 // Sizes, text sizes and the small widgets several views share: buttons, tabs,
-// the dialog card, a tool's mark, the spinner, skeleton rows and the status
-// line. It imports no view.
+// switches, the dialog card, a tool's mark, the spinner, skeleton rows and the
+// status line. It imports no view.
 
 import { div, image, svg } from "gpui-kit";
-import { h_flex, v_flex, TextView } from "gpui-base";
+import { h_flex, v_flex, Switch, TextView } from "gpui-base";
 import { settings } from "herdr";
 import { MOD } from "./host.js";
 import { openableLink, toolMark } from "./view-model.js";
@@ -40,6 +40,8 @@ export const SIZE = {
   pillMax: 200,
   rowToolsMax: 120,
   messageMax: 320,
+  // the Machines tab
+  followRow: 44,
   // skeleton bars
   skeletonName: 10,
   skeletonText: 8,
@@ -126,8 +128,26 @@ export function tabButton(id, label, active, onClick, t, ts) {
     .child(label);
 }
 
-export function placeholder(text, t) {
-  return div().flex_1().min_h(0).px(14).py(14).text_color(t.dim).child(text);
+// gpui-base's Switch, drawn in the theme's colors (it comes unstyled).
+// `onChange(checked, cx)` gets the new position. A disabled switch is dimmed
+// and takes no clicks.
+export function toggleSwitch(id, on, disabled, onChange, t) {
+  return Switch.new(id)
+    .checked(on)
+    .disabled(disabled)
+    .on_change(onChange)
+    .w(SIZE.switchWidth)
+    .h(SIZE.switchHeight)
+    .flex_none()
+    .flex()
+    .items_center()
+    .p(2)
+    .rounded_full()
+    .bg(on ? t.accent : t.hover)
+    .when(on, (el) => el.justify_end())
+    .when(disabled, (el) => el.opacity(0.5))
+    .when(!disabled, (el) => el.cursor_pointer())
+    .child(div().size(SIZE.knob).rounded_full().bg(on ? t.accent_foreground : t.muted));
 }
 
 // Placeholder rows while a tab's first result is on its way (the first scan

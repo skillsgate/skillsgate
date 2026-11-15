@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import {
   activeTool,
   ago,
+  allScanDue,
   cantCheckText,
+  cardMachines,
   capMarkdown,
   catalogPreview,
   catalogRows,
@@ -15,6 +17,8 @@ import {
   effectiveMachine,
   emptyText,
   filterSkills,
+  followChoice,
+  following,
   footerText,
   formatInstalls,
   installAction,
@@ -22,12 +26,15 @@ import {
   installedFolders,
   inStore,
   layoutNode,
+  machineCard,
+  machineCards,
   machineNames,
   machineUnavailable,
   noticeShown,
   openableLink,
   regionsChanged,
   requestPending,
+  scanFailure,
   scanNotice,
   searchErrorText,
   searchKey,
@@ -42,6 +49,7 @@ import {
   toolRows,
   toolsNote,
   toolSummary,
+  viewChoice,
   withTargets,
 } from "../skillsgate/mods/skillsgate/view-model.js";
 import { createCatalog } from "../skillsgate/mods/skillsgate/catalog.js";
@@ -669,4 +677,204 @@ test("catalogPreview: the description and the body, or Preview unavailable", () 
   assert.deepEqual(catalogPreview(""), { description: "", body: "" });
   assert.deepEqual(catalogPreview(null), { message: "Preview unavailable" });
   assert.deepEqual(catalogPreview(undefined), { message: "Preview unavailable" });
+});
+
+// ---- The Machines tab ----
+
+// A machine's per-machine UI state, as the panel's MachineData keeps it.
+const machineState = (extra = {}) => ({ scan: null, skills: null, error: null, at: 0, loading: false, unavailable: false, ...extra });
+const tool = (name) => ({ name, dir: `/h/.${name}/skills`, detected: true });
+const machineScan = (git = true) => ({ home: "/h", git, tools: ["claude-code", "cursor", "codex-cli", "universal"].map(tool), entries: [] });
+// 3 skills over 2 tools: Claude Code has all three, Cursor one.
+const threeSkills = () => [sk("a", "store", ["claude-code"]), sk("b", "store", ["claude-code", "cursor"]), sk("c", "store", ["claude-code"])];
+const loaded = (extra = {}) => machineState({ scan: machineScan(), skills: threeSkills(), at: 1, ...extra });
+
+test("machineCard for a loaded machine", () => {
+  assert.deepEqual(machineCard("sulvali", loaded(), "sulvali"), {
+    label: "sulvali",
+    viewing: true,
+    dot: "ok",
+    summary: "3 skills · 2 tools",
+    topTools: ["Claude Code", "Cursor"],
+    problem: null,
+  });
+});
+test("machineCard before the first scan", () => {
+  const card = machineCard("vps", machineState({ loading: true }), null);
+  assert.deepEqual(card, { label: "vps", viewing: false, dot: "loading", summary: "", topTools: [], problem: null });
+  // No state yet, or a scan not started yet, reads the same.
+  assert.deepEqual(machineCard("vps", undefined, null), card);
+  assert.deepEqual(machineCard("vps", machineState(), null), card);
+});
+test("machineCard for a machine it can't reach", () => {
+  const card = machineCard("vps", machineState({ error: "machine vps is unreachable" }), null);
+  assert.equal(card.dot, "off");
+  assert.equal(card.problem, "Can't reach vps");
+  assert.equal(card.summary, "");
+  assert.deepEqual(card.topTools, []);
+});
+test("machineCard without git", () => {
+  const card = machineCard("vps", machineState({ scan: machineScan(false), skills: threeSkills(), at: 1 }), null);
+  assert.equal(card.problem, "git is not installed, so installs are off");
+  assert.equal(card.dot, "ok");
+  assert.equal(card.summary, "3 skills · 2 tools");
+});
+
+test("machineCard: the label, and the viewed machine's card says it is viewed", () => {
+  assert.equal(machineCard(null, loaded(), null).label, "This computer");
+  assert.equal(machineCard(null, loaded(), null).viewing, true);
+  assert.equal(machineCard(null, loaded(), "sulvali").viewing, false);
+  assert.equal(machineCard("sulvali", loaded(), null).viewing, false);
+  assert.equal(machineCard("sulvali", loaded(), "vps").viewing, false);
+});
+test("machineCard's top tools: the three with the most skills, ties in registry order", () => {
+  const skills = [
+    sk("a", "store", ["cursor", "codex-cli", "universal"]),
+    sk("b", "store", ["claude-code", "codex-cli", "universal"]),
+    sk("c", "store", ["claude-code", "universal"]),
+    sk("d", "store", ["universal"]),
+  ];
+  // universal 4, claude-code 2, codex-cli 2, cursor 1 ("Universal" is printed without its folder note)
+  const card = machineCard("vps", machineState({ scan: machineScan(), skills, at: 1 }), null);
+  assert.deepEqual(card.topTools, ["Universal", "Claude Code", "Codex CLI"]);
+  assert.equal(card.summary, "4 skills · 4 tools");
+  const none = machineCard("vps", machineState({ scan: machineScan(), skills: [], at: 1 }), null);
+  assert.deepEqual([none.summary, none.topTools, none.dot], ["0 skills · 0 tools", [], "ok"]);
+});
+test("machineCard says Can't reach for every way Herdr reports an unreachable machine", () => {
+  // Seen from Herdr 0.1.15's in-app exec: an unknown machine, and a scan that
+  // ran out of time on a remote machine. The others are herdr-core's own texts.
+  for (const error of [
+    '`herdr.exec`: unknown machine "vps"',
+    "`herdr.exec`: sh took longer than 30 s on vps and was stopped",
+    "`herdr.exec`: vps is not connected",
+    "`herdr.exec`: vps is unreachable: connection refused",
+    "`herdr.exec`: still connecting to vps",
+    "`herdr.exec`: lost the line to vps during the call",
+    "`herdr.exec`: vps didn't answer within 10 s",
+    "`herdr.exec`: vps sent nothing for 30 s: line given up",
+    "machine vps is unreachable",
+  ]) {
+    const card = machineCard("vps", machineState({ error }), null);
+    assert.deepEqual([card.dot, card.problem], ["off", "Can't reach vps"], error);
+  }
+});
+test("machineCard: Herdr reporting the machine unavailable is Can't reach, and the last counts stay", () => {
+  const card = machineCard("sulvali", loaded({ unavailable: true }), "sulvali");
+  assert.deepEqual(card, {
+    label: "sulvali",
+    viewing: true,
+    dot: "off",
+    summary: "3 skills · 2 tools",
+    topTools: ["Claude Code", "Cursor"],
+    problem: "Can't reach sulvali",
+  });
+  assert.equal(machineCard("vps", machineState({ unavailable: true, loading: true }), null).problem, "Can't reach vps");
+});
+test("machineCard: a scan that fails after a good one keeps the last counts and shows the problem", () => {
+  const card = machineCard("sulvali", loaded({ error: "`herdr.exec`: sulvali is not connected" }), null);
+  assert.deepEqual([card.dot, card.summary, card.topTools, card.problem], ["off", "3 skills · 2 tools", ["Claude Code", "Cursor"], "Can't reach sulvali"]);
+  // The error wins over the git line.
+  const noGit = machineCard("vps", machineState({ scan: machineScan(false), skills: [], at: 1, error: "Unreadable scan" }), null);
+  assert.equal(noGit.problem, "Unreadable scan");
+});
+test("machineCard for a machine without a POSIX shell", () => {
+  const shell = "has no POSIX shell. SkillsGate for Herdr supports macOS and Linux machines.";
+  // Herdr's own Files mod reads this text as a Windows machine.
+  const card = machineCard("win", machineState({ error: "`herdr.exec`: cannot start sh: program not found" }), null);
+  assert.deepEqual([card.dot, card.problem], ["off", `win ${shell}`]);
+  assert.equal(machineCard(null, machineState({ error: "`herdr.exec`: cannot run sh: No such file or directory (os error 2)" }), null).problem, `This computer ${shell}`);
+  assert.equal(machineCard("win", machineState({ error: "sh: not found" }), null).problem, `win ${shell}`);
+  assert.equal(machineCard("win", machineState({ error: "'sh' is not recognized as an internal or external command," }), null).problem, `win ${shell}`);
+});
+test("machineCard shows any other error as it is, without Herdr's prefix", () => {
+  const card = (error, on = "vps") => machineCard(on, machineState({ error }), null);
+  assert.deepEqual([card("Unreadable scan").dot, card("Unreadable scan").problem], ["off", "Unreadable scan"]);
+  assert.equal(card("`herdr.exec`: vps needs a login typed by a person in a terminal: hc machine login vps").problem, "vps needs a login typed by a person in a terminal: hc machine login vps");
+  // A scan that runs too long on this computer is not a reachability problem.
+  assert.equal(card("`herdr.exec`: sh took longer than 30 s and was stopped", null).problem, "sh took longer than 30 s and was stopped");
+  // sh reporting another program missing is not a missing shell.
+  assert.equal(card("sh: 1: awk: not found").problem, "sh: 1: awk: not found");
+  assert.equal(card("Exited with code 2").problem, "Exited with code 2");
+});
+test("scanFailure classifies a failed scan's error", () => {
+  assert.equal(scanFailure('`herdr.exec`: unknown machine "vps"'), "unreachable");
+  assert.equal(scanFailure("`herdr.exec`: sh took longer than 30 s on vps and was stopped"), "unreachable");
+  assert.equal(scanFailure("`herdr.exec`: sh took longer than 30 s and was stopped"), "other");
+  assert.equal(scanFailure("`herdr.exec`: cannot start sh: program not found"), "shell");
+  assert.equal(scanFailure("`herdr.exec`: cannot start no-such-prog: No such file or directory (os error 2)"), "other");
+  assert.equal(scanFailure("Machine vps is down"), "unreachable");
+  assert.equal(scanFailure(""), "other");
+  assert.equal(scanFailure(undefined), "other");
+});
+
+test("machineCards: this computer first, then by name, each with its card", () => {
+  const states = new Map([["", loaded()], ["sulvali", machineState({ error: '`herdr.exec`: unknown machine "sulvali"' })]]);
+  const cards = machineCards({
+    machines: [{ name: null, layout: "ready" }, { name: "sulvali", layout: "ready" }],
+    spaces: [{ machine: "box" }, { machine: null }],
+    viewed: "sulvali",
+    stateOf: (on) => states.get(on ?? ""),
+  });
+  assert.deepEqual(cards.map((c) => [c.on, c.label, c.viewing, c.dot]), [
+    [null, "This computer", false, "ok"],
+    ["box", "box", false, "loading"],
+    ["sulvali", "sulvali", true, "off"],
+  ]);
+  assert.equal(cards[2].problem, "Can't reach sulvali");
+  assert.equal(cards[0].summary, "3 skills · 2 tools");
+});
+test("machineCards keeps a card for the viewed machine after Herdr forgets it", () => {
+  const cards = machineCards({ machines: [{ name: null }, { name: "zed" }], spaces: [], viewed: "gone", stateOf: () => undefined });
+  assert.deepEqual(cards.map((c) => [c.on, c.viewing]), [[null, false], ["gone", true], ["zed", false]]);
+  assert.deepEqual(cardMachines([{ name: "zed" }], [], "zed"), [null, "zed"]);
+  assert.deepEqual(cardMachines([], [], null), [null]);
+  assert.deepEqual(cardMachines(undefined, undefined, "a"), [null, "a"]);
+});
+
+test("following: the follow switch is on unless a machine was chosen", () => {
+  assert.equal(following(undefined), true);
+  assert.equal(following(null), true);
+  assert.equal(following({ follow: true }), true);
+  assert.equal(following({ follow: true, on: "vps" }), true);
+  assert.equal(following({ follow: false, on: "vps" }), false);
+  assert.equal(following({ follow: false, on: null }), false);
+  assert.equal(following("vps"), true);
+  // On exactly when the panel views the shown space's machine whatever it is.
+  for (const pref of [undefined, null, { follow: true }, { follow: false, on: "vps" }, { follow: false, on: null }, "x"]) {
+    const tracks = effectiveMachine(pref, "a") === "a" && effectiveMachine(pref, "b") === "b";
+    assert.equal(following(pref), tracks, JSON.stringify(pref));
+  }
+});
+test("followChoice and viewChoice: what the switch and a card write", () => {
+  assert.deepEqual(followChoice(true, "vps"), { follow: true });
+  assert.deepEqual(followChoice(false, "vps"), { follow: false, on: "vps" });
+  assert.deepEqual(followChoice(false, null), { follow: false, on: null });
+  assert.deepEqual(followChoice(false, undefined), { follow: false, on: null });
+  assert.deepEqual(viewChoice("sulvali"), { follow: false, on: "sulvali" });
+  assert.deepEqual(viewChoice(null), { follow: false, on: null });
+  // Turning following off keeps the machine viewed now; a card views its machine.
+  assert.equal(effectiveMachine(followChoice(false, "vps"), "box"), "vps");
+  assert.equal(effectiveMachine(followChoice(true, "vps"), "box"), "box");
+  assert.equal(effectiveMachine(viewChoice(null), "box"), null);
+  assert.equal(effectiveMachine(viewChoice("sulvali"), null), "sulvali");
+});
+test("following the shown space: the viewed machine is the shown space's until a card is chosen", () => {
+  // The panel views effectiveMachine(choice, <the shown space's machine>).
+  let choice; // absent: following
+  assert.equal(effectiveMachine(choice, null), null);
+  assert.equal(effectiveMachine(choice, "sulvali"), "sulvali"); // a space on sulvali is shown
+  choice = viewChoice(null); // a click on This computer's card
+  assert.equal(effectiveMachine(choice, "sulvali"), null);
+  assert.equal(following(choice), false);
+  choice = followChoice(true, effectiveMachine(choice, "sulvali")); // the switch back on
+  assert.equal(effectiveMachine(choice, "sulvali"), "sulvali");
+  assert.equal(effectiveMachine(choice, null), null);
+});
+test("allScanDue: on opening, then every 60 s", () => {
+  assert.equal(allScanDue(null, 5), true); // the tab was not showing
+  assert.equal(allScanDue(1000, 1000), false);
+  assert.equal(allScanDue(1000, 60999), false);
+  assert.equal(allScanDue(1000, 61000), true);
+  assert.equal(allScanDue(5000, 1000), true); // the clock went back
 });

@@ -43,9 +43,10 @@ class MachineData {
 
   // Starts a scan of machine `on` unless one is already running, and says
   // whether it started. It may be called from render: the work begins after
-  // the frame. The result redraws by itself; a caller outside render redraws
-  // when this returns true (the Refresh icon starts spinning).
-  scan(on, cx) {
+  // the frame. The result redraws by itself, unless `unchanged()` says after
+  // it that nothing on screen reads differently; a caller outside render
+  // redraws when this returns true (the Refresh icon starts spinning).
+  scan(on, cx, unchanged = null) {
     const state = this.state(on);
     if (state.loading) return false;
     state.loading = true;
@@ -53,7 +54,7 @@ class MachineData {
     cx.spawn(async (cx) => {
       await cx.sleep(0);
       await this.load(on, true);
-      cx.notify();
+      if (!unchanged?.()) cx.notify();
     });
     return true;
   }
@@ -131,7 +132,11 @@ export default class Panel {
     const select = (tab, cx) => this.select(tab, cx);
     const rescan = (on, cx) => this.data.scan(on, cx);
     const discoverShown = () => this.tab === "discover" && !panelHidden();
-    this.views = { installed: new InstalledTab(select, rescan), discover: new DiscoverTab(discoverShown), machines: new MachinesTab() };
+    this.views = {
+      installed: new InstalledTab(select, rescan),
+      discover: new DiscoverTab(discoverShown),
+      machines: new MachinesTab(this.data, select),
+    };
     cx.timer.every(SCAN_EVERY_MS, (cx) => {
       if (panelHidden()) return;
       if (this.data.scan(viewedMachine(), cx)) cx.notify();
@@ -178,20 +183,28 @@ export default class Panel {
     }
   }
 
-  // Every second: pick up a request (also while hidden: see pump). While the
-  // panel is hidden, only note that it is (so showing it again rescans).
-  // While it shows, redraw only when a part that changes with the clock alone
-  // ("checked 10s ago", a notice running out) would read differently from the
-  // last frame.
+  // Whether the Machines tab shows in a shown panel: only then does it scan
+  // every machine (MachinesTab.keepFresh).
+  machinesShown() {
+    return this.tab === "machines" && !panelHidden();
+  }
+
+  // Every second: pick up a request (also while hidden: see pump), and let the
+  // Machines tab start its due scans (it stops while hidden or on another
+  // tab). While the panel is hidden, only note that it is (so showing it again
+  // rescans). While it shows, redraw only when a scan started that the footer
+  // shows, or a part that changes with the clock alone ("checked 10s ago", a
+  // notice running out) would read differently from the last frame.
   tick(cx) {
     this.pump(cx);
+    const on = viewedMachine();
+    const started = this.views.machines.keepFresh(this.machinesShown(), on, cx);
     if (panelHidden()) {
       this.wasHidden = true;
       return;
     }
-    const on = viewedMachine();
     const next = clockRegions(this.data.state(on), channel.textAt(on), channel.notice(), Date.now());
-    if (this.wasHidden || regionsChanged(this.drawn, next)) cx.notify();
+    if (started || this.wasHidden || regionsChanged(this.drawn, next)) cx.notify();
   }
 
   select(tab, cx) {
@@ -199,8 +212,10 @@ export default class Panel {
     cx.notify();
   }
 
+  // The footer's Refresh: the viewed machine, or every machine on Machines.
   refresh(on, cx) {
-    if (this.data.scan(on, cx)) cx.notify();
+    const started = this.tab === "machines" ? this.views.machines.scanAll(on, cx) : this.data.scan(on, cx);
+    if (started) cx.notify();
   }
 
   render(cx) {
@@ -209,6 +224,8 @@ export default class Panel {
     this.pump(cx);
     const on = viewedMachine();
     this.watch(on, cx);
+    // Before markUnavailable, so every card's machine has its state.
+    this.views.machines.keepFresh(this.machinesShown(), on, cx);
     const state = this.data.state(on);
     this.data.markUnavailable();
     // One clock reading per frame, so what is drawn is exactly what is recorded.

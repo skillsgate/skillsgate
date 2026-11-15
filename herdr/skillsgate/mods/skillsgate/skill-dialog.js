@@ -8,10 +8,22 @@
 // a request it sent has no outcome yet (requestPending).
 
 import { div, svg } from "gpui-kit";
-import { h_flex, v_flex, Scrollbar, Switch } from "gpui-base";
+import { h_flex, v_flex, Scrollbar } from "gpui-base";
 import { closeOverlay, knownAgents, props, theme } from "herdr";
 import { channel, errorText, machine, readText } from "./host.js";
-import { SIZE, button, dialogCard, icon, iconButton, markdownView, spinner, tabButton, textSizes, toolMarkBox } from "./ui.js";
+import {
+  SIZE,
+  button,
+  dialogCard,
+  icon,
+  iconButton,
+  markdownView,
+  spinner,
+  tabButton,
+  textSizes,
+  toggleSwitch,
+  toolMarkBox,
+} from "./ui.js";
 import { machineLabel, shortPath } from "./model.js";
 import { cantCheckText, deleteLabel, requestPending, skillDocument, toolRows, toolsNote } from "./view-model.js";
 
@@ -292,22 +304,7 @@ export default class SkillDialog {
   }
 
   switchFor(row, locked, t) {
-    return Switch.new(`sg-skill-switch-${row.name}`)
-      .checked(row.on)
-      .disabled(locked)
-      .on_change((checked) => this.toggle(row.name, checked))
-      .w(SIZE.switchWidth)
-      .h(SIZE.switchHeight)
-      .flex_none()
-      .flex()
-      .items_center()
-      .p(2)
-      .rounded_full()
-      .bg(row.on ? t.accent : t.hover)
-      .when(row.on, (el) => el.justify_end())
-      .when(locked, (el) => el.opacity(0.5))
-      .when(!locked, (el) => el.cursor_pointer())
-      .child(div().size(SIZE.knob).rounded_full().bg(row.on ? t.accent_foreground : t.muted));
+    return toggleSwitch(`sg-skill-switch-${row.name}`, row.on, locked, (checked) => this.toggle(row.name, checked), t);
   }
 
   // Delete at the left, the machine's running work in the middle, Done at the right.

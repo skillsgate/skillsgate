@@ -1,10 +1,12 @@
 // Pure decisions about what each view shows: the panel's frame and its
-// Installed tab, the skill dialog, Discover and the catalog dialog. The data
-// they read (scans, skills, names and labels) comes from model.js.
+// Installed tab, the Machines tab, the skill dialog, Discover and the catalog
+// dialog. The data they read (scans, skills, names and labels) comes from
+// model.js.
 import { TOOLS, UNIVERSAL } from "./registry.js";
 import {
   machineInSentence,
   machineKey,
+  machineLabel,
   parseFrontmatter,
   sanitizeName,
   shortPath,
@@ -170,6 +172,81 @@ export function regionsChanged(drawn, next) {
   const same = (a, b) => (a === null ? b === null : b !== null && a.kind === b.kind && a.text === b.text);
   return drawn.footer !== next.footer || !same(drawn.status, next.status);
 }
+
+// ---- What the Machines tab shows ----
+
+// What a failed scan's error says: "unreachable", "shell" (no POSIX sh) or
+// "other". Seen from this mod's exec on Herdr 0.1.15, after "`herdr.exec`: ":
+//   unknown machine "<name>"
+//   sh took longer than 30 s on <name> and was stopped   (this computer: no "on <name>")
+//   cannot start <program>: No such file or directory (os error 2)
+// herdr-core's other texts ("<name> is not connected", "<name> is unreachable:
+// <why>", "still connecting to <name>", ...) and the Windows text ("cannot
+// start sh: program not found", which Herdr's own Files mod checks for) are
+// untested here. Last, the brief's rules: an error starting with "machine",
+// or one saying sh itself is missing.
+const UNREACHABLE =
+  /^unknown machine\b| took longer than .+ on .+ and was stopped$|^\S+ (is not connected|is unreachable|didn't answer within|sent nothing for)\b|^(still connecting to|lost the line to) |^machine\b/i;
+const NO_SHELL = /^cannot (start|run) sh\b|(^|[\s'"`])sh(\.exe)?['"`]?(:| is) (command )?(not found|not recognized)/i;
+const herdrText = (error) => String(error ?? "").replace(/^`[^`]*`:\s*/, ""); // without "`herdr.exec`: "
+
+export function scanFailure(error) {
+  const text = herdrText(error);
+  return UNREACHABLE.test(text) ? "unreachable" : NO_SHELL.test(text) ? "shell" : "other";
+}
+
+// The three tools with the most skills (ties in registry order), as printed.
+function topTools(scan, skills) {
+  const chips = toolChips(scan, skills).map((chip, i) => ({ chip, i }));
+  return chips.sort((a, b) => b.chip.count - a.chip.count || a.i - b.i).slice(0, 3).map(({ chip }) => toolLabel(chip.name));
+}
+
+// One machine's card. `state` is its `{ scan, skills, error, loading,
+// unavailable }`; `viewed` is the machine the panel views (null: this
+// computer). A failed scan after a good one keeps the counts.
+export function machineCard(on, state, viewed) {
+  const good = Boolean(state?.scan && state.skills);
+  const failure = state?.unavailable ? "unreachable" : state?.error ? scanFailure(state.error) : null;
+  let problem = null;
+  if (failure === "unreachable") problem = `Can't reach ${inSentence(on)}`;
+  else if (failure === "shell") problem = `${machineLabel(on)} has no POSIX shell. SkillsGate for Herdr supports macOS and Linux machines.`;
+  else if (failure) problem = herdrText(state.error);
+  else if (good && !state.scan.git) problem = "git is not installed, so installs are off";
+  return {
+    label: machineLabel(on),
+    viewing: machineKey(on) === machineKey(viewed),
+    dot: failure ? "off" : good ? "ok" : "loading",
+    summary: good ? summaryText(state.scan, state.skills) : "",
+    topTools: good ? topTools(state.scan, state.skills) : [],
+    problem,
+  };
+}
+
+// The machines with a card: every machine Herdr knows or a space lives on,
+// and the viewed one even after Herdr forgot it; this computer first.
+export function cardMachines(machines, spaces, viewed) {
+  const names = machineNames(machines, spaces);
+  if (typeof viewed !== "string" || names.includes(viewed)) return names;
+  return machineNames(machines, [...(spaces ?? []), { machine: viewed }]);
+}
+
+// The Machines tab's cards, in order: `{ on, ...machineCard }`. `stateOf(on)`
+// is that machine's state, or undefined before its first scan starts.
+export function machineCards({ machines, spaces, viewed, stateOf }) {
+  return cardMachines(machines, spaces, viewed).map((on) => ({ on, ...machineCard(on, stateOf(on), viewed) }));
+}
+
+// The follow switch, from the stored choice (on unless a machine was chosen,
+// the rule effectiveMachine reads it by); what it writes (off keeps viewing
+// the machine viewed now); what a card writes (its machine, until following
+// is switched back on).
+export const following = (pref) => !(pref !== null && typeof pref === "object" && pref.follow === false);
+export const followChoice = (follow, viewedNow) => (follow ? { follow: true } : { follow: false, on: viewedNow ?? null });
+export const viewChoice = (on) => ({ follow: false, on: on ?? null });
+
+// Whether the tab scans every machine now: when it opens (`at` is null while
+// it is not shown), then 60 s after the last time.
+export const allScanDue = (at, now) => at === null || now - at >= 60000 || now < at;
 
 // ---- What the skill dialog shows ----
 

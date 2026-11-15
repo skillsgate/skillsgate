@@ -45,7 +45,11 @@ export const errorText = (error) => String(error?.message ?? error);
 export const panelNode = () => layoutNode(layout(), PANEL);
 export const panelHidden = () => Boolean(panelNode()?.hidden);
 const shownSpaceMachine = () => spaces().find((s) => s.active)?.machine ?? null;
-export const viewedMachine = () => effectiveMachine(shared(MACHINE_CHOICE), shownSpaceMachine());
+// The stored choice of machine ({ follow, on }; absent means following). Only
+// a click writes it: a card or the follow switch on the Machines tab.
+export const machineChoice = () => shared(MACHINE_CHOICE);
+export const setMachineChoice = (choice) => setShared(MACHINE_CHOICE, choice);
+export const viewedMachine = () => effectiveMachine(machineChoice(), shownSpaceMachine());
 
 // The ids of requests a copy of this build has taken. Copies of one build
 // share module state, so a second panel copy (mod.open puts one anywhere)

@@ -581,7 +581,7 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
     const { m, r, calls } = await setup();
     const before = calls.length;
     assert.deepEqual(await m.install(null, { ...r.scan, git: false }, installed("alpha")), { ok: false, error: "git is not installed on this computer" });
-    assert.deepEqual(await m.install("sulvali", { ...r.scan, git: false }, installed("alpha")), { ok: false, error: "git is not installed on sulvali" });
+    assert.deepEqual(await m.install("remote-box", { ...r.scan, git: false }, installed("alpha")), { ok: false, error: "git is not installed on remote-box" });
     assert.equal(calls.length, before);
   });
   it("install maps the script's exit 127 to the git message", async () => {

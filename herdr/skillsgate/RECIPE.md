@@ -88,7 +88,7 @@ Say all three to the person before adding the mod.
 
 ### Files
 
-One mod, `mods/skillsgate/`, with `mod.json` `{ "place": "none", "title": "SkillsGate", "focusable": true }`. To test the logic modules under `node --test`, a `package.json` with `{ "private": true, "type": "module" }` must sit in a folder above the mod, so `node` reads its `.js` files as modules (Herdr itself does not need it; the SkillsGate monorepo has one at `herdr/package.json`). One mod copy plays one role, chosen by `props().role`: none (the panel), `toggle`, `skill` (props `{ role, on, key }`: the machine's name or null, and the skill's real path) or `catalog` (props `{ role, on, row: { source, skillId, name, installs } }`).
+One mod, `mods/skillsgate/`, with `mod.json` `{ "place": "none", "title": "SkillsGate" }` (no `focusable`: the panel and the button handle no keys, so Herdr's pane navigation passes them by). To test the logic modules under `node --test`, a `package.json` with `{ "private": true, "type": "module" }` must sit in a folder above the mod, so `node` reads its `.js` files as modules (Herdr itself does not need it; the SkillsGate monorepo has one at `herdr/package.json`). One mod copy plays one role, chosen by `props().role`: none (the panel), `toggle`, `skill` (props `{ role, on, key }`: the machine's name or null, and the skill's real path) or `catalog` (props `{ role, on, row: { source, skillId, name, installs } }`).
 
 Views draw with Herdr's UI kit and may import Herdr:
 

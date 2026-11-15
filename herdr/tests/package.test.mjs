@@ -196,8 +196,8 @@ test("tool folders that are not $HOME/.<name>/skills", () => {
   assert.deepEqual(TOOLS.find((t) => t.name === "universal").detect, ["$HOME"]);
 });
 
-test("mod.json", () =>
-  assert.deepEqual(JSON.parse(readFileSync(MOD + "/mod.json", "utf8")), { place: "none", title: "SkillsGate", focusable: true }));
+// No "focusable": no copy handles the keyboard focus Herdr would hand it.
+test("mod.json", () => assert.deepEqual(JSON.parse(readFileSync(MOD + "/mod.json", "utf8")), { place: "none", title: "SkillsGate" }));
 
 // Logic modules take Herdr's functions as arguments, so node --test covers
 // them. Views draw with Herdr's UI kit and may import Herdr. A new file must

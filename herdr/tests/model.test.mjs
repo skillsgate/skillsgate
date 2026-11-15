@@ -78,9 +78,9 @@ test("toolByName", () => {
 });
 test("machineKey and machineLabel", () => {
   assert.equal(machineKey(null), "");
-  assert.equal(machineKey("sulvali"), "sulvali");
+  assert.equal(machineKey("remote-box"), "remote-box");
   assert.equal(machineLabel(null), "This computer");
-  assert.equal(machineLabel("sulvali"), "sulvali");
+  assert.equal(machineLabel("remote-box"), "remote-box");
 });
 test("lockPath", () => assert.equal(lockPath({ home: "/h" }), "/h/.agents/.skill-lock.json"));
 test("mergeLock starts a lock and keeps installedAt", () => {

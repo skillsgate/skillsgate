@@ -769,8 +769,8 @@ const threeSkills = () => [sk("a", "store", ["claude-code"]), sk("b", "store", [
 const loaded = (extra = {}) => machineState({ scan: machineScan(), skills: threeSkills(), at: 1, ...extra });
 
 test("machineCard for a loaded machine", () => {
-  assert.deepEqual(machineCard("sulvali", loaded(), "sulvali"), {
-    label: "sulvali",
+  assert.deepEqual(machineCard("remote-box", loaded(), "remote-box"), {
+    label: "remote-box",
     viewing: true,
     dot: "ok",
     summary: "3 skills · 2 tools",
@@ -802,9 +802,9 @@ test("machineCard without git", () => {
 test("machineCard: the label, and the viewed machine's card says it is viewed", () => {
   assert.equal(machineCard(null, loaded(), null).label, "This computer");
   assert.equal(machineCard(null, loaded(), null).viewing, true);
-  assert.equal(machineCard(null, loaded(), "sulvali").viewing, false);
-  assert.equal(machineCard("sulvali", loaded(), null).viewing, false);
-  assert.equal(machineCard("sulvali", loaded(), "vps").viewing, false);
+  assert.equal(machineCard(null, loaded(), "remote-box").viewing, false);
+  assert.equal(machineCard("remote-box", loaded(), null).viewing, false);
+  assert.equal(machineCard("remote-box", loaded(), "vps").viewing, false);
 });
 test("machineCard's top tools: the three with the most skills, ties in registry order", () => {
   const skills = [
@@ -839,20 +839,20 @@ test("machineCard says Can't reach for every way Herdr reports an unreachable ma
   }
 });
 test("machineCard: Herdr reporting the machine unavailable is Can't reach, and the last counts stay", () => {
-  const card = machineCard("sulvali", loaded({ unavailable: true }), "sulvali");
+  const card = machineCard("remote-box", loaded({ unavailable: true }), "remote-box");
   assert.deepEqual(card, {
-    label: "sulvali",
+    label: "remote-box",
     viewing: true,
     dot: "off",
     summary: "3 skills · 2 tools",
     topTools: ["Claude Code", "Cursor"],
-    problem: "Can't reach sulvali",
+    problem: "Can't reach remote-box",
   });
   assert.equal(machineCard("vps", machineState({ unavailable: true, loading: true }), null).problem, "Can't reach vps");
 });
 test("machineCard: a scan that fails after a good one keeps the last counts and shows the problem", () => {
-  const card = machineCard("sulvali", loaded({ error: "`herdr.exec`: sulvali is not connected" }), null);
-  assert.deepEqual([card.dot, card.summary, card.topTools, card.problem], ["off", "3 skills · 2 tools", ["Claude Code", "Cursor"], "Can't reach sulvali"]);
+  const card = machineCard("remote-box", loaded({ error: "`herdr.exec`: remote-box is not connected" }), null);
+  assert.deepEqual([card.dot, card.summary, card.topTools, card.problem], ["off", "3 skills · 2 tools", ["Claude Code", "Cursor"], "Can't reach remote-box"]);
   // The error wins over the git line.
   const noGit = machineCard("vps", machineState({ scan: machineScan(false), skills: [], at: 1, error: "Unreadable scan" }), null);
   assert.equal(noGit.problem, "Unreadable scan");
@@ -888,19 +888,19 @@ test("scanFailure classifies a failed scan's error", () => {
 });
 
 test("machineCards: this computer first, then by name, each with its card", () => {
-  const states = new Map([["", loaded()], ["sulvali", machineState({ error: '`herdr.exec`: unknown machine "sulvali"' })]]);
+  const states = new Map([["", loaded()], ["remote-box", machineState({ error: '`herdr.exec`: unknown machine "remote-box"' })]]);
   const cards = machineCards({
-    machines: [{ name: null, layout: "ready" }, { name: "sulvali", layout: "ready" }],
+    machines: [{ name: null, layout: "ready" }, { name: "remote-box", layout: "ready" }],
     spaces: [{ machine: "box" }, { machine: null }],
-    viewed: "sulvali",
+    viewed: "remote-box",
     stateOf: (on) => states.get(on ?? ""),
   });
   assert.deepEqual(cards.map((c) => [c.on, c.label, c.viewing, c.dot]), [
     [null, "This computer", false, "ok"],
     ["box", "box", false, "loading"],
-    ["sulvali", "sulvali", true, "off"],
+    ["remote-box", "remote-box", true, "off"],
   ]);
-  assert.equal(cards[2].problem, "Can't reach sulvali");
+  assert.equal(cards[2].problem, "Can't reach remote-box");
   assert.equal(cards[0].summary, "3 skills · 2 tools");
 });
 test("machineCards keeps a card for the viewed machine after Herdr forgets it", () => {
@@ -930,24 +930,24 @@ test("followChoice and viewChoice: what the switch and a card write", () => {
   assert.deepEqual(followChoice(false, "vps"), { follow: false, on: "vps" });
   assert.deepEqual(followChoice(false, null), { follow: false, on: null });
   assert.deepEqual(followChoice(false, undefined), { follow: false, on: null });
-  assert.deepEqual(viewChoice("sulvali"), { follow: false, on: "sulvali" });
+  assert.deepEqual(viewChoice("remote-box"), { follow: false, on: "remote-box" });
   assert.deepEqual(viewChoice(null), { follow: false, on: null });
   // Turning following off keeps the machine viewed now; a card views its machine.
   assert.equal(effectiveMachine(followChoice(false, "vps"), "box"), "vps");
   assert.equal(effectiveMachine(followChoice(true, "vps"), "box"), "box");
   assert.equal(effectiveMachine(viewChoice(null), "box"), null);
-  assert.equal(effectiveMachine(viewChoice("sulvali"), null), "sulvali");
+  assert.equal(effectiveMachine(viewChoice("remote-box"), null), "remote-box");
 });
 test("following the shown space: the viewed machine is the shown space's until a card is chosen", () => {
   // The panel views effectiveMachine(choice, <the shown space's machine>).
   let choice; // absent: following
   assert.equal(effectiveMachine(choice, null), null);
-  assert.equal(effectiveMachine(choice, "sulvali"), "sulvali"); // a space on sulvali is shown
+  assert.equal(effectiveMachine(choice, "remote-box"), "remote-box"); // a space on remote-box is shown
   choice = viewChoice(null); // a click on This computer's card
-  assert.equal(effectiveMachine(choice, "sulvali"), null);
+  assert.equal(effectiveMachine(choice, "remote-box"), null);
   assert.equal(following(choice), false);
-  choice = followChoice(true, effectiveMachine(choice, "sulvali")); // the switch back on
-  assert.equal(effectiveMachine(choice, "sulvali"), "sulvali");
+  choice = followChoice(true, effectiveMachine(choice, "remote-box")); // the switch back on
+  assert.equal(effectiveMachine(choice, "remote-box"), "remote-box");
   assert.equal(effectiveMachine(choice, null), null);
 });
 test("allScanDue: on opening, then every 60 s", () => {

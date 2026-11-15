@@ -162,7 +162,8 @@ export default class SkillDialog {
     cx.notify();
   }
 
-  key(e, cx) {
+  // Esc closes the dialog. (Not named `key`: that field is the skill's key.)
+  onKey(e, cx) {
     if (e.key !== "escape") return;
     this.close();
     cx.stop_propagation();
@@ -176,7 +177,7 @@ export default class SkillDialog {
       this.rev = rev;
       this.read(cx);
     }
-    const card = dialogCard("sg-skill", this.handle, (e, cx) => this.key(e, cx), t, ts);
+    const card = dialogCard("sg-skill", this.handle, (e, cx) => this.onKey(e, cx), t, ts);
     const skill = this.skill;
     if (!skill) {
       const text = this.error ? cantCheckText(this.on, this.error) : "Loading…";

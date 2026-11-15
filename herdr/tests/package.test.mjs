@@ -53,3 +53,48 @@ test("logic imports only logic, and host.js and ui.js import no view", () => {
   assert.deepEqual(localImports("host.js").filter((i) => !LOGIC.includes(i)), []);
   assert.deepEqual(localImports("ui.js").filter((i) => !LOGIC.includes(i) && i !== "host.js"), []);
 });
+
+// Each class in a file, read from the source text as the code is formatted:
+// a class runs from its `class Name` line to the next "}" at column 0, its
+// methods and getters are the members written two spaces in, and its fields
+// are every `this.<name> =` inside it.
+function classesOf(text) {
+  const lines = text.split("\n");
+  const classes = [];
+  for (let i = 0; i < lines.length; i++) {
+    const head = /^(?:export\s+)?(?:default\s+)?class\s+([A-Za-z_$][\w$]*)/.exec(lines[i]);
+    if (!head) continue;
+    let end = i + 1;
+    while (end < lines.length && lines[end] !== "}") end++;
+    const body = lines.slice(i + 1, end);
+    const methods = new Set();
+    for (const line of body) {
+      const m = /^ {2}(?:static\s+)?(?:async\s+)?(?:get\s+|set\s+)?\*?([A-Za-z_$][\w$]*)\s*\(/.exec(line);
+      if (m && m[1] !== "constructor") methods.add(m[1]);
+    }
+    const fields = new Set([...body.join("\n").matchAll(/this\.([A-Za-z_$][\w$]*)\s*=(?!=)/g)].map((m) => m[1]));
+    classes.push({ name: head[1], methods, fields });
+    i = end;
+  }
+  return classes;
+}
+
+test("no view class assigns a field with the name of one of its methods", () => {
+  // A field written in init hides the method of the same name, so a handler
+  // calling the method throws.
+  const clashes = [];
+  for (const f of VIEWS) {
+    for (const c of classesOf(source(f))) {
+      for (const name of c.fields) if (c.methods.has(name)) clashes.push(`${f}: ${c.name}.${name}`);
+    }
+  }
+  assert.deepEqual(clashes, []);
+});
+test("the class scan reads methods and fields", () => {
+  const dialog = classesOf(source("skill-dialog.js")).find((c) => c.name === "SkillDialog");
+  assert.ok(dialog.methods.has("render") && dialog.methods.has("close") && dialog.methods.has("deleteClicked"));
+  assert.ok(dialog.fields.has("tab") && dialog.fields.has("closed") && dialog.fields.has("armed"));
+  assert.deepEqual(classesOf("class A {\n  get x() {}\n  y() { this.x = 1; }\n}\n").map((c) => [...c.fields].filter((n) => c.methods.has(n))), [["x"]]);
+  const names = VIEWS.flatMap((f) => classesOf(source(f)).map((c) => c.name)).sort();
+  assert.deepEqual(names, ["DiscoverTab", "InstalledTab", "MachineData", "MachinesTab", "Panel", "SkillDialog", "SkillsGate", "Toggle"]);
+});

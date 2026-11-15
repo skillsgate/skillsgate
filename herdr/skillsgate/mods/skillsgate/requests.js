@@ -31,23 +31,26 @@ const folderOf = (key) => key.slice(key.lastIndexOf("/") + 1);
 const where = (on) => (on == null ? "" : ` on ${on}`);
 
 // What each op needs, does and says. `tool` ops name a tool in the request.
+// The texts get the skill as `{ name, home }`. A skill linked from elsewhere
+// keeps its folder when removed, so its removal never says "Deleting".
 const OPS = {
   link: {
     tool: true,
-    running: (name, tool, on) => `Adding ${name} to ${tool}${where(on)}…`,
-    done: (name, tool) => `Added ${name} to ${tool}`,
+    running: (s, tool, on) => `Adding ${s.name} to ${tool}${where(on)}…`,
+    done: (s, tool) => `Added ${s.name} to ${tool}`,
     run: (machine, on, scan, skill, req) => machine.link(on, scan, skill, req.tool),
   },
   unlink: {
     tool: true,
-    running: (name, tool, on) => `Removing ${name} from ${tool}${where(on)}…`,
-    done: (name, tool) => `Removed ${name} from ${tool}`,
+    running: (s, tool, on) => `Removing ${s.name} from ${tool}${where(on)}…`,
+    done: (s, tool) => `Removed ${s.name} from ${tool}`,
     run: (machine, on, _scan, skill, req) => machine.unlink(on, skill, req.tool),
   },
   remove: {
     tool: false,
-    running: (name, _tool, on) => `Deleting ${name}${where(on)}…`,
-    done: (name) => `Deleted ${name}`,
+    running: (s, _tool, on) =>
+      s.home === "external" ? `Removing ${s.name} from all tools${where(on)}…` : `Deleting ${s.name}${where(on)}…`,
+    done: (s) => (s.home === "external" ? `Removed ${s.name} from all tools` : `Deleted ${s.name}`),
     run: (machine, on, scan, skill) => machine.remove(on, scan, skill),
   },
 };
@@ -65,9 +68,10 @@ function readRequest(req) {
   return { op, on, key: req.key, tool: op.tool ? req.tool : undefined };
 }
 
-// The skill's name as the caller last saw it, else its folder (the key is its
-// real path). Only for the lock's status text.
-function knownName(known, on, key) {
+// The skill as the caller last saw it (`{ name, home }`), else named by its
+// folder (the key is its real path) with no home. Only for the lock's status
+// text; the fresh scan under the lock decides everything else.
+function knownSkill(known, on, key) {
   let latest = null;
   try {
     latest = known?.(on);
@@ -75,7 +79,8 @@ function knownName(known, on, key) {
     // named by its folder
   }
   const seen = Array.isArray(latest?.skills) ? latest.skills.find((s) => s.key === key) : null;
-  return typeof seen?.name === "string" && seen.name ? seen.name : folderOf(key);
+  const name = typeof seen?.name === "string" && seen.name ? seen.name : folderOf(key);
+  return { name, home: seen?.home };
 }
 
 // A scan Result that never rejects.
@@ -96,7 +101,7 @@ export async function runRequest(req, { channel, machine, known, scan = (on) => 
   const { op, on, key, tool } = r;
   const label = tool === undefined ? "" : toolLabel(tool);
   // Nothing is awaited before the claim, so no other request can slip in.
-  if (!channel.claim(on, op.running(knownName(known, on, key), label, on))) {
+  if (!channel.claim(on, op.running(knownSkill(known, on, key), label, on))) {
     channel.say("warn", `${machineLabel(on)} is busy. Try again when it finishes.`);
     return null;
   }
@@ -137,6 +142,6 @@ export async function runRequest(req, { channel, machine, known, scan = (on) => 
   channel.bump(on);
   if (!result.ok) channel.say("error", result.error || "Something went wrong");
   else if (result.warn) channel.say("warn", result.warn);
-  else channel.say("done", op.done(skill.name, label));
+  else channel.say("done", op.done(skill, label));
   return result;
 }

@@ -107,6 +107,30 @@ test("remove deletes the skill and every link to it", async () => {
   assert.equal(s.channel.rev(null), 1);
 });
 
+test("remove of a skill linked from elsewhere removes it from all tools and keeps its folder", async () => {
+  const s = setup();
+  await s.prime();
+  await runRequest({ id: "1", op: "remove", on: null, key: s.keyOf("ext/outside") }, s.deps);
+  assert.equal(isLink(s.h.path(".cursor/skills/outside")), false);
+  assert.equal(exists(s.h.path(".cursor/skills/outside")), false);
+  assert.equal(exists(s.h.path("ext/outside/SKILL.md")), true, "the folder is kept");
+  assert.deepEqual(s.claims, [{ on: null, text: "Removing outside from all tools…" }]);
+  assert.deepEqual(s.during.map((d) => d.busy), ["Removing outside from all tools…"]);
+  assert.deepEqual(notice(s.channel), { kind: "done", text: "Removed outside from all tools" });
+  assert.equal(s.channel.busyAt(null), false);
+  assert.equal(s.channel.rev(null), 1);
+});
+
+test("remove of a skill linked from elsewhere names a named machine while running", async () => {
+  const s = setup();
+  await s.prime("vps");
+  await runRequest({ id: "1", op: "remove", on: "vps", key: s.keyOf("ext/outside") }, s.deps);
+  assert.deepEqual(s.claims, [{ on: "vps", text: "Removing outside from all tools on vps…" }]);
+  assert.deepEqual(notice(s.channel), { kind: "done", text: "Removed outside from all tools" });
+  assert.equal(isLink(s.h.path(".cursor/skills/outside")), false);
+  assert.equal(exists(s.h.path("ext/outside/SKILL.md")), true);
+});
+
 test("a named machine is named while running and not when done", async () => {
   const s = setup();
   await s.prime("vps");

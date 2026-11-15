@@ -7,8 +7,11 @@ const RAW = "https://raw.githubusercontent.com";
 
 // Both patterns are anchored at both ends. In a non-multiline regex `$` matches
 // only at the very end of the string, so a trailing newline does not pass.
-const SOURCE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
-const SKILL_ID = /^[A-Za-z0-9._-]+$/;
+// Every segment starts with a letter or a digit: that rules out `.` and `..`
+// (path traversal), a leading `-` (read as an option by git) and a leading `.`
+// (a hidden folder).
+const SOURCE = /^[A-Za-z0-9][A-Za-z0-9_.-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*$/;
+const SKILL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 export function validSource(s) {
   return typeof s === "string" && SOURCE.test(s);

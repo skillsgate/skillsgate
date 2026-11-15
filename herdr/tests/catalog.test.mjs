@@ -105,6 +105,41 @@ test("validation", () => {
   assert.equal(validSkillId("a;rm -rf ~"), false);
 });
 
+test("validSkillId refuses dot and dash-led names", () => {
+  for (const bad of [".", "..", ".hidden", "-x", "_x", "", "a/b", "a b", "a\nb", undefined]) {
+    assert.equal(validSkillId(bad), false, JSON.stringify(bad));
+  }
+  for (const good of ["pdf", "pdf-tools_2.0", "0day"]) {
+    assert.equal(validSkillId(good), true, good);
+  }
+});
+
+test("validSource refuses dot and dash-led segments", () => {
+  for (const bad of ["../..", "a/..", "./b", "-a/b", "a/-b", "a/b/c", "a", "", "a/b\n", undefined]) {
+    assert.equal(validSource(bad), false, JSON.stringify(bad));
+  }
+  for (const good of ["anthropics/skills", "a.b/c_d-e"]) {
+    assert.equal(validSource(good), true, good);
+  }
+});
+
+test("content makes no request for dot segments", async () => {
+  const { fetch, urls } = fakeFetch({ ok: true, text: async () => "text" });
+  const catalog = createCatalog({ fetch });
+  assert.equal(await catalog.content("../..", "pdf"), null);
+  assert.equal(await catalog.content("anthropics/skills", ".."), null);
+  assert.deepEqual(urls, []);
+});
+
+test("search marks a dot-dot skill id as not installable", async () => {
+  const { fetch } = fakeFetch({
+    ok: true,
+    json: async () => ({ skills: [{ id: "a/b/..", source: "a/b", skillId: "..", name: "x", installs: 1 }] }),
+  });
+  const rows = await createCatalog({ fetch }).search("x");
+  assert.equal(rows[0].installable, false);
+});
+
 test("validators are anchored: newline, space, semicolon and extra segments fail", () => {
   for (const bad of ["a/b\n", "\na/b", "a/b ", "a /b", "a/b;x", "a/b/c", "a", "/b", "a/", "", "a/b\nc/d"]) {
     assert.equal(validSource(bad), false, JSON.stringify(bad));

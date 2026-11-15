@@ -10,7 +10,9 @@
     "dev": "npm run dev -w apps/web",
     "build": "npm run build -w apps/web",
     "deploy": "npm run deploy -w apps/web",
-    "preview": "npm run preview -w apps/web"
+    "preview": "npm run preview -w apps/web",
+    "test:herdr": "node --test herdr/tests/*.test.mjs",
+    "herdr:dev": "mkdir -p ~/.config/herdr-app/mods/skillsgate && cp -R herdr/skillsgate/mods/skillsgate/. ~/.config/herdr-app/mods/skillsgate/ && herdr-app check ~/.config/herdr-app/mods/skillsgate"
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "4.59.0",

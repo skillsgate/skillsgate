@@ -270,8 +270,21 @@ export default class CatalogDialog {
       .child(div().flex_1().min_w(0).truncate().child(row.label));
   }
 
-  // Why Install is disabled at the left, Cancel and Install at the right.
+  // At the left, why Install is disabled and what an install would replace;
+  // Cancel and Install at the right. The replace line wraps when it is alone.
   footer(action, t, ts) {
+    const reason = h_flex()
+      .min_w(0)
+      .gap(8)
+      .items_center()
+      .text_color(t.muted)
+      .when(action.working, (el) => el.child(spinner(t)))
+      .child(div().min_w(0).truncate().child(action.reason ?? ""));
+    const note = div()
+      .min_w(0)
+      .text_color(t.blocked)
+      .when(Boolean(action.reason), (el) => el.truncate())
+      .child(action.note ?? "");
     return h_flex()
       .h(SIZE.dialogFooter)
       .flex_none()
@@ -281,15 +294,14 @@ export default class CatalogDialog {
       .border_t(1)
       .border_color(t.border)
       .child(
-        h_flex()
+        v_flex()
           .flex_1()
           .min_w(0)
-          .gap(8)
-          .items_center()
+          .gap(2)
+          .justify_center()
           .text_size(ts.small)
-          .text_color(t.muted)
-          .when(action.working, (el) => el.child(spinner(t)))
-          .when(Boolean(action.reason), (el) => el.child(div().min_w(0).truncate().child(action.reason))),
+          .when(Boolean(action.reason), (el) => el.child(reason))
+          .when(Boolean(action.note), (el) => el.child(note)),
       )
       .child(button("sg-catalog-cancel", "Cancel", () => this.close(), t, ts))
       .child(button("sg-catalog-install", action.label, () => this.install(), t, ts, true, Boolean(action.reason)));

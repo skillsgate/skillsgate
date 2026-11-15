@@ -11,7 +11,7 @@ import { h_flex, v_flex, Input, InputState, Scrollbar } from "gpui-base";
 import { openOverlay } from "herdr";
 import { MOD, catalog, errorText } from "./host.js";
 import { DIALOG, SIZE, button, icon, skeletonRows, spinner } from "./ui.js";
-import { catalogRows, discoverView, searchKey } from "./view-model.js";
+import { catalogRows, discoverView, searchErrorText, searchKey } from "./view-model.js";
 
 const DEBOUNCE_MS = 300;
 
@@ -62,7 +62,7 @@ export default class DiscoverTab {
       try {
         outcome = { key, results: await catalog.search(key) };
       } catch (error) {
-        outcome = { key, error: errorText(error) };
+        outcome = { key, error: searchErrorText(errorText(error)) };
       }
       this.running.delete(key);
       if (key === searchKey(this.query)) this.last = outcome; // else dropped: the field moved on

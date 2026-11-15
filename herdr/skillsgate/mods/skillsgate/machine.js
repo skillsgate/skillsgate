@@ -8,7 +8,7 @@ import {
   buildSkills,
   dropFromLock,
   lockPath,
-  machineLabel,
+  machineInSentence,
   mergeLock,
   parseScan,
   relativePath,
@@ -137,10 +137,10 @@ export function createMachine({
     if (!validSource(source) || !validSkillId(skillId) || unsafeFolder(folder)) {
       return { ok: false, error: `Can't install "${skillId}" from ${source}` };
     }
-    const gitMissing = { ok: false, error: `git is not installed on ${machineLabel(on)}` };
+    const gitMissing = { ok: false, error: `git is not installed on ${machineInSentence(on)}` };
     if (!scanResult.git) return gitMissing;
     const store = scanResult.tools.find((t) => t.name === UNIVERSAL)?.dir;
-    if (!store) return { ok: false, error: `Could not find the shared skills folder on ${machineLabel(on)}` };
+    if (!store) return { ok: false, error: `Could not find the shared skills folder on ${machineInSentence(on)}` };
 
     const r = await exec(INSTALL, [cloneUrl(source), skillId, store, folder], on, INSTALL_TIMEOUT_MS);
     if (r.code === 127) return gitMissing;

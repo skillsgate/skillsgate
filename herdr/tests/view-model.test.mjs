@@ -27,6 +27,7 @@ import {
   regionsChanged,
   requestPending,
   scanNotice,
+  searchErrorText,
   searchKey,
   sections,
   skillDocument,
@@ -41,6 +42,7 @@ import {
   toolSummary,
   withTargets,
 } from "../skillsgate/mods/skillsgate/view-model.js";
+import { createCatalog } from "../skillsgate/mods/skillsgate/catalog.js";
 import { createMachine } from "../skillsgate/mods/skillsgate/machine.js";
 import { FIXTURE, makeHome } from "./helpers.mjs";
 
@@ -530,28 +532,76 @@ test("installAction: the primary button's label and why it is disabled", () => {
   const row = { source: "anthropics/skills", skillId: "pdf", installable: true };
   const read = { scan: dialogScan, skills: [sk("alpha", "store", ["universal"])] };
   const pdfInStore = [sk("pdf", "store", ["universal"])];
-  assert.deepEqual(installAction({ on: null, row, read, busy: null }), { label: "Install on this computer", reason: null, working: false });
-  assert.deepEqual(installAction({ on: "vps", row, read: { ...read, skills: pdfInStore }, busy: null }), { label: "Update on vps", reason: null, working: false });
+  const replaces = "pdf is already in the shared store. Installing replaces it.";
+  assert.deepEqual(installAction({ on: null, row, read, busy: null }), { label: "Install on this computer", reason: null, working: false, note: null });
+  assert.deepEqual(installAction({ on: "vps", row, read: { ...read, skills: pdfInStore }, busy: null }), {
+    label: "Update on vps",
+    reason: null,
+    working: false,
+    note: replaces,
+  });
   assert.equal(installAction({ on: null, row, read: { ...read, skills: [sk("pdf", "tool", ["claude-code"])] }, busy: null }).label, "Install on this computer");
   // Disabled, with the reason beside it.
-  assert.deepEqual(installAction({ on: null, row, read: {}, busy: null }), { label: "Install on this computer", reason: "Checking this computer…", working: true });
+  assert.deepEqual(installAction({ on: null, row, read: {}, busy: null }), { label: "Install on this computer", reason: "Checking this computer…", working: true, note: null });
   assert.deepEqual(installAction({ on: "vps", row, read: { error: "machine vps is unreachable" }, busy: null }), {
     label: "Install on vps",
     reason: "Can't check vps: machine vps is unreachable",
     working: false,
+    note: null,
   });
   assert.deepEqual(installAction({ on: "vps", row, read: { ...read, scan: { ...dialogScan, git: false } }, busy: null }), {
     label: "Install on vps",
     reason: "git is not installed on vps",
     working: false,
+    note: null,
   });
   assert.equal(installAction({ on: null, row, read: { ...read, scan: { ...dialogScan, git: false } }, busy: null }).reason, "git is not installed on this computer");
   assert.deepEqual(installAction({ on: "vps", row, read: { ...read, skills: pdfInStore }, busy: "Installing pdf on vps…" }), {
     label: "Update on vps",
     reason: "Installing pdf on vps…",
     working: true,
+    note: replaces,
   });
   assert.equal(installAction({ on: null, row: { ...row, installable: false }, read, busy: null }).reason, "This skill can't be installed");
+});
+test("installAction says what an install replaces when the shared store has the folder", () => {
+  const read = (skills) => ({ scan: dialogScan, skills });
+  const row = (skillId, installable = true) => ({ source: "a/b", skillId, installable });
+  // The folder is sanitizeName(skillId), and the line names it.
+  assert.equal(
+    installAction({ on: null, row: row("My-Skill"), read: read([sk("my-skill", "store", ["universal"])]), busy: null }).note,
+    "my-skill is already in the shared store. Installing replaces it.",
+  );
+  // A folder of that name inside one tool, or no folder at all, is not replaced.
+  assert.equal(installAction({ on: null, row: row("pdf"), read: read([sk("pdf", "tool", ["claude-code"])]), busy: null }).note, null);
+  assert.equal(installAction({ on: null, row: row("pdf"), read: read([sk("docx", "store", ["universal"])]), busy: null }).note, null);
+  // Not known before the dialog's scan; never for a skill that can't be installed.
+  assert.equal(installAction({ on: null, row: row("pdf"), read: {}, busy: null }).note, null);
+  assert.equal(installAction({ on: null, row: row("pdf", false), read: read([sk("pdf", "store", ["universal"])]), busy: null }).note, null);
+});
+test("searchErrorText: a failed request can't reach skills.sh; a status keeps its text", () => {
+  assert.equal(searchErrorText("skills.sh search failed (HTTP 404)"), "skills.sh search failed (HTTP 404)");
+  assert.equal(searchErrorText("skills.sh search failed (HTTP 503)"), "skills.sh search failed (HTTP 503)");
+  const rejected = "fetching https://skills.sh/api/search?q=skill&limit=30 failed: error sending request for url (https://skills.sh/api/search?q=skill&limit=30)";
+  assert.equal(searchErrorText(rejected), "Can't reach skills.sh");
+  assert.equal(searchErrorText("Unexpected token < in JSON"), "Can't reach skills.sh", "an answer that is not the API's");
+  assert.equal(searchErrorText(""), "Can't reach skills.sh");
+  assert.equal(searchErrorText(undefined), "Can't reach skills.sh");
+});
+test("searchErrorText on what catalog.search throws", async () => {
+  const shown = async (fetch) => {
+    try {
+      await createCatalog({ fetch }).search("pdf");
+      return "no error";
+    } catch (error) {
+      return searchErrorText(String(error?.message ?? error));
+    }
+  };
+  assert.equal(await shown(async () => ({ ok: false, status: 404, json: async () => ({}) })), "skills.sh search failed (HTTP 404)");
+  const offline = async () => {
+    throw new Error("fetching https://skills.sh/api/search?q=pdf&limit=30 failed: error sending request");
+  };
+  assert.equal(await shown(offline), "Can't reach skills.sh");
 });
 test("catalogPreview: the description and the body, or Preview unavailable", () => {
   assert.deepEqual(catalogPreview("---\nname: pdf\ndescription: Read PDFs\n---\n# PDF\nBody\n"), { description: "Read PDFs", body: "# PDF\nBody\n" });

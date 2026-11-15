@@ -323,14 +323,22 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
   it("install refuses when git is missing without running anything", async () => {
     const { m, r, calls } = await setup();
     const before = calls.length;
-    assert.deepEqual(await m.install(null, { ...r.scan, git: false }, installed("alpha")), { ok: false, error: "git is not installed on This computer" });
+    assert.deepEqual(await m.install(null, { ...r.scan, git: false }, installed("alpha")), { ok: false, error: "git is not installed on this computer" });
     assert.deepEqual(await m.install("sulvali", { ...r.scan, git: false }, installed("alpha")), { ok: false, error: "git is not installed on sulvali" });
     assert.equal(calls.length, before);
   });
   it("install maps the script's exit 127 to the git message", async () => {
     const m = createMachine({ exec: async () => ({ code: 127, stdout: "", stderr: "" }), readText: async () => null, ...sources() });
     const scan = { home: "/h", git: true, tools: [{ name: "universal", dir: "/h/.agents/skills", detected: true }], entries: [] };
-    assert.deepEqual(await m.install(null, scan, installed("alpha")), { ok: false, error: "git is not installed on This computer" });
+    assert.deepEqual(await m.install(null, scan, installed("alpha")), { ok: false, error: "git is not installed on this computer" });
+  });
+  it("install names the machine in its sentence when the shared skills folder is unknown", async () => {
+    const calls = [];
+    const m = createMachine({ exec: async (...args) => (calls.push(args), { code: 0, stdout: "", stderr: "" }), readText: async () => null, ...sources() });
+    const scan = { home: "/h", git: true, tools: [{ name: "claude-code", dir: "/h/.claude/skills", detected: true }], entries: [] };
+    assert.deepEqual(await m.install(null, scan, installed("alpha")), { ok: false, error: "Could not find the shared skills folder on this computer" });
+    assert.deepEqual(await m.install("vps", scan, installed("alpha")), { ok: false, error: "Could not find the shared skills folder on vps" });
+    assert.deepEqual(calls, [], "nothing ran on the machine");
   });
   it("install calls onStep before each step on the machine after the copy", async () => {
     const h = makeHome({});

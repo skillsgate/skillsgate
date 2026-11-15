@@ -299,6 +299,16 @@ export function discoverView(last, key) {
   return { body: "empty", label, message: last.key ? `No skills found for "${last.key}"` : "No skills found" };
 }
 
+// What Discover says for a failed search, from the error's message. The
+// catalog's own message for an answer with a bad status ("skills.sh search
+// failed (HTTP 503)") is kept; anything else means the request itself failed
+// (Herdr rejects a fetch that never got an answer) or the answer was not the
+// API's, and reads "Can't reach skills.sh".
+export function searchErrorText(message) {
+  const text = String(message ?? "");
+  return /^skills\.sh search failed \(HTTP \d+\)$/.test(text) ? text : "Can't reach skills.sh";
+}
+
 const stringOr = (value) => (typeof value === "string" ? value : "");
 
 // A row per search result: the name, `owner/repo`, the installs, and whether
@@ -350,14 +360,19 @@ export function storeNote(scan) {
 }
 
 // The catalog dialog's primary button: its label, why it is disabled (null
-// when it is not) and whether that is work in progress (`working`, drawn with
-// a spinner). `read` is the dialog's own scan of the machine: `{ scan, skills }`
-// once one worked, `{ error }` when the first failed, `{}` while it runs.
-// `busy` is the machine's lock text, or null.
+// when it is not), whether that is work in progress (`working`, drawn with a
+// spinner), and `note`: the line saying the install replaces a folder already
+// in the shared store, or null. The match is by folder name only, so the copy
+// replaced may be the person's own; the label alone does not say so.
+// `read` is the dialog's own scan of the machine: `{ scan, skills }` once one
+// worked, `{ error }` when the first failed, `{}` while it runs. `busy` is the
+// machine's lock text, or null.
 export function installAction({ on, row, read, busy }) {
   const where = inSentence(on);
-  const label = `${inStore(read.skills, row.skillId) ? "Update" : "Install"} on ${where}`;
-  const off = (reason, working = false) => ({ label, reason, working });
+  const updating = inStore(read.skills, row.skillId);
+  const label = `${updating ? "Update" : "Install"} on ${where}`;
+  const note = row.installable && updating ? `${sanitizeName(row.skillId)} is already in the shared store. Installing replaces it.` : null;
+  const off = (reason, working = false) => ({ label, reason, working, note });
   if (!row.installable) return off("This skill can't be installed");
   if (!read.scan) return read.error ? off(cantCheckText(on, read.error)) : off(`Checking ${where}…`, true);
   if (!read.scan.git) return off(`git is not installed on ${where}`);

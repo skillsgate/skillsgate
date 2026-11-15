@@ -1,25 +1,31 @@
 // The body of the panel's request loop: one request a dialog posted, run on
-// the machine it names. main.js only schedules it (the panel role, never a
+// the machine it names. The panel only schedules it (the panel role, never a
 // dialog), so node --test covers everything that changes the disk.
 //
 // For one request: refuse an unknown op or a malformed request without
-// touching anything; refuse a busy machine with a warning; find the skill by
-// `key` in that machine's latest scan; take the machine's lock with the status
-// text; run the operation; release the lock (also when the operation throws);
-// re-scan the machine; raise its revision so open dialogs read again; and say
-// the outcome as a notice.
+// touching anything; take the machine's lock with the status text (a busy
+// machine is refused with a warning); scan the machine under the lock, so the
+// operation acts on the disk as it is now and not on an older scan (a machine
+// that can't be read runs nothing); find the skill by `key` in that scan; run
+// the operation; release the lock (also when the operation throws); re-scan;
+// raise the machine's revision so open dialogs read again; and say the outcome
+// as a notice.
 //
 // deps:
 //   channel  createChannel(...)
 //   machine  createMachine(...)
-//   scanOf(on, fresh) -> Promise<{ scan, skills } | { error }>: the machine's
-//            latest good scan, scanning first when there is none; with
-//            `fresh` true it scans now (after a change) and keeps the result.
+//   known(on) -> { skills } | null: the caller's latest scan, read at once and
+//            only to name the skill in the lock's status text (the fresh scan
+//            comes after the lock); a key it lacks is named by its folder.
+//   scan(on) -> Promise<Result of machine.scan>: scans the machine now and lets
+//            the caller keep the result (the panel's rows update from it).
+//            Defaults to machine.scan.
 
 import { cantCheckText, machineInSentence, machineLabel, toolLabel } from "./model.js";
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const message = (error) => String(error?.message ?? error);
+const folderOf = (key) => key.slice(key.lastIndexOf("/") + 1);
 
 // " on vps", or nothing for this computer.
 const where = (on) => (on == null ? "" : ` on ${on}`);
@@ -59,57 +65,75 @@ function readRequest(req) {
   return { op, on, key: req.key, tool: op.tool ? req.tool : undefined };
 }
 
+// The skill's name as the caller last saw it, else its folder (the key is its
+// real path). Only for the lock's status text.
+function knownName(known, on, key) {
+  let latest = null;
+  try {
+    latest = known?.(on);
+  } catch {
+    // named by its folder
+  }
+  const seen = Array.isArray(latest?.skills) ? latest.skills.find((s) => s.key === key) : null;
+  return typeof seen?.name === "string" && seen.name ? seen.name : folderOf(key);
+}
+
+// A scan Result that never rejects.
+async function scanNow(scan, on) {
+  try {
+    const r = await scan(on);
+    return isRecord(r) ? r : { ok: false, error: "No answer" };
+  } catch (error) {
+    return { ok: false, error: message(error) };
+  }
+}
+
 // Runs one request. Never rejects. Returns the operation's Result when it ran,
 // else null (refused, busy, unreadable machine, or the skill is gone).
-export async function runRequest(req, { channel, machine, scanOf }) {
+export async function runRequest(req, { channel, machine, known, scan = (on) => machine.scan(on) }) {
   const r = readRequest(req);
   if (!r) return null;
   const { op, on, key, tool } = r;
-  const busy = () => channel.say("warn", `${machineLabel(on)} is busy. Try again when it finishes.`);
-  if (channel.busyAt(on)) {
-    busy();
+  const label = tool === undefined ? "" : toolLabel(tool);
+  // Nothing is awaited before the claim, so no other request can slip in.
+  if (!channel.claim(on, op.running(knownName(known, on, key), label, on))) {
+    channel.say("warn", `${machineLabel(on)} is busy. Try again when it finishes.`);
     return null;
   }
 
-  let latest;
+  // Under the lock: read the machine, find the skill, operate.
+  let outcome;
   try {
-    latest = await scanOf(on, false);
-  } catch (error) {
-    latest = { error: message(error) };
+    const fresh = await scanNow(scan, on);
+    const skill = fresh.ok && Array.isArray(fresh.skills) ? fresh.skills.find((s) => s.key === key) : null;
+    if (!fresh.ok) {
+      outcome = { unreadable: fresh.error || "No answer" };
+    } else if (!skill) {
+      outcome = { gone: true };
+    } else {
+      let result;
+      try {
+        result = await op.run(machine, on, fresh.scan, skill, r);
+      } catch (error) {
+        result = { ok: false, error: message(error) };
+      }
+      outcome = { skill, result: isRecord(result) ? result : { ok: false, error: "No result" } };
+    }
+  } finally {
+    channel.release(on);
   }
-  if (!Array.isArray(latest?.skills)) {
-    channel.say("error", cantCheckText(on, latest?.error || "no answer"));
+
+  if (outcome.unreadable !== undefined) {
+    channel.say("error", cantCheckText(on, outcome.unreadable)); // nothing changed: no bump
     return null;
   }
-  const skill = latest.skills.find((s) => s.key === key);
-  if (!skill) {
+  if (outcome.gone) {
     channel.say("error", `That skill is no longer on ${machineInSentence(on)}.`);
     channel.bump(on); // a dialog that still shows it reads again and closes
     return null;
   }
-
-  const label = tool === undefined ? "" : toolLabel(tool);
-  // The lock is the real guard: another request may have taken the machine
-  // while the scan above ran.
-  if (!channel.claim(on, op.running(skill.name, label, on))) {
-    busy();
-    return null;
-  }
-  let result;
-  try {
-    result = await op.run(machine, on, latest.scan, skill, r);
-  } catch (error) {
-    result = { ok: false, error: message(error) };
-  } finally {
-    channel.release(on);
-  }
-  if (!isRecord(result)) result = { ok: false, error: "No result" };
-
-  try {
-    await scanOf(on, true);
-  } catch {
-    // The change is done either way; the panel's next scan catches up.
-  }
+  const { skill, result } = outcome;
+  await scanNow(scan, on); // the change is done either way; a failed re-scan is the panel's to report
   channel.bump(on);
   if (!result.ok) channel.say("error", result.error || "Something went wrong");
   else if (result.warn) channel.say("warn", result.warn);

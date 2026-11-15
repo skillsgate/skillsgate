@@ -12,9 +12,9 @@
 // Dialogs never change anything themselves (their tasks end when they close).
 // A switch or the delete button posts a request through the channel
 // (channel.js) and only the panel listens: it runs each request with
-// runRequest (requests.js), which takes the machine's lock, operates,
-// re-scans and raises the machine's revision. An open dialog reads its
-// machine again when that revision changes.
+// runRequest (requests.js), which takes the machine's lock, scans it,
+// operates, re-scans and raises the machine's revision. An open dialog reads
+// its machine again when that revision changes.
 //
 // Layout of this file: host adapters, sizes, window facts, shared pieces, the
 // toggle role, the panel's per-machine data (MachineData), the panel itself
@@ -305,17 +305,18 @@ class MachineData {
     return true;
   }
 
-  // Scans machine `on` now and keeps the result unless a scan that started
-  // later has already been kept. Never rejects. `counted`: scan() has already
-  // counted it as running.
+  // Scans machine `on` now, keeps the result unless a scan that started later
+  // has already been kept, and resolves with the scan's Result. Never rejects.
+  // `counted`: scan() has already counted it as running. The request loop
+  // scans through this (requests.js `scan`), so its fresh scans update the rows.
   async load(on, counted = false) {
     const state = this.state(on);
     const run = this.run(on);
     if (!counted) run.running++;
     state.loading = true;
     const seq = ++run.started;
+    let r;
     try {
-      let r;
       try {
         r = await machine.scan(on);
       } catch (error) {
@@ -330,15 +331,14 @@ class MachineData {
       run.running--;
       state.loading = run.running > 0;
     }
+    return r;
   }
 
-  // For the request loop (requests.js `scanOf`): the machine's latest good
-  // scan as { scan, skills }, scanning first when there is none, or now when
-  // `fresh` (after a change); { error } while no scan has worked.
-  async latest(on, fresh) {
-    const state = this.state(on);
-    if (fresh || !state.skills) await this.load(on);
-    return state.skills ? { scan: state.scan, skills: state.skills } : { error: state.error || "No answer" };
+  // For the request loop (requests.js `known`): the machine's latest good
+  // scan, or null. It only names the skill in the lock's status text.
+  known(on) {
+    const state = this.states.get(machineKey(on));
+    return state?.skills ? { scan: state.scan, skills: state.skills } : null;
   }
 
   // A failed scan keeps the last good result. When there was one, the failure
@@ -402,7 +402,12 @@ class Panel {
     cx.spawn(async (cx) => {
       await cx.sleep(0);
       try {
-        await runRequest(req, { channel, machine, scanOf: (on, fresh) => this.data.latest(on, fresh) });
+        await runRequest(req, {
+          channel,
+          machine,
+          known: (on) => this.data.known(on),
+          scan: (on) => this.data.load(on),
+        });
       } finally {
         if (!panelHidden()) cx.notify();
       }

@@ -7,10 +7,12 @@ import { runRequest } from "../skillsgate/mods/skillsgate/requests.js";
 import { FIXTURE, SKILL, makeHome } from "./helpers.mjs";
 
 // A temp home with real `sh`, a machine on it, a Map standing in for Herdr's
-// shared store, and a scanOf that keeps the latest good scan per machine the
-// way the panel does. `ops` replaces machine operations (to make one warn or
-// throw). Every exec call, claim and scanOf call is recorded, and so is the
-// lock text seen while an operation runs.
+// shared store, and a caller that keeps the latest good scan per machine the
+// way the panel does: `known(on)` reads it, `scan(on)` scans and keeps it,
+// `prime(on)` gives the caller a first scan (as the panel has before any
+// dialog opens). `ops` replaces machine operations (to make one warn or
+// throw). Every exec call, claim and runRequest scan is recorded, and so is
+// the lock text seen while an operation runs.
 function setup({ files = FIXTURE, ops = {} } = {}) {
   const h = makeHome(files);
   const calls = [];
@@ -36,20 +38,21 @@ function setup({ files = FIXTURE, ops = {} } = {}) {
   };
   const machine = { ...real, link: watched("link"), unlink: watched("unlink"), remove: watched("remove") };
   const latest = new Map();
-  const scans = [];
-  const scanOf = async (on, fresh) => {
-    scans.push({ on, fresh: Boolean(fresh), locked: channel.busyAt(on) });
-    const key = on ?? "";
-    if (fresh || !latest.has(key)) {
-      const r = await real.scan(on);
-      if (r.ok) latest.set(key, { scan: r.scan, skills: r.skills });
-      else if (!latest.has(key)) return { error: r.error };
-    }
-    return latest.get(key);
+  const keep = (on, r) => {
+    if (r.ok) latest.set(on ?? "", { scan: r.scan, skills: r.skills });
   };
-  const deps = { channel, machine, scanOf };
+  const scans = [];
+  const scan = async (on) => {
+    scans.push({ on, locked: channel.busyAt(on) });
+    const r = await real.scan(on);
+    keep(on, r);
+    return r;
+  };
+  const known = (on) => latest.get(on ?? "") ?? null;
+  const prime = async (on = null) => keep(on, await real.scan(on));
+  const deps = { channel, machine, known, scan };
   const keyOf = (rel) => fs.realpathSync(h.path(rel));
-  return { h, calls, store, channel, claims, during, scans, deps, keyOf };
+  return { h, calls, store, channel, claims, during, scans, deps, keyOf, prime };
 }
 
 const exists = (p) => fs.existsSync(p);
@@ -67,6 +70,7 @@ const notice = (channel) => {
 
 test("link adds the skill to a tool, with the brief's texts", async () => {
   const s = setup();
+  await s.prime();
   await runRequest({ id: "1", op: "link", on: null, key: s.keyOf(".agents/skills/alpha"), tool: "cursor" }, s.deps);
   assert.equal(fs.readlinkSync(s.h.path(".cursor/skills/alpha")), "../../.agents/skills/alpha");
   assert.deepEqual(s.claims, [{ on: null, text: "Adding alpha to Cursor…" }]);
@@ -78,6 +82,7 @@ test("link adds the skill to a tool, with the brief's texts", async () => {
 
 test("unlink removes the tool's link and keeps the shared copy", async () => {
   const s = setup();
+  await s.prime();
   await runRequest({ id: "1", op: "unlink", on: null, key: s.keyOf(".agents/skills/alpha"), tool: "claude-code" }, s.deps);
   assert.equal(exists(s.h.path(".claude/skills/alpha")), false);
   assert.equal(exists(s.h.path(".agents/skills/alpha/SKILL.md")), true);
@@ -90,6 +95,7 @@ test("unlink removes the tool's link and keeps the shared copy", async () => {
 
 test("remove deletes the skill and every link to it", async () => {
   const s = setup();
+  await s.prime();
   await runRequest({ id: "1", op: "remove", on: null, key: s.keyOf(".agents/skills/alpha") }, s.deps);
   assert.equal(exists(s.h.path(".agents/skills/alpha")), false);
   assert.equal(isLink(s.h.path(".claude/skills/alpha")), false);
@@ -103,6 +109,7 @@ test("remove deletes the skill and every link to it", async () => {
 
 test("a named machine is named while running and not when done", async () => {
   const s = setup();
+  await s.prime("vps");
   const key = s.keyOf(".agents/skills/alpha");
   await runRequest({ id: "1", op: "link", on: "vps", key, tool: "cursor" }, s.deps);
   assert.deepEqual(notice(s.channel), { kind: "done", text: "Added alpha to Cursor" });
@@ -126,31 +133,106 @@ test("a named machine is named while running and not when done", async () => {
   assert.equal(s.channel.busyAt("vps"), false);
 });
 
-test("each run finds the skill in the latest scan and re-scans after releasing the lock", async () => {
+test("each run scans under the lock, then again after releasing it", async () => {
   const s = setup();
+  await s.prime("vps");
   const key = s.keyOf(".agents/skills/alpha");
   await runRequest({ id: "1", op: "link", on: "vps", key, tool: "cursor" }, s.deps);
   assert.deepEqual(s.scans, [
-    { on: "vps", fresh: false, locked: false },
-    { on: "vps", fresh: true, locked: false },
+    { on: "vps", locked: true },
+    { on: "vps", locked: false },
   ]);
-  // The second request sees what the first one's re-scan found.
-  await runRequest({ id: "2", op: "unlink", on: "vps", key, tool: "cursor" }, s.deps);
+});
+
+test("a link made on disk after the caller's last scan is really removed", async () => {
+  const s = setup();
+  await s.prime();
+  // Made by another program after the panel's scan: the panel does not know it.
+  fs.symlinkSync("../../.agents/skills/alpha", s.h.path(".cursor/skills/alpha"));
+  await runRequest({ id: "1", op: "unlink", on: null, key: s.keyOf(".agents/skills/alpha"), tool: "cursor" }, s.deps);
   assert.equal(isLink(s.h.path(".cursor/skills/alpha")), false);
+  assert.equal(exists(s.h.path(".cursor/skills/alpha")), false);
+  assert.equal(exists(s.h.path(".agents/skills/alpha/SKILL.md")), true);
+  assert.deepEqual(notice(s.channel), { kind: "done", text: "Removed alpha from Cursor" });
+});
+
+test("a skill deleted on disk since the caller's last scan is no longer there, and nothing changes", async () => {
+  const s = setup();
+  await s.prime();
+  const key = s.keyOf(".agents/skills/alpha"); // the real path the panel knew
+  fs.rmSync(s.h.path(".agents/skills/alpha"), { recursive: true });
+  await runRequest({ id: "1", op: "link", on: null, key, tool: "cursor" }, s.deps);
+  assert.deepEqual(notice(s.channel), { kind: "error", text: "That skill is no longer on this computer." });
+  assert.deepEqual(s.claims, [{ on: null, text: "Adding alpha to Cursor…" }], "named as the panel last saw it");
+  assert.deepEqual(s.during, [], "no operation ran");
+  assert.equal(exists(s.h.path(".cursor/skills/alpha")), false);
+  assert.equal(isLink(s.h.path(".cursor/skills/alpha")), false);
+  assert.equal(isLink(s.h.path(".claude/skills/alpha")), true, "the other tool's dangling link is left alone");
+  assert.equal(s.channel.busyAt(null), false);
+  assert.equal(s.channel.rev(null), 1, "a dialog still showing it reads again");
+});
+
+test("a key no scan has seen is named by its folder and is no longer on the machine", async () => {
+  const s = setup();
+  await runRequest({ id: "1", op: "remove", on: null, key: s.h.home + "/.agents/skills/gone" }, s.deps);
+  assert.deepEqual(notice(s.channel), { kind: "error", text: "That skill is no longer on this computer." });
+  await runRequest({ id: "2", op: "link", on: "vps", key: s.h.home + "/.agents/skills/gone", tool: "cursor" }, s.deps);
+  assert.deepEqual(notice(s.channel), { kind: "error", text: "That skill is no longer on vps." });
+  assert.deepEqual(s.claims, [
+    { on: null, text: "Deleting gone…" },
+    { on: "vps", text: "Adding gone to Cursor on vps…" },
+  ]);
+  assert.deepEqual(s.during, []);
+  assert.equal(s.channel.busyAt(null), false);
+  assert.equal(s.channel.busyAt("vps"), false);
+  // Only the two scans under the lock ran, and nothing on disk changed.
+  assert.equal(s.calls.length, 2);
+  assert.equal(exists(s.h.path(".agents/skills/alpha/SKILL.md")), true);
+  assert.equal(s.channel.rev(null), 1);
+  assert.equal(s.channel.rev("vps"), 1);
+});
+
+test("a skill the caller has not seen yet is named by its folder while running", async () => {
+  const s = setup();
+  const key = s.keyOf(".agents/skills/it's odd name");
+  await runRequest({ id: "1", op: "link", on: null, key, tool: "cursor" }, s.deps);
+  assert.deepEqual(s.claims, [{ on: null, text: "Adding it's odd name to Cursor…" }]);
+  assert.deepEqual(notice(s.channel), { kind: "done", text: "Added odd to Cursor" }, "the fresh scan names it when done");
+});
+
+test("a scan that fails under the lock says so, releases the lock and runs nothing", async () => {
+  const s = setup();
+  await s.prime("vps");
+  await s.prime(null);
+  const before = s.calls.length;
+  const failing = { ...s.deps, scan: async () => ({ ok: false, error: "machine vps is unreachable" }) };
+  await runRequest({ id: "1", op: "link", on: "vps", key: s.keyOf(".agents/skills/alpha"), tool: "cursor" }, failing);
+  assert.deepEqual(notice(s.channel), { kind: "error", text: "Can't check vps: machine vps is unreachable" });
+  assert.deepEqual(s.claims, [{ on: "vps", text: "Adding alpha to Cursor on vps…" }]);
+  assert.equal(s.channel.busyAt("vps"), false);
+  const throwing = { ...s.deps, scan: async () => Promise.reject(new Error("sh: timeout")) };
+  await runRequest({ id: "2", op: "remove", on: null, key: s.keyOf(".agents/skills/alpha") }, throwing);
+  assert.deepEqual(notice(s.channel), { kind: "error", text: "Can't check this computer: sh: timeout" });
+  assert.equal(s.channel.busyAt(null), false);
+  assert.deepEqual(s.during, [], "no operation ran");
+  assert.equal(s.calls.length, before, "nothing ran on the machine");
+  assert.equal(s.channel.rev("vps"), 0, "nothing changed, so no dialog is told to read again");
+  assert.equal(s.channel.rev(null), 0);
+  assert.equal(isLink(s.h.path(".cursor/skills/alpha")), false);
+  assert.equal(exists(s.h.path(".agents/skills/alpha/SKILL.md")), true);
 });
 
 test("a busy machine gives the warning and changes nothing", async () => {
   const s = setup();
   s.channel.claim(null, "Installing pdf…");
   s.channel.claim("vps", "Installing pdf on vps…");
-  s.claims.length = 0;
   const key = s.keyOf(".agents/skills/alpha");
   await runRequest({ id: "1", op: "link", on: null, key, tool: "cursor" }, s.deps);
   assert.deepEqual(notice(s.channel), { kind: "warn", text: "This computer is busy. Try again when it finishes." });
   await runRequest({ id: "2", op: "remove", on: "vps", key }, s.deps);
   assert.deepEqual(notice(s.channel), { kind: "warn", text: "vps is busy. Try again when it finishes." });
-  assert.deepEqual(s.claims, []);
   assert.deepEqual(s.during, []);
+  assert.deepEqual(s.scans, []);
   assert.deepEqual(s.calls, [], "nothing ran on the machine, not even a scan");
   assert.equal(isLink(s.h.path(".cursor/skills/alpha")), false);
   assert.equal(exists(s.h.path(".agents/skills/alpha/SKILL.md")), true);
@@ -160,50 +242,21 @@ test("a busy machine gives the warning and changes nothing", async () => {
   assert.equal(s.channel.rev("vps"), 0);
 });
 
-test("a skill that is not in the latest scan is no longer on the machine", async () => {
-  const s = setup();
-  await runRequest({ id: "1", op: "remove", on: null, key: s.h.home + "/.agents/skills/gone" }, s.deps);
-  assert.deepEqual(notice(s.channel), { kind: "error", text: "That skill is no longer on this computer." });
-  await runRequest({ id: "2", op: "link", on: "vps", key: s.h.home + "/.agents/skills/gone", tool: "cursor" }, s.deps);
-  assert.deepEqual(notice(s.channel), { kind: "error", text: "That skill is no longer on vps." });
-  assert.deepEqual(s.claims, []);
-  assert.deepEqual(s.during, []);
-  assert.equal(s.channel.busyAt(null), false);
-  // Only scans ran, and nothing on disk changed.
-  assert.equal(s.calls.length, 2);
-  assert.equal(exists(s.h.path(".agents/skills/alpha/SKILL.md")), true);
-  // A dialog still showing it is told to read again.
-  assert.equal(s.channel.rev(null), 1);
-  assert.equal(s.channel.rev("vps"), 1);
-});
-
-test("a machine that can't be scanned says so and changes nothing", async () => {
-  const s = setup();
-  const deps = { ...s.deps, scanOf: async () => ({ error: "machine vps is unreachable" }) };
-  await runRequest({ id: "1", op: "link", on: "vps", key: s.keyOf(".agents/skills/alpha"), tool: "cursor" }, deps);
-  assert.deepEqual(notice(s.channel), { kind: "error", text: "Can't check vps: machine vps is unreachable" });
-  const throwing = { ...s.deps, scanOf: async () => Promise.reject(new Error("sh: timeout")) };
-  await runRequest({ id: "2", op: "remove", on: null, key: s.keyOf(".agents/skills/alpha") }, throwing);
-  assert.deepEqual(notice(s.channel), { kind: "error", text: "Can't check this computer: sh: timeout" });
-  assert.deepEqual(s.claims, []);
-  assert.deepEqual(s.calls, []);
-  assert.equal(s.channel.rev("vps"), 0);
-  assert.equal(exists(s.h.path(".agents/skills/alpha/SKILL.md")), true);
-});
-
 test("a failing operation says its error, releases the lock and bumps the revision", async () => {
   const s = setup({ files: { ...FIXTURE, ".cursor/skills/alpha/SKILL.md": SKILL("mine") } });
+  await s.prime();
   await runRequest({ id: "1", op: "link", on: null, key: s.keyOf(".agents/skills/alpha"), tool: "cursor" }, s.deps);
   assert.deepEqual(notice(s.channel), { kind: "error", text: 'A different copy of "alpha" is already in Cursor' });
   assert.equal(isLink(s.h.path(".cursor/skills/alpha")), false);
   assert.equal(exists(s.h.path(".cursor/skills/alpha/SKILL.md")), true);
   assert.equal(s.channel.busyAt(null), false);
   assert.equal(s.channel.rev(null), 1);
-  assert.deepEqual(s.scans.at(-1), { on: null, fresh: true, locked: false });
+  assert.deepEqual(s.scans.at(-1), { on: null, locked: false });
 });
 
 test("a warn result says it as a warning", async () => {
   const s = setup({ ops: { remove: async () => ({ ok: true, warn: "Deleted, but something was left" }) } });
+  await s.prime("vps");
   await runRequest({ id: "1", op: "remove", on: "vps", key: s.keyOf(".agents/skills/alpha") }, s.deps);
   assert.deepEqual(notice(s.channel), { kind: "warn", text: "Deleted, but something was left" });
   assert.deepEqual(s.during.map((d) => d.busy), ["Deleting alpha on vps…"]);
@@ -219,19 +272,21 @@ test("an operation that throws is reported, and the lock is released and the rev
       },
     },
   });
+  await s.prime();
   const result = await runRequest({ id: "1", op: "link", on: null, key: s.keyOf(".agents/skills/alpha"), tool: "cursor" }, s.deps);
   assert.deepEqual(result, { ok: false, error: "exec went away" });
   assert.deepEqual(notice(s.channel), { kind: "error", text: "exec went away" });
   assert.deepEqual(s.during.map((d) => d.busy), ["Adding alpha to Cursor…"]);
   assert.equal(s.channel.busyAt(null), false);
   assert.equal(s.channel.rev(null), 1);
-  assert.deepEqual(s.scans.at(-1), { on: null, fresh: true, locked: false }, "the machine is read again after a failure too");
+  assert.deepEqual(s.scans.at(-1), { on: null, locked: false }, "the machine is read again after a failure too");
 });
 
 test("a re-scan that throws after the change still bumps and reports", async () => {
   const s = setup();
-  const base = s.deps.scanOf;
-  const deps = { ...s.deps, scanOf: async (on, fresh) => (fresh ? Promise.reject(new Error("gone")) : base(on, fresh)) };
+  await s.prime();
+  let n = 0;
+  const deps = { ...s.deps, scan: async (on) => (++n === 2 ? Promise.reject(new Error("gone")) : s.deps.scan(on)) };
   await runRequest({ id: "1", op: "link", on: null, key: s.keyOf(".agents/skills/alpha"), tool: "cursor" }, deps);
   assert.equal(isLink(s.h.path(".cursor/skills/alpha")), true);
   assert.deepEqual(notice(s.channel), { kind: "done", text: "Added alpha to Cursor" });
@@ -270,8 +325,10 @@ test("a request with an unknown op or a malformed shape is refused without touch
 
 test("link, unlink and remove a folder with a quote and spaces", async () => {
   const s = setup();
+  await s.prime();
   const key = s.keyOf(".agents/skills/it's odd name");
   await runRequest({ id: "1", op: "link", on: null, key, tool: "cursor" }, s.deps);
+  assert.deepEqual(s.claims, [{ on: null, text: "Adding odd to Cursor…" }], "named as the panel saw it");
   assert.deepEqual(notice(s.channel), { kind: "done", text: "Added odd to Cursor" });
   assert.equal(fs.readlinkSync(s.h.path(".cursor/skills/it's odd name")), "../../.agents/skills/it's odd name");
   await runRequest({ id: "2", op: "unlink", on: null, key, tool: "cursor" }, s.deps);
@@ -285,6 +342,7 @@ test("link, unlink and remove a folder with a quote and spaces", async () => {
 
 test("remove acts on the skill the request names and no other", async () => {
   const s = setup();
+  await s.prime();
   await runRequest({ id: "1", op: "remove", on: null, key: s.keyOf(".claude/skills/solo") }, s.deps);
   assert.deepEqual(notice(s.channel), { kind: "done", text: "Deleted solo" });
   assert.equal(exists(s.h.path(".claude/skills/solo")), false);

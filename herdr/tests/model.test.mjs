@@ -4,14 +4,23 @@ import {
   activeTool,
   ago,
   cantCheckText,
+  catalogPreview,
+  catalogRows,
+  checklist,
   clockRegions,
+  defaultTargets,
   deleteLabel,
+  discoverView,
   dropFromLock,
   effectiveMachine,
   emptyText,
   filterSkills,
   footerText,
+  formatInstalls,
+  inStore,
+  installAction,
   installedBody,
+  installedFolders,
   layoutNode,
   lockPath,
   machineInSentence,
@@ -29,9 +38,12 @@ import {
   relativePath,
   requestPending,
   sanitizeName,
+  searchKey,
   sections,
   shortPath,
   skillDocument,
+  startTargets,
+  storeNote,
   stripFrontmatter,
   summaryText,
   toolByName,
@@ -41,7 +53,10 @@ import {
   toolRows,
   toolsNote,
   toolSummary,
+  withTargets,
 } from "../skillsgate/mods/skillsgate/model.js";
+import { createMachine } from "../skillsgate/mods/skillsgate/machine.js";
+import { FIXTURE, makeHome } from "./helpers.mjs";
 
 test("parseFrontmatter reads name and description", () => {
   assert.deepEqual(parseFrontmatter('---\nname: "pdf"\ndescription: Read PDFs\n---\n', "x"), { name: "pdf", description: "Read PDFs" });
@@ -504,4 +519,168 @@ test("skillDocument: the text without frontmatter, or a short message", () => {
   assert.deepEqual(skillDocument({ text: "" }), { body: "" });
   assert.deepEqual(skillDocument({ text: null }), { message: "This folder has no SKILL.md." });
   assert.deepEqual(skillDocument({ error: "Permission denied" }), { message: "Couldn't read SKILL.md: Permission denied" });
+});
+
+// ---- Discover and the catalog dialog ----
+
+test("formatInstalls", () => {
+  assert.equal(formatInstalls(950), "950");
+  assert.equal(formatInstalls(229736), "229.7k");
+  assert.equal(formatInstalls(1200000), "1.2M");
+});
+test("formatInstalls at the edges, by hand", () => {
+  assert.equal(formatInstalls(0), "0");
+  assert.equal(formatInstalls(999), "999");
+  assert.equal(formatInstalls(1000), "1k");
+  assert.equal(formatInstalls(1049), "1k");
+  assert.equal(formatInstalls(1050), "1.1k");
+  assert.equal(formatInstalls(999949), "999.9k");
+  assert.equal(formatInstalls(999950), "1M", "rounds up into millions, never 1000k");
+  assert.equal(formatInstalls(1000000), "1M");
+  assert.equal(formatInstalls(12345678), "12.3M");
+  assert.equal(formatInstalls(1234.6), "1.2k");
+  assert.equal(formatInstalls("1234"), "1.2k");
+  assert.equal(formatInstalls(-5), "0");
+  assert.equal(formatInstalls(NaN), "0");
+  assert.equal(formatInstalls(undefined), "0");
+});
+
+// Task 2's fixture home, scanned for real.
+async function fixtureScan() {
+  const h = makeHome(FIXTURE);
+  const r = await createMachine({ exec: h.exec, readText: h.readText }).scan(null);
+  assert.equal(r.ok, true);
+  return r;
+}
+test("defaultTargets", async () => {
+  const { scan, skills } = await fixtureScan();
+  assert.deepEqual(defaultTargets(scan, skills), ["claude-code", "cursor"]);
+});
+test("defaultTargets leaves out undetected tools and tools without a skill", () => {
+  const skills = [sk("alpha", "store", ["claude-code", "codex-cli", "universal"])];
+  assert.deepEqual(defaultTargets(dialogScan, skills), ["claude-code"]);
+  assert.deepEqual(defaultTargets(dialogScan, []), []);
+  assert.deepEqual(defaultTargets(null, null), []);
+});
+test("installedFolders", async () => {
+  const { skills } = await fixtureScan();
+  assert.deepEqual(installedFolders(skills), new Set(["alpha", "it's odd name"]));
+  assert.deepEqual(installedFolders(null), new Set());
+});
+test("inStore: the shared store already has the folder an install of this id makes", () => {
+  const skills = [sk("pdf", "store", ["universal"]), sk("my-skill", "store", []), sk("solo", "tool", ["claude-code"])];
+  assert.equal(inStore(skills, "pdf"), true);
+  assert.equal(inStore(skills, "My-Skill"), true, "the folder is sanitizeName(skillId)");
+  assert.equal(inStore(skills, "solo"), false, "a folder inside one tool is not the shared copy");
+  assert.equal(inStore(skills, "docx"), false);
+  assert.equal(inStore(null, "pdf"), false);
+  assert.equal(inStore(skills, ""), false);
+});
+
+test("searchKey: the trimmed query, or the popular list under two characters", () => {
+  assert.equal(searchKey(""), "");
+  assert.equal(searchKey(" p "), "");
+  assert.equal(searchKey("pd"), "pd");
+  assert.equal(searchKey("  pdf  "), "pdf");
+  assert.equal(searchKey(null), "");
+});
+test("discoverView: what the Discover body shows for each state", () => {
+  const rows = [{ name: "pdf" }];
+  assert.deepEqual(discoverView(null, ""), { body: "searching", label: "POPULAR", message: null });
+  assert.deepEqual(discoverView(null, "pdf"), { body: "searching", label: "RESULTS", message: null });
+  assert.deepEqual(discoverView({ key: "", results: rows }, ""), { body: "results", label: "POPULAR", message: null });
+  assert.deepEqual(discoverView({ key: "pdf", results: rows }, "pdf"), { body: "results", label: "RESULTS", message: null });
+  // While a newer search runs, the last outcome stays, under its own label.
+  assert.deepEqual(discoverView({ key: "", results: rows }, "pdf"), { body: "results", label: "POPULAR", message: null });
+  assert.deepEqual(discoverView({ key: "zzzz", results: [] }, "zzzz"), { body: "empty", label: "RESULTS", message: 'No skills found for "zzzz"' });
+  assert.deepEqual(discoverView({ key: "", results: [] }, ""), { body: "empty", label: "POPULAR", message: "No skills found" });
+  assert.deepEqual(discoverView({ key: "pdf", error: "skills.sh search failed (HTTP 500)" }, "pdf"), {
+    body: "error",
+    label: "RESULTS",
+    message: "skills.sh search failed (HTTP 500)",
+  });
+});
+test("catalogRows: each row's name, source, installs and tags", () => {
+  const results = [
+    { id: "anthropics/skills/pdf", source: "anthropics/skills", skillId: "pdf", name: "pdf", installs: 229736, installable: true },
+    { id: "a/b/my", source: "a/b", skillId: "My-Skill", name: "My Skill", installs: 950, installable: true },
+    { id: "x", source: "bad source", skillId: "pdf", name: "", installs: 0, installable: false },
+    { id: "y", source: 7, skillId: null, name: null, installs: 1200000, installable: false },
+  ];
+  const skills = [sk("pdf", "store", ["universal"]), sk("my-skill", "tool", ["claude-code"])];
+  assert.deepEqual(catalogRows(results, skills), [
+    { name: "pdf", source: "anthropics/skills", installs: "229.7k", installed: true, installable: true },
+    { name: "My Skill", source: "a/b", installs: "950", installed: false, installable: true },
+    { name: "pdf", source: "bad source", installs: "0", installed: false, installable: false },
+    { name: "Unnamed skill", source: "", installs: "1.2M", installed: false, installable: false },
+  ]);
+  assert.deepEqual(catalogRows(results, null).map((r) => r.installed), [false, false, false, false], "the machine is not read yet");
+  assert.deepEqual(catalogRows(null, skills), []);
+});
+
+test("startTargets: the machine's remembered tools, else the default", () => {
+  const skills = [sk("alpha", "store", ["claude-code", "universal"])];
+  assert.deepEqual(startTargets(undefined, null, dialogScan, skills), ["claude-code"]);
+  assert.deepEqual(startTargets({ "": ["cursor"] }, null, dialogScan, skills), ["cursor"]);
+  assert.deepEqual(startTargets({ "": [] }, null, dialogScan, skills), [], "an empty choice is a choice");
+  assert.deepEqual(startTargets({ vps: ["cursor"] }, null, dialogScan, skills), ["claude-code"], "another machine's choice");
+  assert.deepEqual(startTargets({ vps: ["cursor"] }, "vps", dialogScan, skills), ["cursor"]);
+  assert.deepEqual(startTargets({ "": "cursor" }, null, dialogScan, skills), ["claude-code"], "not an array");
+  assert.deepEqual(startTargets("junk", null, dialogScan, skills), ["claude-code"]);
+  assert.deepEqual(startTargets({ "": ["cursor", 7, ""] }, null, dialogScan, skills), ["cursor"]);
+});
+test("withTargets keeps other machines' choices and never changes the stored object", () => {
+  const stored = { vps: ["cursor"] };
+  assert.deepEqual(withTargets(stored, null, ["claude-code"]), { vps: ["cursor"], "": ["claude-code"] });
+  assert.deepEqual(stored, { vps: ["cursor"] });
+  assert.deepEqual(withTargets(undefined, "vps", []), { vps: [] });
+  assert.deepEqual(withTargets(["junk"], "vps", ["a"]), { vps: ["a"] });
+});
+test("checklist lists the detected tools except Universal, checked from the choice", () => {
+  // codex-cli is remembered but not detected: it is not listed, so never installed to.
+  assert.deepEqual(checklist(dialogScan, ["cursor", "codex-cli"]), [
+    { name: "claude-code", label: "Claude Code", shortCode: "CC", program: "claude", checked: false },
+    { name: "cursor", label: "Cursor", shortCode: "CU", program: "cursor", checked: true },
+    { name: "windsurf", label: "Windsurf", shortCode: "WS", program: null, checked: false },
+  ]);
+  assert.deepEqual(checklist(dialogScan, new Set(["windsurf"])).map((r) => r.checked), [false, false, true]);
+  assert.deepEqual(checklist(null, []), []);
+});
+test("storeNote names the shared store", () => {
+  assert.equal(storeNote(dialogScan), "The shared store (~/.agents/skills) always gets a copy.");
+  assert.equal(storeNote(null), "The shared store always gets a copy.");
+});
+test("installAction: the primary button's label and why it is disabled", () => {
+  const row = { source: "anthropics/skills", skillId: "pdf", installable: true };
+  const read = { scan: dialogScan, skills: [sk("alpha", "store", ["universal"])] };
+  const pdfInStore = [sk("pdf", "store", ["universal"])];
+  assert.deepEqual(installAction({ on: null, row, read, busy: null }), { label: "Install on this computer", reason: null, working: false });
+  assert.deepEqual(installAction({ on: "vps", row, read: { ...read, skills: pdfInStore }, busy: null }), { label: "Update on vps", reason: null, working: false });
+  assert.equal(installAction({ on: null, row, read: { ...read, skills: [sk("pdf", "tool", ["claude-code"])] }, busy: null }).label, "Install on this computer");
+  // Disabled, with the reason beside it.
+  assert.deepEqual(installAction({ on: null, row, read: {}, busy: null }), { label: "Install on this computer", reason: "Checking this computer…", working: true });
+  assert.deepEqual(installAction({ on: "vps", row, read: { error: "machine vps is unreachable" }, busy: null }), {
+    label: "Install on vps",
+    reason: "Can't check vps: machine vps is unreachable",
+    working: false,
+  });
+  assert.deepEqual(installAction({ on: "vps", row, read: { ...read, scan: { ...dialogScan, git: false } }, busy: null }), {
+    label: "Install on vps",
+    reason: "git is not installed on vps",
+    working: false,
+  });
+  assert.equal(installAction({ on: null, row, read: { ...read, scan: { ...dialogScan, git: false } }, busy: null }).reason, "git is not installed on this computer");
+  assert.deepEqual(installAction({ on: "vps", row, read: { ...read, skills: pdfInStore }, busy: "Installing pdf on vps…" }), {
+    label: "Update on vps",
+    reason: "Installing pdf on vps…",
+    working: true,
+  });
+  assert.equal(installAction({ on: null, row: { ...row, installable: false }, read, busy: null }).reason, "This skill can't be installed");
+});
+test("catalogPreview: the description and the body, or Preview unavailable", () => {
+  assert.deepEqual(catalogPreview("---\nname: pdf\ndescription: Read PDFs\n---\n# PDF\nBody\n"), { description: "Read PDFs", body: "# PDF\nBody\n" });
+  assert.deepEqual(catalogPreview("# Just a body"), { description: "", body: "# Just a body" });
+  assert.deepEqual(catalogPreview(""), { description: "", body: "" });
+  assert.deepEqual(catalogPreview(null), { message: "Preview unavailable" });
+  assert.deepEqual(catalogPreview(undefined), { message: "Preview unavailable" });
 });

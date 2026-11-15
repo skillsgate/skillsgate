@@ -37,7 +37,18 @@ test("mod.json", () =>
 // them. Views draw with Herdr's UI kit and may import Herdr. A new file must
 // be added to one of the two lists.
 const LOGIC = ["registry.js", "scripts.js", "model.js", "machine.js", "catalog.js", "channel.js", "requests.js"];
-const VIEWS = ["main.js", "host.js", "ui.js", "toggle.js", "panel.js", "installed-tab.js", "discover-tab.js", "machines-tab.js", "skill-dialog.js"];
+const VIEWS = [
+  "main.js",
+  "host.js",
+  "ui.js",
+  "toggle.js",
+  "panel.js",
+  "installed-tab.js",
+  "discover-tab.js",
+  "machines-tab.js",
+  "skill-dialog.js",
+  "catalog-dialog.js",
+];
 const source = (f) => readFileSync(`${MOD}/${f}`, "utf8");
 const localImports = (f) => [...source(f).matchAll(/from "\.\/([^"]+)"/g)].map((m) => m[1]);
 
@@ -96,5 +107,5 @@ test("the class scan reads methods and fields", () => {
   assert.ok(dialog.fields.has("tab") && dialog.fields.has("closed") && dialog.fields.has("armed"));
   assert.deepEqual(classesOf("class A {\n  get x() {}\n  y() { this.x = 1; }\n}\n").map((c) => [...c.fields].filter((n) => c.methods.has(n))), [["x"]]);
   const names = VIEWS.flatMap((f) => classesOf(source(f)).map((c) => c.name)).sort();
-  assert.deepEqual(names, ["DiscoverTab", "InstalledTab", "MachineData", "MachinesTab", "Panel", "SkillDialog", "SkillsGate", "Toggle"]);
+  assert.deepEqual(names, ["CatalogDialog", "DiscoverTab", "InstalledTab", "MachineData", "MachinesTab", "Panel", "SkillDialog", "SkillsGate", "Toggle"]);
 });

@@ -1,9 +1,10 @@
 // Host adapters and the singletons the views share: the one place Herdr's
-// machine functions are called, the channel and the machine built on them,
-// the facts about the window the panel and the toggle read, and the ids of
-// requests already taken. It imports no view.
+// machine functions and `fetch` are called, the channel, machine and catalog
+// built on them, the facts about the window the panel and the toggle read,
+// and the ids of requests already taken. It imports no view.
 
 import { exec as hostExec, layout, readTextFile, setShared, shared, spaces } from "herdr";
+import { createCatalog } from "./catalog.js";
 import { createChannel } from "./channel.js";
 import { createMachine } from "./machine.js";
 import { effectiveMachine, layoutNode } from "./model.js";
@@ -11,6 +12,7 @@ import { effectiveMachine, layoutNode } from "./model.js";
 export const MOD = "skillsgate";
 export const PANEL = "skillsgate-panel";
 export const MACHINE_CHOICE = "skillsgate.machine.v1";
+export const TARGETS = "skillsgate.targets.v1"; // { [machineKey]: tool names }: the last install's tools
 
 // ---- Host adapters: the one place Herdr's machine functions are called ----
 
@@ -30,6 +32,9 @@ export const readText = (path, on) => readTextFile(path, { on });
 
 export const channel = createChannel({ get: shared, set: setShared });
 export const machine = createMachine({ exec, readText });
+// Herdr's global fetch: its response has the `ok`, `status`, `json()` and
+// `text()` catalog.js reads.
+export const catalog = createCatalog({ fetch: (url, options) => fetch(url, options) });
 
 export const errorText = (error) => String(error?.message ?? error);
 

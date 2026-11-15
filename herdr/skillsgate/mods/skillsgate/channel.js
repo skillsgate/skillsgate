@@ -82,6 +82,16 @@ export function createChannel({ get, set, now = Date.now, staleMs = 150000 }) {
       set(BUSY, rest);
     },
 
+    // touch(on): refresh the time of machine `on`'s lock, so a long operation
+    // that touches it before each step never sees it go stale. Does nothing
+    // when the machine holds no live lock; other machines keep theirs.
+    touch(on) {
+      const key = machineKey(on);
+      const live = liveLocks();
+      if (!live[key]) return;
+      set(BUSY, { ...live, [key]: { text: live[key].text, at: now() } });
+    },
+
     // busyAt(on) -> boolean: whether machine `on` has a live lock.
     busyAt(on) {
       return Boolean(liveLocks()[machineKey(on)]);

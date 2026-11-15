@@ -131,6 +131,48 @@ test("a stale lock on one machine does not free another", () => {
   assert.equal(channel.busyAt("vps"), true);
 });
 
+test("touch extends a held lock past its old stale time", () => {
+  const { channel, clock } = setup();
+  channel.claim(null, "Installing pdf…");
+  clock.now += 100000;
+  channel.touch(null);
+  clock.now += 100000; // 200 s after the claim, 100 s after the touch
+  assert.equal(channel.busyAt(null), true);
+  assert.equal(channel.textAt(null), "Installing pdf…", "the text is kept");
+  assert.equal(channel.claim(null, "Other"), false);
+  clock.now += 50001; // 150 s and a bit after the touch
+  assert.equal(channel.busyAt(null), false);
+});
+
+test("touch does not create a lock", () => {
+  const { channel, store } = setup();
+  channel.touch(null);
+  channel.touch("vps");
+  assert.equal(store.has(BUSY), false);
+  assert.equal(channel.busyAt(null), false);
+  assert.equal(channel.busyAt("vps"), false);
+  // Nor does it bring back a lock that went stale.
+  const { channel: c2, clock } = setup();
+  c2.claim(null, "old");
+  clock.now += 150001;
+  c2.touch(null);
+  assert.equal(c2.busyAt(null), false);
+});
+
+test("touch leaves other machines' locks alone", () => {
+  const { channel, clock, store } = setup();
+  channel.claim(null, "here");
+  channel.claim("vps", "there");
+  const hereAt = store.get(BUSY)[""].at;
+  clock.now += 100000;
+  channel.touch("vps");
+  assert.deepEqual(store.get(BUSY)[""], { text: "here", at: hereAt });
+  assert.deepEqual(store.get(BUSY).vps, { text: "there", at: clock.now });
+  clock.now += 60000;
+  assert.equal(channel.busyAt(null), false, "this computer's lock went stale on its own time");
+  assert.equal(channel.busyAt("vps"), true);
+});
+
 test("a malformed busy value is treated as no locks", () => {
   for (const bad of ["oops", null, [], 7, { "": "text" }, { "": { text: "x" } }]) {
     const { channel, store } = setup();

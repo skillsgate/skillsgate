@@ -462,6 +462,129 @@ export function skillDocument(read) {
   return { body: stripFrontmatter(read.text) };
 }
 
+// ---- What Discover and the catalog dialog show ----
+
+// "950", "229.7k", "1.2M": tenths counted with integers, by hand, because
+// Herdr's runtime has no Intl and its toLocaleString does not group digits.
+export function formatInstalls(n) {
+  const count = Math.max(0, Math.round(Number(n) || 0));
+  if (count < 1000) return String(count);
+  const thousands = Math.round(count / 100); // in tenths of a thousand
+  const [tenths, unit] = thousands < 10000 ? [thousands, "k"] : [Math.round(count / 100000), "M"];
+  const rest = tenths % 10;
+  return `${Math.floor(tenths / 10)}${rest ? "." + rest : ""}${unit}`;
+}
+
+// The folders the shared store holds (skills whose home is "store").
+export const installedFolders = (skills) => new Set((skills ?? []).filter((s) => s.home === "store").map((s) => s.folder));
+
+// Whether the shared store already has the folder an install of `skillId`
+// makes (sanitizeName(skillId)): the install is then an update.
+export const inStore = (skills, skillId) => {
+  const folder = sanitizeName(skillId);
+  return Boolean(folder) && installedFolders(skills).has(folder);
+};
+
+// The tools an install goes to before any is remembered for the machine:
+// every detected tool that already has a skill, minus Universal.
+export function defaultTargets(scan, skills) {
+  return (scan?.tools ?? [])
+    .filter((t) => t.detected && t.name !== UNIVERSAL && (skills ?? []).some((s) => s.tools.includes(t.name)))
+    .map((t) => t.name);
+}
+
+// What a query searches for: the trimmed text, or "" (the popular list, which
+// the catalog searches as `skill`) under two characters.
+export function searchKey(query) {
+  const trimmed = String(query ?? "").trim();
+  return trimmed.length < 2 ? "" : trimmed;
+}
+
+// What the Discover body shows. `last` is the latest search outcome kept
+// (`{ key, results }` or `{ key, error }`), or null before the first; `key` is
+// the field's. A newer search keeps the last outcome on screen, labelled by
+// its own key, until its result arrives.
+export function discoverView(last, key) {
+  const label = (last ? last.key : key) === "" ? "POPULAR" : "RESULTS";
+  if (!last) return { body: "searching", label, message: null };
+  if (typeof last.error === "string") return { body: "error", label, message: last.error };
+  if (last.results.length) return { body: "results", label, message: null };
+  return { body: "empty", label, message: last.key ? `No skills found for "${last.key}"` : "No skills found" };
+}
+
+const stringOr = (value) => (typeof value === "string" ? value : "");
+
+// A row per search result: the name, `owner/repo`, the installs, and whether
+// the viewed machine's shared store has it (`skills` is null until read).
+export function catalogRows(results, skills) {
+  const folders = installedFolders(skills);
+  return (results ?? []).map((r) => {
+    const installable = Boolean(r.installable);
+    return {
+      name: stringOr(r.name) || stringOr(r.skillId) || "Unnamed skill",
+      source: stringOr(r.source),
+      installs: formatInstalls(r.installs),
+      installed: installable && folders.has(sanitizeName(r.skillId)),
+      installable,
+    };
+  });
+}
+
+const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+
+// The tools the dialog starts with checked: those remembered for the machine
+// (`stored` is shared "skillsgate.targets.v1"), else defaultTargets.
+export function startTargets(stored, on, scan, skills) {
+  const kept = isRecord(stored) ? stored[machineKey(on)] : undefined;
+  if (!Array.isArray(kept)) return defaultTargets(scan, skills);
+  return kept.filter((name) => typeof name === "string" && name !== "");
+}
+
+// The stored choices with this machine's replaced, as a new object.
+export const withTargets = (stored, on, tools) => ({ ...(isRecord(stored) ? stored : {}), [machineKey(on)]: [...tools] });
+
+// The dialog's checklist: the machine's detected tools except Universal (the
+// shared store always gets the skill), in registry order. A remembered tool
+// that is not listed is never installed to.
+export function checklist(scan, checked) {
+  const picked = new Set(checked ?? []);
+  return (scan?.tools ?? [])
+    .filter((t) => t.detected && t.name !== UNIVERSAL)
+    .map(({ name }) => {
+      const tool = toolByName(TOOLS, name);
+      return { name, label: toolLabel(name), shortCode: tool?.shortCode ?? "", program: tool?.program ?? null, checked: picked.has(name) };
+    });
+}
+
+// The line under the checklist.
+export function storeNote(scan) {
+  const store = scan?.tools?.find((t) => t.name === UNIVERSAL)?.dir;
+  return store ? `The shared store (${shortPath(store, scan.home)}) always gets a copy.` : "The shared store always gets a copy.";
+}
+
+// The catalog dialog's primary button: its label, why it is disabled (null
+// when it is not) and whether that is work in progress (`working`, drawn with
+// a spinner). `read` is the dialog's own scan of the machine: `{ scan, skills }`
+// once one worked, `{ error }` when the first failed, `{}` while it runs.
+// `busy` is the machine's lock text, or null.
+export function installAction({ on, row, read, busy }) {
+  const where = inSentence(on);
+  const label = `${inStore(read.skills, row.skillId) ? "Update" : "Install"} on ${where}`;
+  const off = (reason, working = false) => ({ label, reason, working });
+  if (!row.installable) return off("This skill can't be installed");
+  if (!read.scan) return read.error ? off(cantCheckText(on, read.error)) : off(`Checking ${where}…`, true);
+  if (!read.scan.git) return off(`git is not installed on ${where}`);
+  if (busy) return off(busy, true);
+  return off(null);
+}
+
+// A catalog SKILL.md (null when it could not be fetched) as the dialog shows
+// it: the frontmatter's description, then the body without the frontmatter.
+export function catalogPreview(skillMd) {
+  if (typeof skillMd !== "string") return { message: "Preview unavailable" };
+  return { description: parseFrontmatter(skillMd, "").description, body: stripFrontmatter(skillMd) };
+}
+
 // How long ago, from elapsed milliseconds. Seconds go in steps of ten, so a
 // panel showing it redraws at most every 10 s.
 export function ago(ms) {

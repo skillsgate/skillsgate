@@ -5,7 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createMachine } from "../skillsgate/mods/skillsgate/machine.js";
-import { INSTALL, WRITE } from "../skillsgate/mods/skillsgate/scripts.js";
+import { INSTALL, LINK, WRITE } from "../skillsgate/mods/skillsgate/scripts.js";
 import { SKILL, makeHome } from "./helpers.mjs";
 
 const hasGit = spawnSync("git", ["--version"]).status === 0;
@@ -331,6 +331,34 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
     const m = createMachine({ exec: async () => ({ code: 127, stdout: "", stderr: "" }), readText: async () => null, ...sources() });
     const scan = { home: "/h", git: true, tools: [{ name: "universal", dir: "/h/.agents/skills", detected: true }], entries: [] };
     assert.deepEqual(await m.install(null, scan, installed("alpha")), { ok: false, error: "git is not installed on This computer" });
+  });
+  it("install calls onStep before each step on the machine after the copy", async () => {
+    const h = makeHome({});
+    const events = [];
+    const names = new Map([[INSTALL, "install"], [LINK, "link"], [WRITE, "write"]]);
+    const exec = (script, ...rest) => {
+      events.push(names.get(script) ?? "other");
+      return h.exec(script, ...rest);
+    };
+    const readText = (...args) => {
+      events.push("read");
+      return h.readText(...args);
+    };
+    const m = createMachine({ exec, readText, ...sources() });
+    const scan = (await m.scan(null)).scan;
+    events.length = 0;
+    const result = await m.install(null, scan, { ...installed("alpha", ["claude-code", "cursor"]), onStep: () => events.push("step") });
+    assert.deepEqual(result, { ok: true, folder: "alpha" });
+    assert.deepEqual(events, ["install", "step", "link", "step", "link", "step", "read", "step", "write"]);
+  });
+  it("install goes on when onStep throws", async () => {
+    const { h, m, r } = await setup();
+    const onStep = () => {
+      throw new Error("shared store went away");
+    };
+    assert.deepEqual(await m.install(null, r.scan, { ...installed("alpha", ["claude-code"]), onStep }), { ok: true, folder: "alpha" });
+    assert.equal(isLink(h.path(".claude/skills/alpha")), true);
+    assert.equal(lockOf(h).skills.alpha.source, SOURCE);
   });
   it("install without tools installs to the store only", async () => {
     const { h, m, r } = await setup();

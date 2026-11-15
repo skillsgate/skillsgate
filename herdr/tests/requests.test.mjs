@@ -1,34 +1,74 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { BUSY, NOTICE, REV, createChannel } from "../skillsgate/mods/skillsgate/channel.js";
 import { createMachine } from "../skillsgate/mods/skillsgate/machine.js";
 import { runRequest } from "../skillsgate/mods/skillsgate/requests.js";
 import { FIXTURE, SKILL, makeHome } from "./helpers.mjs";
+
+const hasGit = spawnSync("git", ["--version"]).status === 0;
+
+// A local repository standing in for GitHub, as in install.test.mjs: made once,
+// with an environment that never reads the maintainer's own git configuration.
+let repoDir = null;
+function repo() {
+  if (repoDir) return repoDir;
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "sg req repo.")));
+  process.on("exit", () => fs.rmSync(root, { recursive: true, force: true }));
+  const dir = path.join(root, "acme skills");
+  const gitHome = path.join(root, "git-home");
+  fs.mkdirSync(gitHome);
+  for (const [rel, text] of Object.entries({ "skills/alpha/SKILL.md": SKILL("alpha"), "skills/alpha/extra.txt": "extra", "beta/SKILL.md": SKILL("beta") })) {
+    fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+    fs.writeFileSync(path.join(dir, rel), text);
+  }
+  const env = { PATH: process.env.PATH, HOME: gitHome, GIT_CONFIG_NOSYSTEM: "1" };
+  const git = (...args) => execFileSync("git", args, { cwd: dir, env, stdio: "pipe" });
+  git("init", "-q", "-b", "main");
+  git("add", "-A");
+  git("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "init");
+  repoDir = dir;
+  return dir;
+}
 
 // A temp home with real `sh`, a machine on it, a Map standing in for Herdr's
 // shared store, and a caller that keeps the latest good scan per machine the
 // way the panel does: `known(on)` reads it, `scan(on)` scans and keeps it,
 // `prime(on)` gives the caller a first scan (as the panel has before any
 // dialog opens). `ops` replaces machine operations (to make one warn or
-// throw). Every exec call, claim and runRequest scan is recorded, and so is
-// the lock text seen while an operation runs.
-function setup({ files = FIXTURE, ops = {} } = {}) {
+// throw). Every exec call, claim, touch and runRequest scan is recorded, and
+// so is the lock text seen while an operation runs. Installs clone the local
+// repository; `clock` (`{ now }`) drives the channel's time when given, and
+// `onExec(script)` runs before every exec call.
+function setup({ files = FIXTURE, ops = {}, clock = null, onExec = () => {} } = {}) {
   const h = makeHome(files);
   const calls = [];
   const exec = (...args) => {
     calls.push(args);
+    onExec(args[0]);
     return h.exec(...args);
   };
-  const real = createMachine({ exec, readText: h.readText });
+  const real = createMachine({ exec, readText: h.readText, cloneUrl: () => "file://" + repo() });
   const store = new Map();
-  const base = createChannel({ get: (key) => store.get(key), set: (key, value) => store.set(key, value) });
+  const base = createChannel({
+    get: (key) => store.get(key),
+    set: (key, value) => store.set(key, value),
+    ...(clock ? { now: () => clock.now } : {}),
+  });
   const claims = [];
+  const touches = []; // each touch, and whether the lock was still live when it came
   const channel = {
     ...base,
     claim(on, text) {
       claims.push({ on, text });
       return base.claim(on, text);
+    },
+    touch(on) {
+      touches.push({ on, live: base.busyAt(on) });
+      return base.touch(on);
     },
   };
   const during = []; // what the lock said while an operation ran
@@ -36,7 +76,7 @@ function setup({ files = FIXTURE, ops = {} } = {}) {
     during.push({ op: name, on, busy: channel.textAt(on) });
     return (ops[name] ?? real[name])(on, ...rest);
   };
-  const machine = { ...real, link: watched("link"), unlink: watched("unlink"), remove: watched("remove") };
+  const machine = { ...real, link: watched("link"), unlink: watched("unlink"), remove: watched("remove"), install: watched("install") };
   const latest = new Map();
   const keep = (on, r) => {
     if (r.ok) latest.set(on ?? "", { scan: r.scan, skills: r.skills });
@@ -52,7 +92,7 @@ function setup({ files = FIXTURE, ops = {} } = {}) {
   const prime = async (on = null) => keep(on, await real.scan(on));
   const deps = { channel, machine, known, scan };
   const keyOf = (rel) => fs.realpathSync(h.path(rel));
-  return { h, calls, store, channel, claims, during, scans, deps, keyOf, prime };
+  return { h, calls, store, channel, claims, touches, during, scans, deps, keyOf, prime };
 }
 
 const exists = (p) => fs.existsSync(p);
@@ -166,6 +206,7 @@ test("each run scans under the lock, then again after releasing it", async () =>
     { on: "vps", locked: true },
     { on: "vps", locked: false },
   ]);
+  assert.deepEqual(s.touches, [{ on: "vps", live: true }], "the lock is refreshed once, after the fresh scan");
 });
 
 test("a link made on disk after the caller's last scan is really removed", async () => {
@@ -257,6 +298,7 @@ test("a busy machine gives the warning and changes nothing", async () => {
   assert.deepEqual(notice(s.channel), { kind: "warn", text: "vps is busy. Try again when it finishes." });
   assert.deepEqual(s.during, []);
   assert.deepEqual(s.scans, []);
+  assert.deepEqual(s.touches, [], "another request's lock is not refreshed");
   assert.deepEqual(s.calls, [], "nothing ran on the machine, not even a scan");
   assert.equal(isLink(s.h.path(".cursor/skills/alpha")), false);
   assert.equal(exists(s.h.path(".agents/skills/alpha/SKILL.md")), true);
@@ -325,7 +367,6 @@ test("a request with an unknown op or a malformed shape is refused without touch
     null,
     "remove",
     { id: "1", op: "explode", on: null, key },
-    { id: "2", op: "install", on: null, source: "a/b", skillId: "x", name: "x", tools: [] },
     { id: "3", op: "constructor", on: null, key },
     { id: "4", op: ["remove"], on: null, key },
     { id: "5", op: "remove", on: null },
@@ -335,6 +376,18 @@ test("a request with an unknown op or a malformed shape is refused without touch
     { id: "9", op: "unlink", on: null, key, tool: "" },
     { id: "10", op: "remove", on: "", key },
     { id: "11", op: "remove", on: 7, key },
+    // install: a source, skill id or tool list that is malformed
+    { id: "12", op: "install", on: null, skillId: "alpha", name: "alpha", tools: [] },
+    { id: "13", op: "install", on: null, source: "a b/c", skillId: "alpha", name: "alpha", tools: [] },
+    { id: "14", op: "install", on: null, source: "-x/y", skillId: "alpha", name: "alpha", tools: [] },
+    { id: "15", op: "install", on: null, source: "acme/skills", name: "alpha", tools: [] },
+    { id: "16", op: "install", on: null, source: "acme/skills", skillId: "../x", name: "x", tools: [] },
+    { id: "17", op: "install", on: null, source: "acme/skills", skillId: "a;rm -rf ~", name: "x", tools: [] },
+    { id: "18", op: "install", on: null, source: "acme/skills", skillId: "alpha", name: "alpha" },
+    { id: "19", op: "install", on: null, source: "acme/skills", skillId: "alpha", name: "alpha", tools: "claude-code" },
+    { id: "20", op: "install", on: null, source: "acme/skills", skillId: "alpha", name: "alpha", tools: [7] },
+    { id: "21", op: "install", on: null, source: "acme/skills", skillId: "alpha", name: "alpha", tools: [""] },
+    { id: "22", op: "install", on: "", source: "acme/skills", skillId: "alpha", name: "alpha", tools: [] },
   ];
   for (const req of bad) {
     assert.equal(await runRequest(req, s.deps), null, JSON.stringify(req));
@@ -342,6 +395,7 @@ test("a request with an unknown op or a malformed shape is refused without touch
   assert.deepEqual(s.calls, []);
   assert.deepEqual(s.scans, []);
   assert.deepEqual(s.claims, []);
+  assert.deepEqual(s.touches, []);
   for (const k of [BUSY, NOTICE, REV]) assert.equal(s.store.has(k), false, k);
   assert.equal(exists(s.h.path(".agents/skills/alpha/SKILL.md")), true);
   assert.equal(isLink(s.h.path(".claude/skills/alpha")), true);
@@ -375,4 +429,142 @@ test("remove acts on the skill the request names and no other", async () => {
   }
   assert.equal(isLink(s.h.path(".claude/skills/alpha")), true);
   assert.equal(isLink(s.h.path(".cursor/skills/outside")), true);
+});
+
+// ---- install (clones the local repository standing in for GitHub) ----
+
+const withGit = { skip: hasGit ? false : "git is not installed on this computer" };
+const lockEntry = (h, folder) => JSON.parse(fs.readFileSync(h.path(".agents/.skill-lock.json"), "utf8")).skills[folder];
+const install = (skillId, extra = {}) => ({ id: "i", op: "install", on: null, source: "acme/skills", skillId, name: skillId, tools: [], ...extra });
+
+test("a first install says Installed, and the folder, links and lock entry exist", withGit, async () => {
+  const s = setup({ files: {} });
+  const result = await runRequest(install("alpha", { tools: ["claude-code", "cursor"] }), s.deps);
+  assert.deepEqual(result, { ok: true, folder: "alpha" });
+  assert.deepEqual(s.claims, [{ on: null, text: "Installing alpha…" }]);
+  assert.deepEqual(s.during, [{ op: "install", on: null, busy: "Installing alpha…" }]);
+  assert.deepEqual(notice(s.channel), { kind: "done", text: "Installed alpha" });
+  assert.equal(fs.readFileSync(s.h.path(".agents/skills/alpha/extra.txt"), "utf8"), "extra");
+  assert.equal(fs.readlinkSync(s.h.path(".claude/skills/alpha")), "../../.agents/skills/alpha");
+  assert.equal(fs.readlinkSync(s.h.path(".cursor/skills/alpha")), "../../.agents/skills/alpha");
+  const entry = lockEntry(s.h, "alpha");
+  assert.deepEqual([entry.source, entry.sourceType], ["acme/skills", "github"]);
+  assert.equal(s.channel.busyAt(null), false);
+  assert.equal(s.channel.rev(null), 1);
+  assert.deepEqual(s.scans, [
+    { on: null, locked: true },
+    { on: null, locked: false },
+  ]);
+});
+
+test("a second install of the same skill says Updated", withGit, async () => {
+  const s = setup({ files: {} });
+  await runRequest(install("beta"), s.deps);
+  assert.deepEqual(notice(s.channel), { kind: "done", text: "Installed beta" });
+  await runRequest(install("beta"), s.deps);
+  assert.deepEqual(notice(s.channel), { kind: "done", text: "Updated beta" });
+  assert.deepEqual(s.claims.map((c) => c.text), ["Installing beta…", "Installing beta…"]);
+  assert.equal(exists(s.h.path(".agents/skills/beta/SKILL.md")), true);
+  assert.equal(s.channel.busyAt(null), false);
+  assert.equal(s.channel.rev(null), 2);
+});
+
+test("Updated means the shared store had the folder; a folder inside one tool does not count", withGit, async () => {
+  const s = setup(); // the fixture's shared store has alpha
+  await runRequest(install("alpha", { name: "Alpha Skill" }), s.deps);
+  assert.deepEqual(notice(s.channel), { kind: "done", text: "Updated Alpha Skill" });
+  const t = setup({ files: { ".claude/skills/beta/SKILL.md": SKILL("mine") } });
+  await runRequest(install("beta"), t.deps);
+  assert.deepEqual(notice(t.channel), { kind: "done", text: "Installed beta" });
+});
+
+test("a named machine is named while installing and not when done; no name means the skill id", withGit, async () => {
+  const s = setup({ files: {} });
+  await runRequest(install("beta", { on: "vps", name: undefined }), s.deps);
+  assert.deepEqual(s.claims, [{ on: "vps", text: "Installing beta on vps…" }]);
+  assert.deepEqual(notice(s.channel), { kind: "done", text: "Installed beta" });
+  assert.equal(s.channel.busyAt("vps"), false);
+  assert.equal(s.channel.rev("vps"), 1);
+  assert.equal(s.channel.rev(null), 0, "this computer's revision is left alone");
+});
+
+test("a skill the repo does not have says the not-found error and changes nothing", withGit, async () => {
+  const s = setup();
+  const before = fs.readdirSync(s.h.path(".agents/skills")).sort();
+  const result = await runRequest(install("nope", { tools: ["cursor"] }), s.deps);
+  assert.deepEqual(result, { ok: false, error: 'Could not find "nope" in acme/skills' });
+  assert.deepEqual(notice(s.channel), { kind: "error", text: 'Could not find "nope" in acme/skills' });
+  assert.deepEqual(fs.readdirSync(s.h.path(".agents/skills")).sort(), before);
+  assert.equal(exists(s.h.path(".cursor/skills/nope")), false);
+  assert.equal(exists(s.h.path(".agents/.skill-lock.json")), false);
+  assert.equal(s.channel.busyAt(null), false);
+  assert.equal(s.channel.rev(null), 1);
+});
+
+test("an install whose lock file can't be rewritten says so as a warning", withGit, async () => {
+  const s = setup({ files: { ".agents/.skill-lock.json": "{nope" } });
+  const result = await runRequest(install("beta"), s.deps);
+  assert.equal(result.ok, true);
+  assert.deepEqual(notice(s.channel), { kind: "warn", text: "Installed, but the skill lock was not updated (invalid)" });
+  assert.equal(fs.readFileSync(s.h.path(".agents/.skill-lock.json"), "utf8"), "{nope");
+  assert.equal(exists(s.h.path(".agents/skills/beta/SKILL.md")), true);
+  assert.equal(s.channel.busyAt(null), false);
+  assert.equal(s.channel.rev(null), 1);
+});
+
+test("the lock is touched before each step, so a slow install never lets it go stale", withGit, async () => {
+  // Every exec takes 100 s of the channel's clock (the scan, the copy, each
+  // link, the lock write); a lock goes stale 150 s after its last touch.
+  const clock = { now: 1_000_000 };
+  const liveAtExec = [];
+  const holder = {};
+  holder.s = setup({
+    files: {},
+    clock,
+    onExec: () => {
+      liveAtExec.push(holder.s.channel.busyAt(null));
+      clock.now += 100000;
+    },
+  });
+  const { s } = holder;
+  const result = await runRequest(install("alpha", { tools: ["claude-code", "cursor"] }), s.deps);
+  assert.deepEqual(result, { ok: true, folder: "alpha" });
+  // The fresh scan, the copy, two links and the lock write ran under a live
+  // lock; the re-scan runs after the release.
+  assert.deepEqual(liveAtExec, [true, true, true, true, true, false]);
+  // After the fresh scan, before each link, before the lock read and its write.
+  assert.deepEqual(s.touches, Array(5).fill({ on: null, live: true }));
+  assert.deepEqual(notice(s.channel), { kind: "done", text: "Installed alpha" });
+  assert.equal(s.channel.busyAt(null), false);
+  assert.equal(s.channel.rev(null), 1);
+});
+
+test("an install that throws is reported, and the lock is released and the revision bumped", async () => {
+  const s = setup({
+    files: {},
+    ops: {
+      install: async () => {
+        throw new Error("exec went away");
+      },
+    },
+  });
+  const result = await runRequest(install("alpha"), s.deps);
+  assert.deepEqual(result, { ok: false, error: "exec went away" });
+  assert.deepEqual(notice(s.channel), { kind: "error", text: "exec went away" });
+  assert.equal(s.channel.busyAt(null), false);
+  assert.equal(s.channel.rev(null), 1);
+});
+
+test("an install on a machine that can't be read runs nothing", async () => {
+  const s = setup({ files: {} });
+  const failing = { ...s.deps, scan: async () => ({ ok: false, error: "machine vps is unreachable" }) };
+  assert.equal(await runRequest(install("alpha", { on: "vps", tools: ["cursor"] }), failing), null);
+  assert.deepEqual(notice(s.channel), { kind: "error", text: "Can't check vps: machine vps is unreachable" });
+  assert.deepEqual(s.claims, [{ on: "vps", text: "Installing alpha on vps…" }]);
+  assert.deepEqual(s.during, []);
+  assert.deepEqual(s.calls, []);
+  assert.deepEqual(s.touches, []);
+  assert.equal(s.channel.busyAt("vps"), false);
+  assert.equal(s.channel.rev("vps"), 0);
+  assert.equal(exists(s.h.path(".agents")), false);
 });

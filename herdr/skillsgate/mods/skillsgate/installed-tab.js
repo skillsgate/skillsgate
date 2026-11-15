@@ -5,7 +5,7 @@ import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Scrollbar } from "gpui-base";
 import { openOverlay } from "herdr";
 import { MOD } from "./host.js";
-import { DIALOG, SIZE, button, icon } from "./ui.js";
+import { DIALOG, SIZE, button, icon, skeletonRows } from "./ui.js";
 import { activeTool, emptyText, filterSkills, installedBody, sections, toolChips, toolLabel, toolSummary } from "./model.js";
 
 export default class InstalledTab {
@@ -36,7 +36,7 @@ export default class InstalledTab {
     const tab = v_flex().flex_1().min_h(0);
     const body = installedBody(state);
     if (body === "error") return tab.child(this.errorState(on, state, t, ts));
-    if (body === "skeleton") return tab.child(this.filterField(t, ts)).child(this.skeleton(t));
+    if (body === "skeleton") return tab.child(this.filterField(t, ts)).child(skeletonRows(t));
     if (body === "empty") return tab.child(this.emptyState(on, t, ts));
     const chips = toolChips(state.scan, state.skills);
     const tool = activeTool(chips, this.tool);
@@ -168,31 +168,6 @@ export default class InstalledTab {
       )
       .child(
         div().flex_none().max_w(SIZE.rowToolsMax).truncate().text_size(ts.tiny).text_color(t.dim).child(toolSummary(skill)),
-      );
-  }
-
-  // Placeholder rows while the first scan of a machine runs.
-  skeleton(t) {
-    const bar = (w, h) => div().w(w).h(h).rounded(4).bg(t.raised);
-    return v_flex()
-      .flex_1()
-      .min_h(0)
-      .px(14)
-      .pt(8)
-      .border_t(1)
-      .border_color(t.border)
-      .children(
-        [0, 1, 2, 3, 4, 5].map((i) =>
-          v_flex()
-            .id(`sg-skeleton-${i}`)
-            .h(SIZE.row)
-            .flex_none()
-            .justify_center()
-            .gap(7)
-            .loop("opacity", { from: 0.4, to: 1, period: 1200 })
-            .child(bar(110 + ((i * 37) % 80), SIZE.skeletonName))
-            .child(bar(230 - ((i * 29) % 90), SIZE.skeletonText)),
-        ),
       );
   }
 

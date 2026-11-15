@@ -121,8 +121,18 @@ export function createMachine({
   }
 
   // Installs a skill from a GitHub repository into the shared store, adds it to
-  // the chosen tools, and records its source in the lock file.
-  async function install(on, scanResult, { source, skillId, tools: toolNames = [] }) {
+  // the chosen tools, and records its source in the lock file. `onStep()`, if
+  // given, is called before each step that runs on the machine after the copy
+  // (each link, the lock read, the lock write): the request loop refreshes the
+  // machine's lock with it. A throwing onStep does not stop the install.
+  async function install(on, scanResult, { source, skillId, tools: toolNames = [], onStep }) {
+    const step = () => {
+      try {
+        onStep?.();
+      } catch {
+        // the install goes on; the lock is the caller's concern
+      }
+    };
     const folder = sanitizeName(skillId);
     if (!validSource(source) || !validSkillId(skillId) || unsafeFolder(folder)) {
       return { ok: false, error: `Can't install "${skillId}" from ${source}` };
@@ -151,6 +161,7 @@ export function createMachine({
         warnings.push(`Installed, but not added to ${name}: unknown tool`);
         continue;
       }
+      step();
       const linked = await link(on, scanResult, installed, name);
       if (!linked.ok) warnings.push(`Installed, but not added to ${tool.displayName}: ${linked.error}`);
     }
@@ -161,6 +172,7 @@ export function createMachine({
     // failure; a lock that can't be read is never written over.
     let text;
     let readable = true;
+    step();
     try {
       text = await readText(lock, on);
     } catch {
@@ -174,6 +186,7 @@ export function createMachine({
         notUpdated(merged.skip);
       } else {
         // `new` refuses when a lock is there after all (we read it as absent).
+        step();
         const w = await exec(WRITE, [lock, merged.text, text == null ? "new" : "replace"], on, OP_TIMEOUT_MS);
         if (w.code === 3) notUpdated("changed");
         else if (w.code !== 0) notUpdated(lastLine(w.stderr) || "could not write it");

@@ -1,6 +1,6 @@
 // Sizes, text sizes and the small widgets several views share: buttons, tabs,
-// the dialog card, a tool's mark, the spinner and the status line. It imports
-// no view.
+// the dialog card, a tool's mark, the spinner, skeleton rows and the status
+// line. It imports no view.
 
 import { div, image, svg } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
@@ -52,6 +52,11 @@ export const SIZE = {
   switchWidth: 36,
   switchHeight: 20,
   knob: 16,
+  // Discover and the catalog dialog
+  tag: 20, // the "Installed" tag
+  checklistWidth: 250,
+  checkRow: 36,
+  checkBox: 16,
 };
 export const DIALOG = { width: 760, height: 560 };
 
@@ -82,8 +87,9 @@ export function iconButton(id, name, onClick, t) {
     .child(svg(icon(name)).size(SIZE.icon));
 }
 
-export function button(id, label, onClick, t, ts, primary = false) {
-  return h_flex()
+// A disabled button is dimmed and takes no clicks.
+export function button(id, label, onClick, t, ts, primary = false, disabled = false) {
+  const el = h_flex()
     .id(id)
     .h(SIZE.button)
     .px(14)
@@ -95,10 +101,9 @@ export function button(id, label, onClick, t, ts, primary = false) {
     .bg(primary ? t.solid : t.raised)
     .text_size(ts.small)
     .text_color(primary ? t.solid_foreground : t.foreground)
-    .cursor_pointer()
-    .hover((s) => s.opacity(0.88))
-    .on_click(onClick)
     .child(label);
+  if (disabled) return el.opacity(0.5);
+  return el.cursor_pointer().hover((s) => s.opacity(0.88)).on_click(onClick);
 }
 
 // One tab of a tab bar (the panel's and the skill dialog's).
@@ -123,6 +128,32 @@ export function tabButton(id, label, active, onClick, t, ts) {
 
 export function placeholder(text, t) {
   return div().flex_1().min_h(0).px(14).py(14).text_color(t.dim).child(text);
+}
+
+// Placeholder rows while a tab's first result is on its way (the first scan
+// of a machine, the first search).
+export function skeletonRows(t) {
+  const bar = (w, h) => div().w(w).h(h).rounded(4).bg(t.raised);
+  return v_flex()
+    .flex_1()
+    .min_h(0)
+    .px(14)
+    .pt(8)
+    .border_t(1)
+    .border_color(t.border)
+    .children(
+      [0, 1, 2, 3, 4, 5].map((i) =>
+        v_flex()
+          .id(`sg-skeleton-${i}`)
+          .h(SIZE.row)
+          .flex_none()
+          .justify_center()
+          .gap(7)
+          .loop("opacity", { from: 0.4, to: 1, period: 1200 })
+          .child(bar(110 + ((i * 37) % 80), SIZE.skeletonName))
+          .child(bar(230 - ((i * 29) % 90), SIZE.skeletonText)),
+      ),
+    );
 }
 
 // The turning icon beside work in progress.

@@ -129,7 +129,8 @@ export default class Panel {
     this.next = channel.listen();
     const select = (tab, cx) => this.select(tab, cx);
     const rescan = (on, cx) => this.data.scan(on, cx);
-    this.views = { installed: new InstalledTab(select, rescan), discover: new DiscoverTab(), machines: new MachinesTab() };
+    const discoverShown = () => this.tab === "discover" && !panelHidden();
+    this.views = { installed: new InstalledTab(select, rescan), discover: new DiscoverTab(discoverShown), machines: new MachinesTab() };
     cx.timer.every(SCAN_EVERY_MS, (cx) => {
       if (panelHidden()) return;
       if (this.data.scan(viewedMachine(), cx)) cx.notify();
@@ -226,7 +227,7 @@ export default class Panel {
       .child(this.header(on, t, ts))
       .child(this.tabBar(t, ts))
       .when(Boolean(status), (el) => el.child(statusLine(status, t, ts)))
-      .child(this.views[this.tab].render(on, state, t, ts))
+      .child(this.views[this.tab].render(on, state, t, ts, cx))
       .child(this.footer(on, footer, state.loading, t, ts));
   }
 

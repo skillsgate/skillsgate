@@ -241,12 +241,51 @@ export function deleteLabel(skill, armed) {
   return skill.home === "external" ? "Remove from all tools" : "Delete skill";
 }
 
+// ---- Markdown the mod did not write (a skill's SKILL.md) ----
+
+// Whether a link in it may be opened: an absolute http:// or https:// URL with
+// a host. Anything else (file:, javascript:, data:, other schemes, relative
+// paths, anchors, "") is ignored. This is the mod's own rule, checked before
+// Herdr's open_url applies its guard. URL is used only inside the try: a URL
+// that does not parse is not opened.
+export function openableLink(url) {
+  if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return false;
+  try {
+    const parsed = new URL(url);
+    return (parsed.protocol === "http:" || parsed.protocol === "https:") && parsed.hostname !== "";
+  } catch {
+    return false;
+  }
+}
+
+const MARKDOWN_LIMIT = 200000;
+const SHORTENED = "_Shortened: only the first 200,000 characters are shown._";
+
+// The text as it is rendered. Markdown is parsed on the UI thread, so text
+// over 200,000 characters is cut there (never inside a surrogate pair), a
+// code block open at the cut is closed, and a last line says it was shortened.
+export function capMarkdown(text) {
+  const whole = String(text ?? "");
+  if (whole.length <= MARKDOWN_LIMIT) return whole;
+  let cut = whole.slice(0, MARKDOWN_LIMIT);
+  const last = cut.charCodeAt(cut.length - 1);
+  if (last >= 0xd800 && last <= 0xdbff) cut = cut.slice(0, -1);
+  let fence = null; // the character of the code fence open at the cut
+  for (const line of cut.split("\n")) {
+    const m = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (!m) continue;
+    if (!fence) fence = m[1][0];
+    else if (m[1][0] === fence && !m[2].trim()) fence = null;
+  }
+  return `${cut}${fence ? "\n" + fence.repeat(3) : ""}\n\n${SHORTENED}`;
+}
+
 // What the Document tab shows for a read of SKILL.md (`{ text }`, text null
 // when the file is absent, or `{ error }`): the body to render, or a message.
 export function skillDocument(read) {
   if (read?.error !== undefined) return { message: `Couldn't read SKILL.md: ${read.error}` };
   if (typeof read?.text !== "string") return { message: "This folder has no SKILL.md." };
-  return { body: stripFrontmatter(read.text) };
+  return { body: capMarkdown(stripFrontmatter(read.text)) };
 }
 
 // ---- What Discover and the catalog dialog show ----
@@ -381,10 +420,11 @@ export function installAction({ on, row, read, busy }) {
 }
 
 // A catalog SKILL.md (null when it could not be fetched) as the dialog shows
-// it: the frontmatter's description, then the body without the frontmatter.
+// it: the frontmatter's description, then the body without the frontmatter,
+// capped (capMarkdown).
 export function catalogPreview(skillMd) {
   if (typeof skillMd !== "string") return { message: "Preview unavailable" };
-  return { description: parseFrontmatter(skillMd, "").description, body: stripFrontmatter(skillMd) };
+  return { description: parseFrontmatter(skillMd, "").description, body: capMarkdown(stripFrontmatter(skillMd)) };
 }
 
 // How long ago, from elapsed milliseconds. Seconds go in steps of ten, so a

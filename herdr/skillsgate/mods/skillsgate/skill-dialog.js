@@ -8,10 +8,10 @@
 // a request it sent has no outcome yet (requestPending).
 
 import { div, svg } from "gpui-kit";
-import { h_flex, v_flex, Scrollbar, Switch, TextView } from "gpui-base";
+import { h_flex, v_flex, Scrollbar, Switch } from "gpui-base";
 import { closeOverlay, knownAgents, props, theme } from "herdr";
 import { channel, errorText, machine, readText } from "./host.js";
-import { SIZE, button, dialogCard, icon, iconButton, spinner, tabButton, textSizes, toolMarkBox } from "./ui.js";
+import { SIZE, button, dialogCard, icon, iconButton, markdownView, spinner, tabButton, textSizes, toolMarkBox } from "./ui.js";
 import { machineLabel, shortPath } from "./model.js";
 import { cantCheckText, deleteLabel, requestPending, skillDocument, toolRows, toolsNote } from "./view-model.js";
 
@@ -252,7 +252,7 @@ export default class SkillDialog {
       .when(Boolean(skill.description), (el) => el.child(div().text_color(t.muted).child(skill.description)))
       .when(!doc, (el) => el.child(div().text_color(t.dim).child("Loading…")))
       .when(Boolean(doc?.message), (el) => el.child(div().text_size(ts.small).text_color(t.muted).child(doc.message)))
-      .when(Boolean(doc?.body), (el) => el.child(TextView.markdown("sg-skill-md", doc.body).selectable(true)));
+      .when(Boolean(doc?.body), (el) => el.child(markdownView("sg-skill-md", doc.body)));
     return div().flex_1().min_h(0).relative().child(body).child(Scrollbar.vertical("sg-skill-doc").absolute().inset_0());
   }
 

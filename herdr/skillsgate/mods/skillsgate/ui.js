@@ -3,10 +3,10 @@
 // line. It imports no view.
 
 import { div, image, svg } from "gpui-kit";
-import { h_flex, v_flex } from "gpui-base";
+import { h_flex, v_flex, TextView } from "gpui-base";
 import { settings } from "herdr";
 import { MOD } from "./host.js";
-import { toolMark } from "./view-model.js";
+import { openableLink, toolMark } from "./view-model.js";
 
 export const MARK = `mods/${MOD}/mark.svg`;
 export const icon = (name) => `mods/${MOD}/icons/${name}.svg`;
@@ -195,6 +195,23 @@ export function dialogCard(id, handle, onKeyDown, t, ts) {
     .bg(t.popover)
     .text_color(t.foreground)
     .text_size(ts.base);
+}
+
+// Markdown the mod did not write (a skill's SKILL.md, capped by the caller),
+// rendered selectable. A link click replaces TextView's own opener: only a
+// URL openableLink allows goes to cx.open_url, which applies Herdr's http(s)
+// guard too; a URL it refuses does nothing, and so does every other link.
+export function markdownView(id, text) {
+  return TextView.markdown(id, text)
+    .selectable(true)
+    .on_link_click((url, cx) => {
+      if (!openableLink(url)) return;
+      try {
+        cx.open_url(url);
+      } catch {
+        // refused: the click does nothing
+      }
+    });
 }
 
 // A tool's mark: Herdr's own for the tool's program (`programs` is

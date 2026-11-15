@@ -4,6 +4,7 @@ import {
   activeTool,
   ago,
   cantCheckText,
+  capMarkdown,
   catalogPreview,
   catalogRows,
   checklist,
@@ -24,6 +25,7 @@ import {
   machineNames,
   machineUnavailable,
   noticeShown,
+  openableLink,
   regionsChanged,
   requestPending,
   scanNotice,
@@ -602,6 +604,64 @@ test("searchErrorText on what catalog.search throws", async () => {
     throw new Error("fetching https://skills.sh/api/search?q=pdf&limit=30 failed: error sending request");
   };
   assert.equal(await shown(offline), "Can't reach skills.sh");
+});
+test("openableLink: only absolute http(s) URLs with a host", () => {
+  for (const url of ["https://example.com", "http://example.com/a?b=c#d", "HTTPS://Example.com/x", "https://user@example.com:8080/p"]) {
+    assert.equal(openableLink(url), true, url);
+  }
+  const ignored = [
+    "file:///etc/passwd",
+    "javascript:alert(1)",
+    "JavaScript:alert(1)",
+    "data:text/html,<b>x</b>",
+    "vscode://file/x",
+    "x-custom://open",
+    "mailto:a@b.c",
+    "ftp://example.com",
+    "/relative/path",
+    "relative.md",
+    "./other.md",
+    "#anchor",
+    "//example.com/x",
+    "https://",
+    "http://",
+    "https:example.com",
+    " https://example.com",
+    "",
+    null,
+    undefined,
+    42,
+    {},
+  ];
+  for (const url of ignored) assert.equal(openableLink(url), false, String(url));
+});
+
+const SHORTENED = "_Shortened: only the first 200,000 characters are shown._";
+test("capMarkdown leaves text up to 200,000 characters alone", () => {
+  const exact = "a".repeat(200000);
+  assert.equal(capMarkdown(exact), exact);
+  assert.equal(capMarkdown("# Short\n"), "# Short\n");
+  assert.equal(capMarkdown(""), "");
+  assert.equal(capMarkdown(null), "");
+});
+test("capMarkdown cuts longer text at 200,000 characters with a last line saying so", () => {
+  const out = capMarkdown("b".repeat(200001));
+  assert.equal(out, "b".repeat(200000) + "\n\n" + SHORTENED);
+  // Never inside a surrogate pair: the half of an emoji at the cut is dropped.
+  const emoji = capMarkdown("a".repeat(199999) + "😀" + "z");
+  assert.equal(emoji, "a".repeat(199999) + "\n\n" + SHORTENED);
+  // A code block open at the cut is closed, so the last line is a line of text.
+  const fenced = capMarkdown("Intro\n```js\n" + "x\n".repeat(150000));
+  assert.ok(fenced.endsWith("\n```\n\n" + SHORTENED), fenced.slice(-80));
+  const closed = capMarkdown("```\ncode\n```\n" + "y".repeat(250000));
+  assert.ok(closed.endsWith("y\n\n" + SHORTENED), "a closed block is left alone");
+});
+test("the catalog preview and the skill's document are capped", () => {
+  const big = "---\nname: big\ndescription: Big\n---\n" + "z".repeat(300000);
+  const preview = catalogPreview(big);
+  assert.equal(preview.description, "Big");
+  assert.equal(preview.body, "z".repeat(200000) + "\n\n" + SHORTENED);
+  assert.deepEqual(skillDocument({ text: big }), { body: "z".repeat(200000) + "\n\n" + SHORTENED });
 });
 test("catalogPreview: the description and the body, or Preview unavailable", () => {
   assert.deepEqual(catalogPreview("---\nname: pdf\ndescription: Read PDFs\n---\n# PDF\nBody\n"), { description: "Read PDFs", body: "# PDF\nBody\n" });

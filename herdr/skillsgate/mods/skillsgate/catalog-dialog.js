@@ -11,10 +11,10 @@
 // the dialog's scan runs or failed, and when the machine has no git.
 
 import { div, svg } from "gpui-kit";
-import { h_flex, v_flex, Checkbox, Scrollbar, TextView } from "gpui-base";
+import { h_flex, v_flex, Checkbox, Scrollbar } from "gpui-base";
 import { closeOverlay, knownAgents, props, setShared, shared, theme } from "herdr";
 import { TARGETS, catalog, channel, errorText, machine } from "./host.js";
-import { SIZE, button, dialogCard, icon, iconButton, spinner, textSizes, toolMarkBox } from "./ui.js";
+import { SIZE, button, dialogCard, icon, iconButton, markdownView, spinner, textSizes, toolMarkBox } from "./ui.js";
 import { validSkillId, validSource } from "./catalog.js";
 import { machineInSentence } from "./model.js";
 import { catalogPreview, checklist, formatInstalls, installAction, startTargets, storeNote, withTargets } from "./view-model.js";
@@ -196,7 +196,7 @@ export default class CatalogDialog {
       .when(!preview, (el) => el.child(div().text_color(t.dim).child("Loading preview…")))
       .when(Boolean(preview?.message), (el) => el.child(div().text_size(ts.small).text_color(t.muted).child(preview.message)))
       .when(Boolean(preview?.description), (el) => el.child(div().text_color(t.muted).child(preview.description)))
-      .when(Boolean(preview?.body?.trim()), (el) => el.child(TextView.markdown("sg-catalog-md", preview.body).selectable(true)));
+      .when(Boolean(preview?.body?.trim()), (el) => el.child(markdownView("sg-catalog-md", preview.body)));
     return div().flex_1().min_w(0).min_h(0).relative().child(body).child(Scrollbar.vertical("sg-catalog-doc").absolute().inset_0());
   }
 

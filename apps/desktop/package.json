@@ -18,7 +18,7 @@
     "postinstall": "node scripts/postinstall.mjs",
     "rebuild:native": "electron-rebuild -f -w better-sqlite3",
     "test:lock": "node --experimental-strip-types --test tests/skill-lock.test.ts tests/skill-lock-ipc.test.ts",
-    "test:ssh": "node --experimental-strip-types --test tests/ssh.test.ts tests/push.test.ts"
+    "test:ssh": "node --experimental-strip-types --test tests/ssh.test.ts tests/push.test.ts tests/push-links.test.ts"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",

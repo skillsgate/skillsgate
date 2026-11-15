@@ -9,8 +9,11 @@ import {
   scanRemoteSkills,
   uploadSkillDir,
   deleteRemoteSkillDir,
+  probeRemoteToolDirs,
+  applyRemoteLinkOps,
+  type RemoteLinkOp,
 } from "./ssh"
-import { listInstalledSkillsInternal } from "../ipc-handlers"
+import { listInstalledSkillsInternal, agentRegistry } from "../ipc-handlers"
 
 const home = os.homedir()
 const CANONICAL_SKILLS_DIR = path.join(home, ".agents", "skills")
@@ -26,12 +29,35 @@ export interface PushPlanEntry {
   remoteHash?: string
 }
 
+/** A link in a tool's skills folder on the remote, such as ~/.claude/skills/<name>. */
+export interface LinkPlanEntry {
+  /** Display name of the tool, or several joined when tools share a folder. */
+  tool: string
+  /** Home-relative tool skills folder on the remote, for example "~/.claude/skills". */
+  remoteDir: string
+  /** Entry name inside that folder. */
+  name: string
+  /** Skill folder in the remote skills base that the link points to. */
+  folderName: string
+  /** Link text, relative to remoteDir where possible. */
+  target: string
+}
+
 export interface PushPreview {
   toAdd: PushPlanEntry[]
   toUpdate: PushPlanEntry[]
   toDelete: PushPlanEntry[]
   unchanged: PushPlanEntry[]
   mirror: boolean
+  /** Links the local tools have that the remote is missing. */
+  linksToAdd: LinkPlanEntry[]
+  /** Mirror only: remote links into the skills base that no local tool has. */
+  linksToRemove: LinkPlanEntry[]
+  /** Something other than the expected link is at that name; left alone. */
+  linkConflicts: LinkPlanEntry[]
+  linksUnchanged: number
+  /** Tools with local links that are not installed on the remote. */
+  toolsNotOnServer: string[]
 }
 
 export interface PushResult {
@@ -39,6 +65,8 @@ export interface PushResult {
   updated: number
   deleted: number
   unchanged: number
+  linksAdded: number
+  linksRemoved: number
   errors: { folderName: string; message: string }[]
 }
 
@@ -100,6 +128,191 @@ export async function listLocalPushCandidates(): Promise<LocalPushCandidate[]> {
   return candidates
 }
 
+// ---------------------------------------------------------------------------
+// Tool links
+// ---------------------------------------------------------------------------
+
+interface ToolDir {
+  tool: string
+  localDir: string
+  /** Home-relative path on the remote, for example "~/.claude/skills". */
+  remoteDir: string
+}
+
+/**
+ * Each tool's global skills folder, mapped to the same home-relative path on
+ * the remote. Folders shared by several tools are listed once. Skipped: the
+ * canonical folder itself (tools that read it need no links) and folders
+ * outside the home folder, which have no counterpart on the remote.
+ */
+function listToolDirs(): ToolDir[] {
+  const byDir = new Map<string, ToolDir>()
+  for (const agent of Object.values(agentRegistry)) {
+    const localDir = path.resolve(agent.globalSkillsDir)
+    if (localDir === path.resolve(CANONICAL_SKILLS_DIR)) continue
+    const rel = path.relative(home, localDir)
+    if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) continue
+    const existing = byDir.get(localDir)
+    if (existing) {
+      existing.tool = `${existing.tool}, ${agent.displayName}`
+    } else {
+      byDir.set(localDir, {
+        tool: agent.displayName,
+        localDir,
+        remoteDir: `~/${rel.split(path.sep).join("/")}`,
+      })
+    }
+  }
+  return [...byDir.values()]
+}
+
+/**
+ * Local tool links to the skills Push sends: entries in a tool's skills folder
+ * that are links resolving to one of `candidates`. Copies are not links and
+ * are not counted. Returns entry names per tool folder, keyed by localDir.
+ */
+async function listLocalToolLinks(
+  toolDirs: ToolDir[],
+  candidates: LocalPushCandidate[],
+): Promise<Map<string, Map<string, string>>> {
+  const folderByRealPath = new Map<string, string>()
+  for (const c of candidates) {
+    try {
+      folderByRealPath.set(await fs.realpath(c.localPath), c.folderName)
+    } catch {
+      // Candidate folder vanished since the scan.
+    }
+  }
+
+  const links = new Map<string, Map<string, string>>()
+  for (const dir of toolDirs) {
+    const names = new Map<string, string>()
+    let entries: import("node:fs").Dirent[] = []
+    try {
+      entries = await fs.readdir(dir.localDir, { withFileTypes: true })
+    } catch {
+      // Tool folder does not exist locally.
+    }
+    for (const entry of entries) {
+      if (!entry.isSymbolicLink()) continue
+      try {
+        const real = await fs.realpath(path.join(dir.localDir, entry.name))
+        const folderName = folderByRealPath.get(real)
+        if (folderName) names.set(entry.name, folderName)
+      } catch {
+        // Broken link: nothing to recreate.
+      }
+    }
+    links.set(dir.localDir, names)
+  }
+  return links
+}
+
+/** Absolute remote skills base, given the remote $HOME. */
+function absoluteRemoteBase(base: string, remoteHome: string): string {
+  const trimmed = normalizeRemoteBase(base)
+  if (trimmed === "~") return remoteHome
+  if (trimmed.startsWith("~/")) return path.posix.join(remoteHome, trimmed.slice(2))
+  return path.posix.normalize(trimmed)
+}
+
+/**
+ * Compare local tool links with the remote's tool folders. Push adds missing
+ * links for tools installed on the remote; Mirror also removes remote links
+ * into the skills base that no local tool has. Anything else in a tool folder
+ * (real folders such as a tool's own synced skills, links elsewhere) is never
+ * changed.
+ */
+async function planLinks(
+  server: RemoteServer,
+  candidates: LocalPushCandidate[],
+  mirror: boolean,
+): Promise<Pick<
+  PushPreview,
+  "linksToAdd" | "linksToRemove" | "linkConflicts" | "linksUnchanged" | "toolsNotOnServer"
+>> {
+  const toolDirs = listToolDirs().filter(
+    (d) => normalizeRemoteBase(server.skillsBasePath) !== d.remoteDir,
+  )
+  const localLinks = await listLocalToolLinks(toolDirs, candidates)
+  const remote = await probeRemoteToolDirs(
+    server,
+    toolDirs.map((d) => d.remoteDir),
+  )
+  const remoteBase = absoluteRemoteBase(server.skillsBasePath, remote.home)
+
+  const linksToAdd: LinkPlanEntry[] = []
+  const linksToRemove: LinkPlanEntry[] = []
+  const linkConflicts: LinkPlanEntry[] = []
+  const toolsNotOnServer: string[] = []
+  let linksUnchanged = 0
+
+  toolDirs.forEach((dir, i) => {
+    const wanted = localLinks.get(dir.localDir) ?? new Map<string, string>()
+    const state = remote.dirs[i]
+    if (!state.toolInstalled) {
+      if (wanted.size > 0) toolsNotOnServer.push(dir.tool)
+      return
+    }
+    const remoteDirAbs = path.posix.join(remote.home, dir.remoteDir.slice(2))
+    const entries = new Map(state.entries.map((e) => [e.name, e]))
+
+    for (const [name, folderName] of wanted) {
+      const expected = path.posix.join(remoteBase, folderName)
+      const entry: LinkPlanEntry = {
+        tool: dir.tool,
+        remoteDir: dir.remoteDir,
+        name,
+        folderName,
+        target: path.posix.relative(remoteDirAbs, expected),
+      }
+      const existing = entries.get(name)
+      if (!existing) {
+        linksToAdd.push(entry)
+      } else if (
+        existing.kind === "link" &&
+        path.posix.resolve(remoteDirAbs, existing.target ?? "") === expected
+      ) {
+        linksUnchanged++
+      } else {
+        linkConflicts.push(entry)
+      }
+    }
+
+    if (!mirror) return
+    for (const existing of state.entries) {
+      if (existing.kind !== "link" || wanted.has(existing.name) || !existing.target) continue
+      const resolved = path.posix.resolve(remoteDirAbs, existing.target)
+      if (path.posix.dirname(resolved) !== remoteBase) continue
+      linksToRemove.push({
+        tool: dir.tool,
+        remoteDir: dir.remoteDir,
+        name: existing.name,
+        folderName: path.posix.basename(resolved),
+        target: existing.target,
+      })
+    }
+  })
+
+  return { linksToAdd, linksToRemove, linkConflicts, linksUnchanged, toolsNotOnServer }
+}
+
+/** Only apply link entries shaped like the ones planLinks produces. */
+function isSafeLinkEntry(e: LinkPlanEntry): boolean {
+  return (
+    typeof e.remoteDir === "string" &&
+    e.remoteDir.startsWith("~/") &&
+    !e.remoteDir.split("/").includes("..") &&
+    typeof e.name === "string" &&
+    e.name !== "" &&
+    e.name !== "." &&
+    e.name !== ".." &&
+    !e.name.includes("/") &&
+    typeof e.target === "string" &&
+    e.target !== ""
+  )
+}
+
 /**
  * Diff local canonical skills against the remote scan. Returns the plan.
  * Does NOT execute anything.
@@ -109,11 +322,12 @@ export async function planPush(
   options: PushOptions,
 ): Promise<PushPreview> {
   // 1. List and hash the local skills Push sends
+  const candidates = await listLocalPushCandidates()
   const localByFolder = new Map<
     string,
     { folderName: string; name: string; localPath: string; hash: string }
   >()
-  for (const c of await listLocalPushCandidates()) {
+  for (const c of candidates) {
     localByFolder.set(c.folderName, {
       folderName: c.folderName,
       name: c.name,
@@ -201,7 +415,10 @@ export async function planPush(
     }
   }
 
-  return { toAdd, toUpdate, toDelete, unchanged, mirror: options.mirror }
+  // 3. Tool links (~/.claude/skills/<skill> and so on)
+  const links = await planLinks(server, candidates, options.mirror)
+
+  return { toAdd, toUpdate, toDelete, unchanged, mirror: options.mirror, ...links }
 }
 
 /**
@@ -243,6 +460,49 @@ export async function applyPush(
 
   // Compute counts: subtract failures
   const failedFolders = new Set(errors.map((e) => e.folderName))
+
+  // Tool links, after the folders they point to are in place. A link is not
+  // created for a skill whose upload failed.
+  const linkEntries: LinkPlanEntry[] = []
+  const linkOps: RemoteLinkOp[] = []
+  for (const e of preview.linksToAdd ?? []) {
+    if (failedFolders.has(e.folderName) || !isSafeLinkEntry(e)) continue
+    linkEntries.push(e)
+    linkOps.push({ kind: "add", dir: e.remoteDir, name: e.name, target: e.target })
+  }
+  if (preview.mirror) {
+    for (const e of preview.linksToRemove ?? []) {
+      if (!isSafeLinkEntry(e)) continue
+      linkEntries.push(e)
+      linkOps.push({ kind: "remove", dir: e.remoteDir, name: e.name, target: e.target })
+    }
+  }
+  let linksAdded = 0
+  let linksRemoved = 0
+  let applied: boolean[] = []
+  let linkError: string | null = null
+  try {
+    applied = await applyRemoteLinkOps(server, linkOps)
+  } catch (err) {
+    linkError = err instanceof Error ? err.message : String(err)
+  }
+  linkOps.forEach((op, i) => {
+    const e = linkEntries[i]
+    if (applied[i]) {
+      if (op.kind === "add") linksAdded++
+      else linksRemoved++
+      return
+    }
+    errors.push({
+      folderName: `${e.tool}: ${e.name}`,
+      message:
+        linkError ??
+        (op.kind === "add"
+          ? "Could not create the link; something may already be there."
+          : "Could not remove the link; it changed since the preview."),
+    })
+  })
+
   return {
     added: preview.toAdd.filter((e) => !failedFolders.has(e.folderName)).length,
     updated: preview.toUpdate.filter((e) => !failedFolders.has(e.folderName)).length,
@@ -250,6 +510,8 @@ export async function applyPush(
       ? preview.toDelete.filter((e) => !failedFolders.has(e.folderName)).length
       : 0,
     unchanged: preview.unchanged.length,
+    linksAdded,
+    linksRemoved,
     errors,
   }
 }

@@ -494,6 +494,129 @@ export async function deleteRemoteSkillDir(
 }
 
 // ---------------------------------------------------------------------------
+// Tool links on the remote
+// ---------------------------------------------------------------------------
+
+function singleQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`
+}
+
+/**
+ * Run a script with /bin/sh on the remote. The login shell may be zsh, which
+ * treats an unmatched glob as an error.
+ */
+function shScript(script: string): string {
+  return `/bin/sh -c ${singleQuote(script)}`
+}
+
+export interface RemoteToolDirEntry {
+  name: string
+  kind: "link" | "dir" | "file"
+  /** What the link points to, as stored (readlink), for links. */
+  target?: string
+}
+
+export interface RemoteToolDirState {
+  /** The tool's own folder (the parent of its skills folder) exists. */
+  toolInstalled: boolean
+  entries: RemoteToolDirEntry[]
+}
+
+/**
+ * Inspect tool skills folders on the remote in one SSH call. `dirs` are
+ * home-relative ("~/.claude/skills"). Returns the remote $HOME and, for each
+ * dir in order, whether the tool is installed and what its skills folder holds.
+ */
+export async function probeRemoteToolDirs(
+  server: RemoteServer,
+  dirs: string[],
+): Promise<{ home: string; dirs: RemoteToolDirState[] }> {
+  const parts = [`printf 'H\\t%s\\n' "$HOME"`]
+  dirs.forEach((dir, i) => {
+    const d = shellQuotePath(dir)
+    const parent = shellQuotePath(path.posix.dirname(dir))
+    parts.push(
+      `if [ -d ${parent} ]; then printf 'T\\t%s\\n' ${i}; fi`,
+      `if [ -d ${d} ]; then for e in ${d}/* ${d}/.[!.]* ${d}/..?*; do ` +
+        `n="\${e##*/}"; ` +
+        `if [ -L "$e" ]; then printf 'L\\t%s\\t%s\\t%s\\n' ${i} "$n" "$(readlink "$e")"; ` +
+        `elif [ -d "$e" ]; then printf 'D\\t%s\\t%s\\n' ${i} "$n"; ` +
+        `elif [ -e "$e" ]; then printf 'F\\t%s\\t%s\\n' ${i} "$n"; fi; ` +
+        `done; fi`,
+    )
+  })
+  const result = await sshExec(server, shScript(parts.join("\n")))
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr.trim() || `Could not read tool folders on ${server.host}`)
+  }
+
+  let home = ""
+  const states: RemoteToolDirState[] = dirs.map(() => ({ toolInstalled: false, entries: [] }))
+  for (const line of result.stdout.split("\n")) {
+    const [kind, index, name, ...rest] = line.split("\t")
+    if (kind === "H") {
+      home = line.slice(2)
+      continue
+    }
+    const state = states[Number(index)]
+    if (!state) continue
+    if (kind === "T") state.toolInstalled = true
+    else if (kind === "L" && name) state.entries.push({ name, kind: "link", target: rest.join("\t") })
+    else if (kind === "D" && name) state.entries.push({ name, kind: "dir" })
+    else if (kind === "F" && name) state.entries.push({ name, kind: "file" })
+  }
+  if (!home) throw new Error(`Could not read $HOME on ${server.host}`)
+  return { home, dirs: states }
+}
+
+export interface RemoteLinkOp {
+  kind: "add" | "remove"
+  /** Home-relative tool skills folder, for example "~/.claude/skills". */
+  dir: string
+  /** Entry name inside that folder. */
+  name: string
+  /** Link text: created for "add"; must match exactly for "remove". */
+  target: string
+}
+
+/**
+ * Create and remove tool links on the remote in one SSH call. An "add" never
+ * replaces anything already at that name, and a "remove" only deletes a link
+ * that still points where the preview saw it. Returns, per op, whether it was
+ * applied.
+ */
+export async function applyRemoteLinkOps(
+  server: RemoteServer,
+  ops: RemoteLinkOp[],
+): Promise<boolean[]> {
+  if (ops.length === 0) return []
+  const parts = ops.map((op, i) => {
+    const at = shellQuotePath(`${op.dir}/${op.name}`)
+    const target = singleQuote(op.target)
+    if (op.kind === "add") {
+      return (
+        `if [ ! -e ${at} ] && [ ! -L ${at} ] && mkdir -p ${shellQuotePath(op.dir)} && ` +
+        `ln -s ${target} ${at}; then printf 'OK\\t%s\\n' ${i}; fi`
+      )
+    }
+    return (
+      `if [ -L ${at} ] && [ "$(readlink ${at})" = ${target} ] && rm ${at}; ` +
+      `then printf 'OK\\t%s\\n' ${i}; fi`
+    )
+  })
+  const result = await sshExec(server, shScript(parts.join("\n")))
+  const applied = new Set<number>()
+  for (const line of result.stdout.split("\n")) {
+    const [status, index] = line.split("\t")
+    if (status === "OK") applied.add(Number(index))
+  }
+  if (result.exitCode !== 0 && applied.size === 0 && result.stderr.trim()) {
+    throw new Error(result.stderr.trim())
+  }
+  return ops.map((_, i) => applied.has(i))
+}
+
+// ---------------------------------------------------------------------------
 // Sync orchestrator
 // ---------------------------------------------------------------------------
 

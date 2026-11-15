@@ -92,6 +92,14 @@ declare global {
     remoteHash?: string
   }
 
+  interface LinkPlanEntry {
+    tool: string
+    remoteDir: string
+    name: string
+    folderName: string
+    target: string
+  }
+
   interface UpdateState {
     status:
       | "idle"
@@ -202,6 +210,11 @@ declare global {
       toDelete: PushPlanEntry[]
       unchanged: PushPlanEntry[]
       mirror: boolean
+      linksToAdd: LinkPlanEntry[]
+      linksToRemove: LinkPlanEntry[]
+      linkConflicts: LinkPlanEntry[]
+      linksUnchanged: number
+      toolsNotOnServer: string[]
     }>
     serversPushApply: (
       serverId: string,
@@ -211,6 +224,8 @@ declare global {
       updated: number
       deleted: number
       unchanged: number
+      linksAdded: number
+      linksRemoved: number
       errors: { folderName: string; message: string }[]
     }>
 

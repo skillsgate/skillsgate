@@ -52,9 +52,12 @@ test("push candidates are the skills stored in ~/.agents/skills", async (t) => {
   t.after(() => Reflect.deleteProperty(globalThis, "pushTest"))
 
   const stubs: Record<string, string> = {
-    "../ipc-handlers": `export const listInstalledSkillsInternal = async () => globalThis.pushTest.installed;`,
+    "../ipc-handlers": `export const listInstalledSkillsInternal = async () => globalThis.pushTest.installed;
+      export const agentRegistry = {};`,
     "./ssh": `export const scanRemoteSkills = async () => [];
-      export const uploadSkillDir = async () => {}; export const deleteRemoteSkillDir = async () => {};`,
+      export const uploadSkillDir = async () => {}; export const deleteRemoteSkillDir = async () => {};
+      export const probeRemoteToolDirs = async () => ({ home: "", dirs: [] });
+      export const applyRemoteLinkOps = async () => [];`,
   }
   const hooks = registerHooks({
     resolve(specifier, context, nextResolve) {

@@ -9,12 +9,25 @@ interface PushPlanEntry {
   reason: "added" | "updated" | "deleted" | "unchanged"
 }
 
+interface LinkPlanEntry {
+  tool: string
+  remoteDir: string
+  name: string
+  folderName: string
+  target: string
+}
+
 interface PushPreview {
   toAdd: PushPlanEntry[]
   toUpdate: PushPlanEntry[]
   toDelete: PushPlanEntry[]
   unchanged: PushPlanEntry[]
   mirror: boolean
+  linksToAdd: LinkPlanEntry[]
+  linksToRemove: LinkPlanEntry[]
+  linkConflicts: LinkPlanEntry[]
+  linksUnchanged: number
+  toolsNotOnServer: string[]
 }
 
 interface PushResult {
@@ -22,6 +35,8 @@ interface PushResult {
   updated: number
   deleted: number
   unchanged: number
+  linksAdded: number
+  linksRemoved: number
   errors: { folderName: string; message: string }[]
 }
 
@@ -96,15 +111,22 @@ export function PushDialog({
     }
   }
 
+  const linksToAdd = preview?.linksToAdd ?? []
+  const linksToRemove = isMirror ? (preview?.linksToRemove ?? []) : []
+  const linkConflicts = preview?.linkConflicts ?? []
+  const toolsNotOnServer = preview?.toolsNotOnServer ?? []
+  const removals = (isMirror ? (preview?.toDelete.length ?? 0) : 0) + linksToRemove.length
   const totalChanges =
     (preview?.toAdd.length ?? 0) +
     (preview?.toUpdate.length ?? 0) +
-    (preview?.toDelete.length ?? 0)
+    (preview?.toDelete.length ?? 0) +
+    linksToAdd.length +
+    linksToRemove.length
 
   const title = isMirror ? `Mirror to ${serverLabel}` : `Push to ${serverLabel}`
   const subtitle = isMirror
-    ? "Match this server one-to-one with your local skills."
-    : "Send your local skills. Adds new ones, updates changed ones, never deletes."
+    ? "Match this server one-to-one with your local skills and the tools each one is enabled for."
+    : "Send your local skills and link them for the same tools. Adds and updates, never deletes."
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -137,6 +159,15 @@ export function PushDialog({
                   </>
                 )}
                 <strong>{preview.unchanged.length}</strong> unchanged.
+                <br />
+                Tool links: <strong>{linksToAdd.length}</strong> to add,{" "}
+                {isMirror && (
+                  <>
+                    <strong className="text-red-400">{linksToRemove.length}</strong> to
+                    remove,{" "}
+                  </>
+                )}
+                <strong>{preview.linksUnchanged ?? 0}</strong> already in place.
               </div>
               {totalChanges === 0 && (
                 <p className="text-[12px] text-muted">
@@ -146,7 +177,9 @@ export function PushDialog({
               )}
               {(preview.toAdd.length > 0 ||
                 preview.toUpdate.length > 0 ||
-                preview.toDelete.length > 0) && (
+                preview.toDelete.length > 0 ||
+                linksToAdd.length > 0 ||
+                linksToRemove.length > 0) && (
                 <ul className="text-[11px] font-mono flex flex-col gap-0.5 max-h-64 overflow-y-auto border border-border rounded-md p-2 bg-background">
                   {preview.toAdd.map((e) => (
                     <li
@@ -169,12 +202,42 @@ export function PushDialog({
                       − {e.folderName}
                     </li>
                   ))}
+                  {linksToAdd.map((e) => (
+                    <li
+                      key={`link-add-${e.remoteDir}-${e.name}`}
+                      className="text-green-400"
+                    >
+                      + link {e.name} for {e.tool}
+                    </li>
+                  ))}
+                  {linksToRemove.map((e) => (
+                    <li
+                      key={`link-del-${e.remoteDir}-${e.name}`}
+                      className="text-red-400"
+                    >
+                      − link {e.name} for {e.tool}
+                    </li>
+                  ))}
                 </ul>
               )}
-              {isMirror && preview.toDelete.length > 0 && (
+              {linkConflicts.length > 0 && (
+                <p className="text-[11px] text-muted">
+                  Left alone because something else is already there:{" "}
+                  {linkConflicts.map((e) => `${e.name} (${e.tool}, ${e.remoteDir})`).join(", ")}.
+                </p>
+              )}
+              {toolsNotOnServer.length > 0 && (
+                <p className="text-[11px] text-muted">
+                  Not installed on this server, so their links are skipped:{" "}
+                  {toolsNotOnServer.join(", ")}.
+                </p>
+              )}
+              {isMirror && removals > 0 && (
                 <p className="text-[11px] text-red-400">
                   Mirror mode will delete {preview.toDelete.length} skill
-                  {preview.toDelete.length === 1 ? "" : "s"} from the remote.
+                  {preview.toDelete.length === 1 ? "" : "s"} and remove{" "}
+                  {linksToRemove.length} tool link
+                  {linksToRemove.length === 1 ? "" : "s"} on the remote.
                 </p>
               )}
             </>
@@ -191,6 +254,10 @@ export function PushDialog({
               <p>
                 {result.added} added, {result.updated} updated,{" "}
                 {result.deleted} deleted, {result.unchanged} unchanged.
+              </p>
+              <p>
+                Tool links: {result.linksAdded ?? 0} added
+                {isMirror ? `, ${result.linksRemoved ?? 0} removed` : ""}.
               </p>
               {result.errors.length > 0 && (
                 <ul className="text-red-400 mt-2 flex flex-col gap-0.5">
@@ -225,14 +292,12 @@ export function PushDialog({
             <button
               onClick={handleApply}
               className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-opacity ${
-                isMirror && preview && preview.toDelete.length > 0
+                isMirror && removals > 0
                   ? "bg-red-500 text-white hover:opacity-90"
                   : "bg-foreground text-background hover:opacity-90"
               }`}
             >
-              {isMirror && preview && preview.toDelete.length > 0
-                ? `Mirror (delete ${preview.toDelete.length})`
-                : "Apply"}
+              {isMirror && removals > 0 ? `Mirror (remove ${removals})` : "Apply"}
             </button>
           )}
 

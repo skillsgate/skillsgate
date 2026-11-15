@@ -98,7 +98,7 @@ export function ManagePopover({
             {t("Push to remote")}
           </span>
           <span className="block text-[11px] text-muted mt-0.5">
-            Send your local skills. Adds new ones, updates changed ones, never deletes.
+            Send your local skills and link them for the same tools. Adds and updates, never deletes.
           </span>
         </span>
       </button>
@@ -122,8 +122,8 @@ export function ManagePopover({
             </span>
           </span>
           <span className="block text-[11px] text-muted mt-0.5">
-            Match this server one-to-one. Anything on the remote that you don't
-            have locally is deleted.
+            Match this server one-to-one, including which tools each skill is
+            enabled for. Skills and links you don't have locally are removed.
           </span>
         </span>
       </button>

@@ -7,6 +7,7 @@ on:
       - "apps/desktop/tests/skill-lock*.test.ts"
       - "apps/desktop/tests/ssh.test.ts"
       - "apps/desktop/tests/push.test.ts"
+      - "apps/desktop/tests/push-links.test.ts"
       - "apps/desktop/package.json"
       - ".github/workflows/desktop-lock-tests.yml"
   push:
@@ -16,6 +17,7 @@ on:
       - "apps/desktop/tests/skill-lock*.test.ts"
       - "apps/desktop/tests/ssh.test.ts"
       - "apps/desktop/tests/push.test.ts"
+      - "apps/desktop/tests/push-links.test.ts"
       - "apps/desktop/package.json"
       - ".github/workflows/desktop-lock-tests.yml"
 

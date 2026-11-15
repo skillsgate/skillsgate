@@ -18,7 +18,7 @@ import {
   type TrendingSkill,
 } from "./db/trending-cache"
 import { testConnection, syncRemoteServer, readRemoteFile, writeRemoteFile } from "./db/ssh"
-import { planPush, applyPush } from "./db/push"
+import { planPush, applyPush, listLocalPushCandidates } from "./db/push"
 import type { PushPreview } from "./db/push"
 import { checkForAppUpdates, getUpdateState, quitAndInstallUpdate } from "./auto-updater"
 
@@ -2336,6 +2336,12 @@ Add your skill instructions here.
   ipcMain.handle("servers:count", () => {
     ensureStores()
     return serverStore.count()
+  })
+
+  // The local skills Push sends, for the Servers page's "not yet pushed" count.
+  ipcMain.handle("servers:local-skills", async () => {
+    const candidates = await listLocalPushCandidates()
+    return candidates.map((c) => ({ folderName: c.folderName, contentHash: c.contentHash }))
   })
 
   // -------------------------------------------------------------------------

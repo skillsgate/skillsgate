@@ -59,15 +59,21 @@ function normalizeRemoteBase(p: string): string {
   return p.replace(/\/+$/, "")
 }
 
+export interface LocalPushCandidate {
+  folderName: string
+  name: string
+  localPath: string
+  contentHash: string
+}
+
 /**
- * Diff local canonical skills against the remote scan. Returns the plan.
- * Does NOT execute anything.
+ * The local skills Push sends: global skills whose real folder is inside
+ * CANONICAL_SKILLS_DIR, with a hash of each SKILL.md as stored. Skills that
+ * live elsewhere (a tool's built-in skills, or a folder in the canonical dir
+ * that links outside it) are never pushed. The Servers page uses the same
+ * list for its "not yet pushed" count.
  */
-export async function planPush(
-  server: RemoteServer,
-  options: PushOptions,
-): Promise<PushPreview> {
-  // 1. List local canonical skills (scope=global AND under CANONICAL_SKILLS_DIR)
+export async function listLocalPushCandidates(): Promise<LocalPushCandidate[]> {
   const allLocal = await listInstalledSkillsInternal({ skipCustomPaths: true })
   const localCanonical = allLocal.filter(
     (s) =>
@@ -75,11 +81,7 @@ export async function planPush(
       path.resolve(s.canonicalPath).startsWith(path.resolve(CANONICAL_SKILLS_DIR)),
   )
 
-  // 2. Hash each local SKILL.md
-  const localByFolder = new Map<
-    string,
-    { folderName: string; name: string; localPath: string; hash: string }
-  >()
+  const candidates: LocalPushCandidate[] = []
   for (const s of localCanonical) {
     const skillMdPath = path.join(s.canonicalPath, "SKILL.md")
     let content: string
@@ -88,15 +90,39 @@ export async function planPush(
     } catch {
       continue // skill dir without SKILL.md -- skip
     }
-    localByFolder.set(s.folderName, {
+    candidates.push({
       folderName: s.folderName,
       name: s.name,
       localPath: s.canonicalPath,
-      hash: sha256(content),
+      contentHash: sha256(content),
+    })
+  }
+  return candidates
+}
+
+/**
+ * Diff local canonical skills against the remote scan. Returns the plan.
+ * Does NOT execute anything.
+ */
+export async function planPush(
+  server: RemoteServer,
+  options: PushOptions,
+): Promise<PushPreview> {
+  // 1. List and hash the local skills Push sends
+  const localByFolder = new Map<
+    string,
+    { folderName: string; name: string; localPath: string; hash: string }
+  >()
+  for (const c of await listLocalPushCandidates()) {
+    localByFolder.set(c.folderName, {
+      folderName: c.folderName,
+      name: c.name,
+      localPath: c.localPath,
+      hash: c.contentHash,
     })
   }
 
-  // 3. Scan remote
+  // 2. Scan remote
   const remote = await scanRemoteSkills(server)
   const remoteBase = normalizeRemoteBase(server.skillsBasePath)
 

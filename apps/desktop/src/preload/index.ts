@@ -95,6 +95,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   serversWriteSkill: (serverId: string, remotePath: string, content: string) =>
     ipcRenderer.invoke("servers:write-skill", serverId, remotePath, content),
   serversCount: () => ipcRenderer.invoke("servers:count"),
+  serversLocalSkills: () => ipcRenderer.invoke("servers:local-skills"),
   serversPushPreview: (serverId: string, mirror: boolean) =>
     ipcRenderer.invoke("servers:push-preview", serverId, mirror),
   serversPushApply: (serverId: string, preview: unknown) =>

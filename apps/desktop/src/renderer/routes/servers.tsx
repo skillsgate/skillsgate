@@ -12,21 +12,6 @@ import {
 } from "../lib/server-status"
 
 // ---------------------------------------------------------------------------
-// SHA-256 helper (Web Crypto, renderer-side)
-// ---------------------------------------------------------------------------
-
-async function sha256Hex(s: string): Promise<string> {
-  const enc = new TextEncoder().encode(s)
-  const buf = await crypto.subtle.digest("SHA-256", enc)
-  const bytes = new Uint8Array(buf)
-  let out = ""
-  for (let i = 0; i < bytes.length; i++) {
-    out += bytes[i].toString(16).padStart(2, "0")
-  }
-  return out
-}
-
-// ---------------------------------------------------------------------------
 // Relative time helper
 // ---------------------------------------------------------------------------
 
@@ -315,34 +300,13 @@ export function Servers() {
     loadServers()
   }, [loadServers])
 
-  // Load + hash local canonical skills once for status hints.
+  // Load the local skills Push sends (same list as Push) for status hints.
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        const list = (await electronAPI.listInstalled()) as Array<{
-          canonicalPath: string
-          scope: string
-        }>
-        const canonical = list.filter(
-          (s) => s.scope === "global" && s.canonicalPath,
-        )
-        const hashed: LocalSkillForStatus[] = []
-        for (const s of canonical) {
-          try {
-            const content = (await electronAPI.readSkillContent(
-              `${s.canonicalPath}/SKILL.md`,
-            )) as string
-            const folderName =
-              s.canonicalPath.split("/").filter(Boolean).pop() ?? ""
-            if (!folderName) continue
-            const hash = await sha256Hex(content)
-            hashed.push({ folderName, contentHash: hash })
-          } catch {
-            // Skip skills whose SKILL.md can't be read.
-          }
-        }
-        if (!cancelled) setLocalSkills(hashed)
+        const candidates = await electronAPI.serversLocalSkills()
+        if (!cancelled) setLocalSkills(candidates)
       } catch {
         // Non-fatal — status hints will fall back to "in sync".
       }

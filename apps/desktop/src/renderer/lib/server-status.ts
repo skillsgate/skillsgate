@@ -23,7 +23,7 @@ type ServerLike = { lastSyncAt: string | null; lastSyncError: string | null }
  * Derive the row-level status hint from cached state. Pure function — no SSH,
  * no IPC. Priority order: error > never synced > additions/updates > only-on-remote > in sync.
  *
- * - localSkills: the canonical local skills (already loaded by Servers view)
+ * - localSkills: the local skills Push sends (listLocalPushCandidates in main)
  * - remoteSkills: the cached `remote_skills` rows for this server
  *
  * `remoteSkills` is matched to local by folder name (the basename of the path

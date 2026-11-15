@@ -29,7 +29,8 @@
 //            Defaults to machine.scan.
 
 import { validSkillId, validSource } from "./catalog.js";
-import { cantCheckText, inStore, machineInSentence, machineLabel, toolLabel } from "./model.js";
+import { machineInSentence, machineLabel, toolLabel } from "./model.js";
+import { cantCheckText, inStore } from "./view-model.js";
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const filled = (value) => typeof value === "string" && value !== "";

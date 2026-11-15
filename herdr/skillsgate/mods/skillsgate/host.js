@@ -7,7 +7,7 @@ import { exec as hostExec, layout, readTextFile, setShared, shared, spaces } fro
 import { createCatalog } from "./catalog.js";
 import { createChannel } from "./channel.js";
 import { createMachine } from "./machine.js";
-import { effectiveMachine, layoutNode } from "./model.js";
+import { effectiveMachine, layoutNode } from "./view-model.js";
 
 export const MOD = "skillsgate";
 export const PANEL = "skillsgate-panel";

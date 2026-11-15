@@ -31,8 +31,9 @@
 //   catalog-dialog.js  the catalog dialog (preview, tools, Install)
 // host.js and ui.js import no view. Logic (no Herdr imports, so node --test
 // covers it; Herdr's functions come in as arguments from host.js):
-//   registry.js, scripts.js, model.js, machine.js, catalog.js, channel.js,
-//   requests.js.
+//   registry.js, scripts.js, model.js (the data: scans, skills, the lock,
+//   names and labels), view-model.js (what each view shows), machine.js,
+//   catalog.js, channel.js, requests.js.
 
 import { View } from "gpui-kit";
 import { props } from "herdr";

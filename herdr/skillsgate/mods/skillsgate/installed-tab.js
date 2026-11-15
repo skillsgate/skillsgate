@@ -6,7 +6,8 @@ import { v_flex, h_flex, InputState, Input, Scrollbar } from "gpui-base";
 import { openOverlay } from "herdr";
 import { MOD } from "./host.js";
 import { DIALOG, SIZE, button, icon, skeletonRows } from "./ui.js";
-import { activeTool, emptyText, filterSkills, installedBody, sections, toolChips, toolLabel, toolSummary } from "./model.js";
+import { toolLabel } from "./model.js";
+import { activeTool, emptyText, filterSkills, installedBody, sections, toolChips, toolSummary } from "./view-model.js";
 
 export default class InstalledTab {
   // `select(tab, cx)` switches the panel's tab; `rescan(on, cx)` starts a scan

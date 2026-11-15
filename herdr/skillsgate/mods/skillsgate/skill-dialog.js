@@ -12,16 +12,8 @@ import { h_flex, v_flex, Scrollbar, Switch, TextView } from "gpui-base";
 import { closeOverlay, knownAgents, props, theme } from "herdr";
 import { channel, errorText, machine, readText } from "./host.js";
 import { SIZE, button, dialogCard, icon, iconButton, spinner, tabButton, textSizes, toolMarkBox } from "./ui.js";
-import {
-  cantCheckText,
-  deleteLabel,
-  machineLabel,
-  requestPending,
-  shortPath,
-  skillDocument,
-  toolRows,
-  toolsNote,
-} from "./model.js";
+import { machineLabel, shortPath } from "./model.js";
+import { cantCheckText, deleteLabel, requestPending, skillDocument, toolRows, toolsNote } from "./view-model.js";
 
 const DIALOG_TABS = [
   ["document", "Document"],

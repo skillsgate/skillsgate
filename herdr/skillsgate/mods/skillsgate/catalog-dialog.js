@@ -16,7 +16,8 @@ import { closeOverlay, knownAgents, props, setShared, shared, theme } from "herd
 import { TARGETS, catalog, channel, errorText, machine } from "./host.js";
 import { SIZE, button, dialogCard, icon, iconButton, spinner, textSizes, toolMarkBox } from "./ui.js";
 import { validSkillId, validSource } from "./catalog.js";
-import { catalogPreview, checklist, formatInstalls, installAction, machineInSentence, startTargets, storeNote, withTargets } from "./model.js";
+import { machineInSentence } from "./model.js";
+import { catalogPreview, checklist, formatInstalls, installAction, startTargets, storeNote, withTargets } from "./view-model.js";
 
 const stringOr = (value) => (typeof value === "string" ? value : "");
 

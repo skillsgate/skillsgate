@@ -6,7 +6,7 @@ import { div, image, svg } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { settings } from "herdr";
 import { MOD } from "./host.js";
-import { toolMark } from "./model.js";
+import { toolMark } from "./view-model.js";
 
 export const MARK = `mods/${MOD}/mark.svg`;
 export const icon = (name) => `mods/${MOD}/icons/${name}.svg`;

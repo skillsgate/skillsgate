@@ -36,7 +36,7 @@ test("mod.json", () =>
 // Logic modules take Herdr's functions as arguments, so node --test covers
 // them. Views draw with Herdr's UI kit and may import Herdr. A new file must
 // be added to one of the two lists.
-const LOGIC = ["registry.js", "scripts.js", "model.js", "machine.js", "catalog.js", "channel.js", "requests.js"];
+const LOGIC = ["registry.js", "scripts.js", "model.js", "view-model.js", "machine.js", "catalog.js", "channel.js", "requests.js"];
 const VIEWS = [
   "main.js",
   "host.js",

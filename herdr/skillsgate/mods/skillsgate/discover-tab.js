@@ -11,7 +11,7 @@ import { h_flex, v_flex, Input, InputState, Scrollbar } from "gpui-base";
 import { openOverlay } from "herdr";
 import { MOD, catalog, errorText } from "./host.js";
 import { DIALOG, SIZE, button, icon, skeletonRows, spinner } from "./ui.js";
-import { catalogRows, discoverView, searchKey } from "./model.js";
+import { catalogRows, discoverView, searchKey } from "./view-model.js";
 
 const DEBOUNCE_MS = 300;
 

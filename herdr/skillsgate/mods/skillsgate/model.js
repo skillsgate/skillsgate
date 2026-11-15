@@ -286,6 +286,18 @@ export function noticeShown(notice, now) {
   return now - notice.at < (notice.kind === "done" ? 4000 : 8000);
 }
 
+// The texts on screen that change with the clock alone: the footer, and the
+// notice while it is shown ("" once it runs out).
+export function clockRegions(state, notice, now) {
+  return { footer: footerText(state, now), notice: noticeShown(notice, now) ? notice.text : "" };
+}
+
+// Whether the panel's clock tick has anything new to draw. Herdr redraws the
+// whole window on every notify, so the tick notifies only when this is true.
+export function regionsChanged(drawn, next) {
+  return !drawn || drawn.footer !== next.footer || drawn.notice !== next.notice;
+}
+
 // `path` with the home folder written as `~`.
 export function shortPath(path, home) {
   const base = String(home ?? "").replace(/\/+$/, "");
@@ -294,11 +306,12 @@ export function shortPath(path, home) {
   return path.startsWith(base + "/") ? "~" + path.slice(base.length) : path;
 }
 
-// How long ago, from elapsed milliseconds.
+// How long ago, from elapsed milliseconds. Seconds go in steps of ten, so a
+// panel showing it redraws at most every 10 s.
 export function ago(ms) {
   const s = Math.floor(ms / 1000);
-  if (s < 5) return "just now";
-  if (s < 60) return `${s}s ago`;
+  if (s < 10) return "just now";
+  if (s < 60) return `${Math.floor(s / 10) * 10}s ago`;
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   return `${Math.floor(s / 3600)}h ago`;
 }

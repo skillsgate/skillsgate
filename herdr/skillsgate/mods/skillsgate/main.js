@@ -29,13 +29,14 @@ import {
 import { createChannel } from "./channel.js";
 import { createMachine } from "./machine.js";
 import {
+  clockRegions,
   effectiveMachine,
   emptyText,
   filterSkills,
-  footerText,
   machineKey,
   machineLabel,
   noticeShown,
+  regionsChanged,
   sections,
   toolChips,
   toolLabel,
@@ -197,7 +198,7 @@ class Panel {
     this.states = new Map();
     this.viewedKey = undefined; // the machine the last frame showed
     this.wasHidden = false;
-    this.drawn = ""; // what the clock-driven parts said in the last frame
+    this.drawn = null; // the clock-driven texts the last frame showed (clockRegions)
     this.input = InputState.new({ placeholder: "Filter skills" });
     this.input.on("change", (_e, cx) => {
       this.query = this.input.value();
@@ -263,19 +264,18 @@ class Panel {
     }
   }
 
-  // Every second: redraw only when the panel shows and something drawn from
-  // the clock alone ("checked 12s ago", a notice running out) has changed.
+  // Every second: while the panel is hidden, only note that it is (so showing
+  // it again rescans). While it shows, redraw only when a text that changes
+  // with the clock alone ("checked 10s ago", a notice running out) would read
+  // differently from the last frame.
   tick(cx) {
     if (panelHidden()) {
       this.wasHidden = true;
       return;
     }
-    if (this.wasHidden || this.clockText(viewedMachine()) !== this.drawn) cx.notify();
-  }
-
-  clockText(on) {
-    const now = Date.now();
-    return `${footerText(this.state(on), now)}|${noticeShown(channel.notice(), now)}`;
+    const on = viewedMachine();
+    const next = clockRegions(this.state(on), channel.notice(), Date.now());
+    if (this.wasHidden || regionsChanged(this.drawn, next)) cx.notify();
   }
 
   markUnavailable() {
@@ -297,8 +297,10 @@ class Panel {
     this.watch(on, cx);
     const state = this.state(on);
     this.markUnavailable();
-    this.drawn = this.clockText(on);
-    const status = this.statusLine(on, t, f);
+    // One clock reading per frame, so what is drawn is exactly what is recorded.
+    const now = Date.now();
+    this.drawn = clockRegions(state, channel.notice(), now);
+    const status = this.statusLine(on, now, t, f);
     return v_flex()
       .id("sg-panel")
       .size_full()
@@ -389,7 +391,7 @@ class Panel {
 
   // Work running on the viewed machine, else a notice that hasn't run out.
   // Null when there is neither.
-  statusLine(on, t, f) {
+  statusLine(on, now, t, f) {
     const line = () => h_flex().h(SIZE.status).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border).text_size(f.small);
     const busy = channel.textAt(on);
     if (busy) {
@@ -399,7 +401,7 @@ class Panel {
         .child(div().flex_1().min_w(0).truncate().child(busy));
     }
     const notice = channel.notice();
-    if (!noticeShown(notice, Date.now())) return null;
+    if (!noticeShown(notice, now)) return null;
     const color = notice.kind === "done" ? t.done : notice.kind === "warn" ? t.blocked : t.ansi1;
     return line()
       .text_color(color)
@@ -422,7 +424,7 @@ class Panel {
   }
 
   footer(on, state, t, f) {
-    const text = footerText(state, Date.now());
+    const text = this.drawn.footer;
     return h_flex()
       .h(SIZE.footer)
       .flex_none()

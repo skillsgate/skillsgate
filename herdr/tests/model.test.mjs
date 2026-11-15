@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   ago,
+  clockRegions,
   dropFromLock,
   effectiveMachine,
   emptyText,
@@ -15,6 +16,7 @@ import {
   noticeShown,
   parseFrontmatter,
   parseScan,
+  regionsChanged,
   relativePath,
   sanitizeName,
   sections,
@@ -185,7 +187,7 @@ test("summaryText counts skills and the tools that have one", () => {
 });
 test("footerText", () => {
   const scan = { tools: [{ name: "cursor" }] };
-  assert.equal(footerText({ scan, skills: [sk("a", "tool", ["cursor"])], at: 1000 }, 13000), "1 skill · 1 tool · checked 12s ago");
+  assert.equal(footerText({ scan, skills: [sk("a", "tool", ["cursor"])], at: 1000 }, 13000), "1 skill · 1 tool · checked 10s ago");
   assert.equal(footerText({ loading: true }, 0), "Checking…");
   assert.equal(footerText({ error: "machine vps is unreachable" }, 0), "");
   assert.equal(footerText(undefined, 0), "");
@@ -211,12 +213,39 @@ test("shortPath leaves other paths alone", () => {
   assert.equal(shortPath("/x/y", ""), "/x/y");
   assert.equal(shortPath("/Users/a/x", "/Users/a/"), "~/x");
 });
-test("ago", () => { assert.equal(ago(2000), "just now"); assert.equal(ago(12000), "12s ago"); assert.equal(ago(180000), "3m ago"); });
+test("ago", () => {
+  assert.equal(ago(2000), "just now");
+  assert.equal(ago(9999), "just now");
+  assert.equal(ago(12000), "10s ago");
+  assert.equal(ago(59000), "50s ago");
+  assert.equal(ago(60000), "1m ago");
+  assert.equal(ago(180000), "3m ago");
+  assert.equal(ago(7200000), "2h ago");
+});
 test("ago at the edges", () => {
   assert.equal(ago(-500), "just now");
-  assert.equal(ago(4999), "just now");
-  assert.equal(ago(5000), "5s ago");
-  assert.equal(ago(59999), "59s ago");
-  assert.equal(ago(60000), "1m ago");
-  assert.equal(ago(2 * 3600000 + 5), "2h ago");
+  assert.equal(ago(10000), "10s ago");
+  assert.equal(ago(19999), "10s ago");
+  assert.equal(ago(20000), "20s ago");
+  assert.equal(ago(59999), "50s ago");
+});
+test("clockRegions is what the clock alone changes on screen", () => {
+  const state = { scan: { tools: [{ name: "cursor" }] }, skills: [sk("a", "tool", ["cursor"])], at: 0 };
+  const notice = { kind: "done", text: "Added", at: 0 };
+  assert.deepEqual(clockRegions(state, notice, 3000), { footer: "1 skill · 1 tool · checked just now", notice: "Added" });
+  assert.deepEqual(clockRegions(state, notice, 12000), { footer: "1 skill · 1 tool · checked 10s ago", notice: "" });
+  assert.deepEqual(clockRegions(undefined, null, 0), { footer: "", notice: "" });
+});
+test("regionsChanged redraws only when a clock-driven text changes", () => {
+  const state = { scan: { tools: [{ name: "cursor" }] }, skills: [sk("a", "tool", ["cursor"])], at: 0 };
+  const at = (now, notice = null) => clockRegions(state, notice, now);
+  assert.equal(regionsChanged(null, at(0)), true); // nothing drawn yet
+  assert.equal(regionsChanged(at(1000), at(9000)), false); // still "just now"
+  assert.equal(regionsChanged(at(9000), at(10000)), true); // "10s ago"
+  assert.equal(regionsChanged(at(12000), at(19000)), false);
+  assert.equal(regionsChanged(at(19000), at(20000)), true);
+  const done = { kind: "done", text: "Added", at: 21000 };
+  assert.equal(regionsChanged(at(21000), at(21000, done)), true); // a notice appears
+  assert.equal(regionsChanged(at(22000, done), at(24000, done)), false); // the same notice, same footer
+  assert.equal(regionsChanged(at(24000, done), at(25000, done)), true); // it runs out after 4 s
 });

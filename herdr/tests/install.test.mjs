@@ -496,6 +496,31 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
     assert.equal(read(h.path(".agents/.skill-lock.json")), "{nope");
     assert.equal(exists(h.path(".agents/skills/alpha/SKILL.md")), true);
   });
+  it("install leaves a lock of another version untouched and says so", async () => {
+    const other = '{"version":3,"skills":{}}';
+    const { h, m, r } = await setup({ ".agents/.skill-lock.json": other });
+    const result = await m.install(null, r.scan, installed("alpha"));
+    assert.deepEqual(result, { ok: true, folder: "alpha", warn: "Installed, but the skill lock was not updated (another version)" });
+    assert.equal(read(h.path(".agents/.skill-lock.json")), other);
+  });
+  it("install never writes through a lock that is a symbolic link and says so", async () => {
+    const linked = '{"version":1,"skills":{}}';
+    const { h, m, r } = await setup({ "dotfiles/lock.json": linked, ".agents/.skill-lock.json": { link: "../dotfiles/lock.json" } });
+    const result = await m.install(null, r.scan, installed("alpha"));
+    assert.deepEqual(result, { ok: true, folder: "alpha", warn: "Installed, but the skill lock was not updated (symbolic link)" });
+    assert.equal(isLink(h.path(".agents/.skill-lock.json")), true, "still a link");
+    assert.equal(read(h.path("dotfiles/lock.json")), linked, "the linked file is as it was");
+    assert.deepEqual(fs.readdirSync(h.path(".agents")).sort(), [".skill-lock.json", "skills"], "no temp file left");
+  });
+  it("the WRITE script refuses to replace a lock that is a symbolic link", async () => {
+    const { h } = await setup({ "dotfiles/lock.json": "original", "d/lock.json": { link: "../dotfiles/lock.json" }, "d/dangling.json": { link: "nowhere" } });
+    for (const name of ["lock.json", "dangling.json"]) {
+      assert.equal((await h.exec(WRITE, [h.path(`d/${name}`), "replaced", "replace"], null, 30000)).code, 4, name);
+      assert.equal(isLink(h.path(`d/${name}`)), true, name);
+    }
+    assert.equal(read(h.path("dotfiles/lock.json")), "original");
+    assert.deepEqual(fs.readdirSync(h.path("d")).sort(), ["dangling.json", "lock.json"]);
+  });
   it("install leaves a lock over 96 KiB untouched and warns", async () => {
     const big = JSON.stringify({ version: 1, skills: { x: { source: "y".repeat(100 * 1024) } } });
     const { h, m, r } = await setup({ ".agents/.skill-lock.json": big });

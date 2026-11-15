@@ -1,6 +1,8 @@
 // The body of the panel's request loop: one request a dialog posted, run on
 // the machine it names. The panel only schedules it (the panel role, never a
-// dialog), so node --test covers everything that changes the disk.
+// dialog), so node --test covers everything that changes the disk. The panel
+// takes a request out of the store with takeRequest, and tidies the store when
+// it starts with tidyStore.
 //
 // For one request: refuse an unknown op or a malformed request without
 // touching anything; take the machine's lock with the status text (a busy
@@ -31,7 +33,7 @@
 
 import { validSkillId, validSource } from "./catalog.js";
 import { machineInSentence, machineLabel, plainName, toolLabel } from "./model.js";
-import { cantCheckText, inStore } from "./view-model.js";
+import { cantCheckText, inStore, noticeShown } from "./view-model.js";
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const filled = (value) => typeof value === "string" && value !== "";
@@ -134,6 +136,28 @@ async function scanNow(scan, on) {
   } catch (error) {
     return { ok: false, error: message(error) };
   }
+}
+
+// Takes a request the panel's listener returned, from the panel's task (never
+// from render): the request slot is cleared first, so a request never stays in
+// Herdr's shared store, and the request runs unless it was already older than
+// 10 s when the listener first saw it (`fresh` false, from channel.fresh at
+// that moment), which is ignored. Never rejects; returns runRequest's result,
+// or null.
+export async function takeRequest(req, fresh, deps) {
+  deps.channel.clearRequest(isRecord(req) ? req.id : undefined);
+  if (!fresh) return null;
+  return runRequest(req, deps);
+}
+
+// When the panel starts: clears the request that was in the slot then
+// (`leftoverId`, read when the panel started listening; it is never run) and a
+// notice that has run out. A request posted since, or a notice still showing,
+// is kept.
+export function tidyStore(channel, leftoverId, now) {
+  channel.clearRequest(leftoverId);
+  const notice = channel.notice();
+  if (notice !== null && !noticeShown(notice, now)) channel.clearNotice();
 }
 
 // Runs one request. Never rejects. Returns the operation's Result when it ran,

@@ -86,18 +86,24 @@ ${calls}
 // path from text in the script itself. They are written with String.raw so the
 // shell sees them exactly as written (keep `${` out of them).
 
-// LINK <tool folder> <folder name> <link target>
+// LINK <tool folder> <folder name> <link target> <skill's real path>
 // Makes `<tool folder>/<folder name>` a symlink to `<link target>` (resolved
-// from the tool folder) and checks that it leads to a folder holding SKILL.md.
+// from the tool folder) and checks that it leads to the skill it was asked
+// for: the link's real path must be the fourth argument, and that folder must
+// hold SKILL.md.
 // Exit: 0 linked; 2 bad arguments; 3 a real file or folder already has the
-// name, left alone; 5 the new link does not lead to a skill, so it is removed.
-export const LINK = String.raw`dir=$1
+// name, left alone; 5 the new link does not lead to that skill, so it is
+// removed.
+export const LINK = String.raw`unset CDPATH
+dir=$1
 name=$2
 target=$3
+expected=$4
 bad() { printf 'Bad arguments\n' >&2; exit 2; }
 case "$dir" in /?*) ;; *) bad ;; esac
 case "$name" in ""|.|..|*/*) bad ;; esac
 [ -n "$target" ] || bad
+case "$expected" in /?*) ;; *) bad ;; esac
 mkdir -p -- "$dir" || exit 1
 dest="$dir/$name"
 if [ -L "$dest" ]; then
@@ -107,9 +113,10 @@ elif [ -e "$dest" ]; then
   exit 3
 fi
 ln -s -- "$target" "$dest" || exit 1
-if [ ! -f "$dest/SKILL.md" ]; then
+now=$(cd -P -- "$dest" 2>/dev/null && pwd -P) || now=
+if [ "$now" != "$expected" ] || [ ! -f "$dest/SKILL.md" ]; then
   if [ -L "$dest" ]; then rm -f -- "$dest"; fi
-  printf 'The new link does not lead to a skill\n' >&2
+  printf 'The new link does not lead to the skill\n' >&2
   exit 5
 fi
 exit 0
@@ -149,7 +156,9 @@ exit 0
 //     real path. Anything else is left alone.
 //   - The folder: removed with rm -rf, only when a base folder was given, so
 //     only after the checks above passed. With `-` (a skill that lives outside
-//     every tool folder) only the entry links go.
+//     every tool folder) only the entry links go, and when not one of them was
+//     a link to the real path (they changed, or the skill is reached through
+//     a linked grouping folder), nothing changed: exit 4.
 // Exit: 0 done; 2 bad arguments; 4 changed on disk.
 export const REMOVE = String.raw`unset CDPATH
 bad() { printf 'Bad arguments\n' >&2; exit 2; }
@@ -169,15 +178,19 @@ if [ "$base" != - ]; then
   case "$real" in "$root"/?*) ;; *) changed ;; esac
   [ -f "$target/SKILL.md" ] || changed
 fi
+removed=0
 for entry in "$@"; do
   [ -L "$entry" ] || continue
   linked=$(cd -P -- "$entry" 2>/dev/null && pwd -P) || continue
   [ "$linked" = "$target" ] || continue
   rm -f -- "$entry" || exit 1
+  removed=1
 done
-if [ "$base" != - ]; then
-  rm -rf -- "$target" || exit 1
+if [ "$base" = - ]; then
+  [ "$removed" = 1 ] || changed
+  exit 0
 fi
+rm -rf -- "$target" || exit 1
 exit 0
 `;
 
@@ -439,10 +452,12 @@ exit 0
 // The third argument says what the caller believes about the target: `new`
 // means it is absent, and the script refuses (exit 3) when something is there,
 // so a file that appeared since the caller looked is never replaced; `replace`
-// means the caller read the current text.
+// means the caller read the current text. A target that is a symbolic link is
+// never replaced (exit 4): the move would put a regular file in its place and
+// leave the file it leads to stale.
 // Exit: 0 written; 1 failed; 2 bad arguments (a relative path, a path ending in
 // "/", empty text, or a third argument other than new or replace); 3 `new`
-// and the target exists.
+// and the target exists; 4 the target is a symbolic link.
 // `rm -f` runs only on the temp file this script named itself.
 export const WRITE = String.raw`unset CDPATH
 bad() { printf 'Bad arguments\n' >&2; exit 2; }
@@ -465,6 +480,10 @@ trap 'exit 1' HUP INT TERM
 if [ "$mode" = new ] && { [ -e "$path" ] || [ -L "$path" ]; }; then
   printf 'The file already exists\n' >&2
   exit 3
+fi
+if [ -L "$path" ]; then
+  printf 'The file is a symbolic link\n' >&2
+  exit 4
 fi
 tmp="$path.skillsgate-tmp.$$"
 rm -f -- "$tmp" || exit 1

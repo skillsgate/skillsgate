@@ -77,7 +77,7 @@ test("link refuses Universal and an unknown tool without running anything", asyn
 test("link removes a link that does not resolve to a skill", async () => {
   const { h, m, r, skill } = await setup();
   // Run the script itself with a target that points at nothing.
-  const bad = await h.exec(LINK, [h.path(".cursor/skills"), "alpha", "../../wrong/place"], null, 30000);
+  const bad = await h.exec(LINK, [h.path(".cursor/skills"), "alpha", "../../wrong/place", skill("alpha").real], null, 30000);
   assert.equal(bad.code, 5);
   assert.equal(isLink(h.path(".cursor/skills/alpha")), false);
   assert.equal(exists(h.path(".cursor/skills/alpha")), false);
@@ -87,12 +87,36 @@ test("link removes a link that does not resolve to a skill", async () => {
   assert.equal(isLink(h.path(".cursor/skills/gone")), false);
 });
 test("link script refuses bad arguments", async () => {
-  const { h } = await setup();
+  const { h, skill } = await setup();
   const dir = h.path(".cursor/skills");
-  for (const args of [["", "alpha", "x"], ["relative/dir", "alpha", "x"], [dir, "", "x"], [dir, "a/b", "x"], [dir, "..", "x"], [dir, "alpha", ""]]) {
+  const real = skill("alpha").real;
+  const cases = [
+    ["", "alpha", "x", real],
+    ["relative/dir", "alpha", "x", real],
+    [dir, "", "x", real],
+    [dir, "a/b", "x", real],
+    [dir, "..", "x", real],
+    [dir, "alpha", "", real],
+    [dir, "alpha", "../../.agents/skills/alpha"], // no expected real path
+    [dir, "alpha", "../../.agents/skills/alpha", ""],
+    [dir, "alpha", "../../.agents/skills/alpha", "relative/alpha"],
+  ];
+  for (const args of cases) {
     assert.equal((await h.exec(LINK, args, null, 30000)).code, 2, JSON.stringify(args));
   }
   assert.deepEqual(fs.readdirSync(dir), ["outside"]);
+});
+test("link script refuses a link that leads to a different skill than the one asked for", async () => {
+  const { h, skill } = await setup();
+  const dir = h.path(".cursor/skills");
+  // The target leads to "it's odd name", which holds a SKILL.md too.
+  const r = await h.exec(LINK, [dir, "alpha", "../../.agents/skills/it's odd name", skill("alpha").real], null, 30000);
+  assert.equal(r.code, 5);
+  assert.equal(isLink(h.path(".cursor/skills/alpha")), false);
+  assert.deepEqual(fs.readdirSync(dir), ["outside"]);
+  // The right target with the same expectation links.
+  assert.equal((await h.exec(LINK, [dir, "alpha", "../../.agents/skills/alpha", skill("alpha").real], null, 30000)).code, 0);
+  assert.equal(fs.readlinkSync(h.path(".cursor/skills/alpha")), "../../.agents/skills/alpha");
 });
 
 test("unlink removes only the tool's link", async () => {
@@ -190,6 +214,21 @@ test("remove keeps a folder linked from elsewhere", async () => {
   assert.equal(isLink(h.path(".cursor/skills/outside")), false);
   assert.equal(exists(h.path(".cursor/skills/outside")), false);
   assert.equal(exists(h.path("ext/outside/SKILL.md")), true);
+});
+test("remove of a skill linked from elsewhere refuses when no link to it was removed", async () => {
+  // Reached through a tool's grouping folder that is a link: the skill's own
+  // entry is not a link, so there is nothing the mod can remove.
+  const { h, m, r, skill } = await setup({ "ext/pack/foo/SKILL.md": SKILL("foo"), ".claude/skills/pack": { link: "../../ext/pack" } });
+  const foo = skill("foo");
+  assert.equal(foo.home, "external");
+  assert.deepEqual(await m.remove(null, r.scan, foo), { ok: false, error: '"foo" changed on disk. Refresh and try again.' });
+  assert.equal(exists(h.path("ext/pack/foo/SKILL.md")), true);
+  assert.equal(isLink(h.path(".claude/skills/pack")), true);
+  // Its links already gone since the scan: the same refusal.
+  const t = await setup();
+  fs.rmSync(t.h.path(".cursor/skills/outside"));
+  assert.deepEqual(await t.m.remove(null, t.r.scan, t.skill("outside")), { ok: false, error: '"outside" changed on disk. Refresh and try again.' });
+  assert.equal(exists(t.h.path("ext/outside/SKILL.md")), true);
 });
 test("remove refuses when SKILL.md is gone", async () => {
   const { h, m, r, skill } = await setup();

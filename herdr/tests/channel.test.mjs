@@ -173,6 +173,78 @@ test("touch leaves other machines' locks alone", () => {
   assert.equal(channel.busyAt("vps"), true);
 });
 
+test("a lock dated ahead of the clock by more than the stale age is stale", () => {
+  const { channel, clock } = setup();
+  channel.claim(null, "Installing x…");
+  clock.now -= 3 * 24 * 3600 * 1000; // the clock is set back three days
+  assert.equal(channel.busyAt(null), false);
+  assert.equal(channel.textAt(null), null);
+  assert.equal(channel.claim(null, "Next"), true);
+  // A little ahead (under the stale age) still holds.
+  const { channel: c2, clock: k2 } = setup();
+  c2.claim(null, "Installing y…");
+  k2.now -= 150000;
+  assert.equal(c2.busyAt(null), true);
+  k2.now -= 1;
+  assert.equal(c2.busyAt(null), false);
+});
+
+test("machines named like Object members are machines like any other", () => {
+  const { channel } = setup();
+  for (const name of ["constructor", "toString", "__proto__", "hasOwnProperty", "valueOf"]) {
+    assert.equal(channel.busyAt(name), false, name);
+    assert.equal(channel.textAt(name), null, name);
+    assert.equal(channel.rev(name), 0, name);
+    assert.equal(channel.claim(name, `busy ${name}`), true, name);
+    assert.equal(channel.busyAt(name), true, name);
+    assert.equal(channel.textAt(name), `busy ${name}`, name);
+    channel.touch(name);
+    channel.release(name);
+    assert.equal(channel.busyAt(name), false, name);
+    channel.bump(name);
+    channel.bump(name);
+    assert.equal(channel.rev(name), 2, name);
+  }
+  assert.equal(channel.busyAt(null), false);
+  assert.equal(channel.rev(null), 0);
+});
+
+test("a request carries the time it was posted, and is fresh for 10 s", () => {
+  const { channel, clock, store } = setup();
+  channel.request({ op: "remove", on: null, key: "/a" });
+  const posted = store.get(REQUEST);
+  assert.equal(posted.at, clock.now);
+  assert.equal(channel.fresh(posted), true);
+  clock.now += 10000;
+  assert.equal(channel.fresh(posted), true);
+  clock.now += 1;
+  assert.equal(channel.fresh(posted), false);
+  // No time, or one more than 10 s ahead, is not fresh.
+  assert.equal(channel.fresh({ ...posted, at: undefined }), false);
+  assert.equal(channel.fresh({ ...posted, at: "now" }), false);
+  assert.equal(channel.fresh({ ...posted, at: clock.now + 10001 }), false);
+  assert.equal(channel.fresh(null), false);
+});
+
+test("clearRequest empties the slot only while it still holds that request", () => {
+  const { channel, store } = setup();
+  channel.request({ op: "remove", on: null, key: "/a" });
+  const first = channel.posted();
+  assert.equal(first.key, "/a");
+  channel.request({ op: "remove", on: null, key: "/b" });
+  channel.clearRequest(first.id);
+  assert.equal(channel.posted().key, "/b", "a newer request is kept");
+  channel.clearRequest(undefined);
+  assert.equal(channel.posted().key, "/b");
+  channel.clearRequest(channel.posted().id);
+  assert.equal(channel.posted(), null);
+  assert.equal(store.get(REQUEST), null);
+  // posted() hands out a copy.
+  channel.request({ op: "remove", on: null, key: "/c" });
+  channel.posted().key = "/changed";
+  assert.equal(channel.posted().key, "/c");
+});
+
 test("a malformed busy value is treated as no locks", () => {
   for (const bad of ["oops", null, [], 7, { "": "text" }, { "": { text: "x" } }]) {
     const { channel, store } = setup();

@@ -4,9 +4,9 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { BUSY, NOTICE, REV, createChannel } from "../skillsgate/mods/skillsgate/channel.js";
+import { BUSY, NOTICE, REQUEST, REV, createChannel } from "../skillsgate/mods/skillsgate/channel.js";
 import { createMachine } from "../skillsgate/mods/skillsgate/machine.js";
-import { runRequest } from "../skillsgate/mods/skillsgate/requests.js";
+import { runRequest, takeRequest, tidyStore } from "../skillsgate/mods/skillsgate/requests.js";
 import { FIXTURE, SKILL, makeHome } from "./helpers.mjs";
 
 const hasGit = spawnSync("git", ["--version"]).status === 0;
@@ -433,6 +433,62 @@ test("remove acts on the skill the request names and no other", async () => {
   }
   assert.equal(isLink(s.h.path(".claude/skills/alpha")), true);
   assert.equal(isLink(s.h.path(".cursor/skills/outside")), true);
+});
+
+// ---- Taking a request out of the store ----
+
+test("a request the panel takes is cleared from the store, then run", async () => {
+  const s = setup();
+  await s.prime();
+  s.channel.request({ op: "link", on: null, key: s.keyOf(".agents/skills/alpha"), tool: "cursor" });
+  const req = s.channel.posted();
+  await takeRequest(req, true, s.deps);
+  assert.equal(s.store.get(REQUEST), null, "the slot is empty");
+  assert.equal(isLink(s.h.path(".cursor/skills/alpha")), true);
+  assert.deepEqual(notice(s.channel), { kind: "done", text: "Added alpha to Cursor" });
+});
+test("a request already older than 10 s when first seen is cleared and ignored", async () => {
+  const clock = { now: 1_000_000 };
+  const s = setup({ clock });
+  s.channel.request({ op: "remove", on: null, key: s.keyOf(".agents/skills/alpha") });
+  const req = s.channel.posted();
+  clock.now += 10001;
+  const fresh = s.channel.fresh(req); // judged when the panel first sees it
+  assert.equal(fresh, false);
+  assert.equal(await takeRequest(req, fresh, s.deps), null);
+  assert.equal(s.store.get(REQUEST), null, "the slot is empty");
+  assert.deepEqual([s.claims, s.calls, s.scans], [[], [], []], "nothing ran");
+  assert.equal(exists(s.h.path(".agents/skills/alpha/SKILL.md")), true);
+  assert.equal(s.store.has(NOTICE), false);
+});
+test("taking a request never clears a newer one posted meanwhile", async () => {
+  const s = setup();
+  s.channel.request({ op: "remove", on: null, key: "/gone/first" });
+  const first = s.channel.posted();
+  s.channel.request({ op: "remove", on: null, key: "/gone/second" });
+  await takeRequest(first, false, s.deps);
+  assert.equal(s.channel.posted().key, "/gone/second");
+});
+test("when the panel starts it clears a leftover request and a notice that has run out", () => {
+  const clock = { now: 1_000_000 };
+  const s = setup({ clock });
+  s.store.set(REQUEST, { op: "install", on: null, id: "old", source: "acme/skills", skillId: "alpha" }); // an older build's, with no time
+  s.channel.say("error", "Can't check vps: gone");
+  const leftover = s.channel.posted()?.id;
+  clock.now += 8000;
+  tidyStore(s.channel, leftover, clock.now);
+  assert.equal(s.store.get(REQUEST), null);
+  assert.equal(s.channel.notice(), null);
+  // A notice still showing stays, and so does a request posted after the start.
+  s.channel.say("done", "Added alpha to Cursor");
+  s.channel.request({ op: "remove", on: null, key: "/a" });
+  tidyStore(s.channel, "old", clock.now + 3999);
+  assert.deepEqual(notice(s.channel), { kind: "done", text: "Added alpha to Cursor" });
+  assert.equal(s.channel.posted().key, "/a");
+  // Nothing left over: nothing is written.
+  const t = setup();
+  tidyStore(t.channel, undefined, Date.now());
+  assert.deepEqual([...t.store.keys()], []);
 });
 
 // ---- install (clones the local repository standing in for GitHub) ----

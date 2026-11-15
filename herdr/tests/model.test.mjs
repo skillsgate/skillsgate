@@ -88,9 +88,16 @@ test("mergeLock writes JSON.stringify(lock, null, 2) and starts from an empty fi
   assert.equal(text, JSON.stringify(JSON.parse(text), null, 2));
   assert.deepEqual(Object.keys(JSON.parse(text).skills.pdf), ["source", "sourceType", "originalUrl", "skillFolderHash", "installedAt", "updatedAt"]);
 });
+test("mergeLock skips a lock of another version with its own reason", () => {
+  assert.deepEqual(mergeLock('{"version":2,"skills":{}}', "pdf", "a/b", "t"), { skip: "another version" });
+  assert.deepEqual(mergeLock('{"version":3,"skills":[]}', "pdf", "a/b", "t"), { skip: "another version" });
+  assert.deepEqual(mergeLock('{"version":0.5}', "pdf", "a/b", "t"), { skip: "another version" });
+  // A version that is not a number, or none at all, is not a lock this mod reads.
+  assert.deepEqual(mergeLock('{"version":"1","skills":{}}', "pdf", "a/b", "t"), { skip: "invalid" });
+  assert.deepEqual(mergeLock('{"skills":{}}', "pdf", "a/b", "t"), { skip: "invalid" });
+});
 test("mergeLock skips a lock it can't read", () => {
   assert.deepEqual(mergeLock("{nope", "pdf", "a/b", "t"), { skip: "invalid" });
-  assert.deepEqual(mergeLock('{"version":2,"skills":{}}', "pdf", "a/b", "t"), { skip: "invalid" });
   assert.deepEqual(mergeLock('{"version":1,"skills":[]}', "pdf", "a/b", "t"), { skip: "invalid" });
   assert.deepEqual(mergeLock('{"version":1,"skills":null}', "pdf", "a/b", "t"), { skip: "invalid" });
   assert.deepEqual(mergeLock("[]", "pdf", "a/b", "t"), { skip: "invalid" });
@@ -112,7 +119,7 @@ test("dropFromLock", () => {
   assert.deepEqual(dropFromLock(lock, "nope"), { skip: "absent" });
   assert.deepEqual(dropFromLock(null, "pdf"), { skip: "absent" });
   assert.deepEqual(dropFromLock("{nope", "pdf"), { skip: "invalid" });
-  assert.deepEqual(dropFromLock('{"version":2,"skills":{"pdf":{}}}', "pdf"), { skip: "invalid" });
+  assert.deepEqual(dropFromLock('{"version":2,"skills":{"pdf":{}}}', "pdf"), { skip: "another version" });
 });
 test("toolLabel drops the folder note and falls back to the name", () => {
   assert.equal(toolLabel("universal"), "Universal");

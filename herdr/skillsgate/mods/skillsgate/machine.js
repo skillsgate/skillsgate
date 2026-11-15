@@ -65,7 +65,7 @@ export function createMachine({
     const scanned = scanResult.tools.find((t) => t.name === toolName);
     if (!tool || !scanned?.dir) return { ok: false, error: `Unknown tool "${toolName}"` };
     const target = relativePath(scanned.dir, skill.real);
-    const r = await exec(LINK, [scanned.dir, skill.folder, target], on, OP_TIMEOUT_MS);
+    const r = await exec(LINK, [scanned.dir, skill.folder, target, skill.real], on, OP_TIMEOUT_MS);
     if (r.code === 0) return { ok: true };
     if (r.code === 3) return { ok: false, error: `A different copy of "${skill.folder}" is already in ${tool.displayName}` };
     if (r.code === 5) return { ok: false, error: `Could not link "${skill.folder}" into ${tool.displayName}` };
@@ -194,6 +194,7 @@ export function createMachine({
         step();
         const w = await exec(WRITE, [lock, merged.text, text == null ? "new" : "replace"], on, OP_TIMEOUT_MS);
         if (w.code === 3) notUpdated("changed");
+        else if (w.code === 4) notUpdated("symbolic link");
         else if (w.code !== 0) notUpdated(lastLine(w.stderr) || "could not write it");
       }
     }

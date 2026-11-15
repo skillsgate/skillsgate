@@ -9,7 +9,7 @@ import { PANEL, channel, errorText, machine, panelHidden, takenRequests, viewedM
 import { MARK, SIZE, icon, iconButton, statusLine, tabButton, textSizes } from "./ui.js";
 import { machineKey, machineLabel } from "./model.js";
 import { clockRegions, machineUnavailable, regionsChanged, scanNotice } from "./view-model.js";
-import { runRequest } from "./requests.js";
+import { takeRequest, tidyStore } from "./requests.js";
 import InstalledTab from "./installed-tab.js";
 import DiscoverTab from "./discover-tab.js";
 import MachinesTab from "./machines-tab.js";
@@ -127,8 +127,14 @@ export default class Panel {
     this.wasHidden = false;
     this.drawn = null; // the clock-driven parts the last frame showed (clockRegions)
     // Only the panel listens: a request posted before this copy started is
-    // never run (channel.listen).
+    // never run (channel.listen), so it is cleared from the store after the
+    // first frame, with a notice that has run out (tidyStore).
+    const leftover = channel.posted()?.id;
     this.next = channel.listen();
+    cx.spawn(async (cx) => {
+      await cx.sleep(0);
+      tidyStore(channel, leftover, Date.now());
+    });
     const select = (tab, cx) => this.select(tab, cx);
     const rescan = (on, cx) => this.data.scan(on, cx);
     const discoverShown = () => this.tab === "discover" && !panelHidden();
@@ -147,16 +153,20 @@ export default class Panel {
   // Runs the request a dialog posted, if there is a new one. Called at the top
   // of every frame (a post re-renders every mod) and by the 1 s tick, which
   // keeps running while the panel is hidden, so a request is never left
-  // waiting for the panel to show. The work starts after the frame; once
-  // started it runs to the end even if the panel hides or the dialog closes.
+  // waiting for the panel to show. Whether it is fresh (under 10 s old) is
+  // judged here, when it is first seen. The work starts after the frame: it
+  // clears the request slot, then runs the request unless it was stale
+  // (takeRequest); once started it runs to the end even if the panel hides or
+  // the dialog closes.
   pump(cx) {
     const req = this.next();
     if (!req || takenRequests.has(req.id)) return;
     takenRequests.add(req.id);
+    const fresh = channel.fresh(req);
     cx.spawn(async (cx) => {
       await cx.sleep(0);
       try {
-        await runRequest(req, {
+        await takeRequest(req, fresh, {
           channel,
           machine,
           known: (on) => this.data.known(on),

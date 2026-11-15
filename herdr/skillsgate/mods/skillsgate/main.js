@@ -10,10 +10,10 @@
 //
 // Dialogs never change anything themselves (their tasks end when they close).
 // A switch, the delete button or Install posts a request through the channel
-// (channel.js) and only the panel listens: it runs each request with
-// runRequest (requests.js), which takes the machine's lock, scans it,
-// operates, re-scans and raises the machine's revision. An open dialog reads
-// its machine again when that revision changes.
+// (channel.js) and only the panel listens: it clears each request from the
+// store and runs it (takeRequest and runRequest, requests.js), which takes the
+// machine's lock, scans it, operates, re-scans and raises the machine's
+// revision. An open dialog reads its machine again when that revision changes.
 //
 // Files. Views (they draw with Herdr's UI kit and may import Herdr):
 //   main.js            this file: picks the role's view

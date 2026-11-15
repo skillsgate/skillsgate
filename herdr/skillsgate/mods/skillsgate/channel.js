@@ -8,6 +8,18 @@
 // `get(key)` and `set(key, value)` are Herdr's `shared` and `setShared`, passed
 // in, so this module never imports Herdr. Every value written here is a fresh
 // object; nothing read from the store is changed in place.
+//
+// A machine is keyed by its name, so the per-machine maps (busy, rev) are read
+// by own properties only: a machine named "constructor" or "__proto__" is a
+// machine like any other.
+//
+// The request slot holds one request. The panel clears it once it has taken
+// the request; each request carries the time it was posted, and the panel
+// ignores (and clears) one that was already older than 10 s when it first saw
+// it. A lock left by a panel that was reloaded or closed in the middle of an
+// operation keeps that machine busy until it goes stale, 150 s after it was
+// last refreshed; a lock dated more than 150 s ahead of the clock (the clock
+// was set back) is stale too.
 
 import { machineKey } from "./model.js";
 
@@ -17,22 +29,24 @@ export const NOTICE = "skillsgate.notice.v1";
 export const REV = "skillsgate.rev.v1";
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+// The value of an own property, or undefined: never one from Object.prototype.
+const own = (record, key) => (Object.hasOwn(record, key) ? record[key] : undefined);
 
-export function createChannel({ get, set, now = Date.now, staleMs = 150000 }) {
+export function createChannel({ get, set, now = Date.now, staleMs = 150000, requestMs = 10000 }) {
   // Different for every call, and different between copies of the mod: the
   // counter separates calls in one copy, the random part separates copies.
   let counter = 0;
   const makeId = () => `${now().toString(36)}-${(counter++).toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
-  // The busy map with stale and malformed entries dropped. A missing or
-  // malformed value reads as no locks.
+  // The busy map with stale and malformed entries dropped, as a map with no
+  // prototype. A missing or malformed value reads as no locks.
   function liveLocks() {
     const stored = get(BUSY);
-    const live = {};
+    const live = Object.create(null);
     if (!isRecord(stored)) return live;
-    const cutoff = now() - staleMs;
+    const t = now();
     for (const [key, lock] of Object.entries(stored)) {
-      if (isRecord(lock) && typeof lock.text === "string" && typeof lock.at === "number" && lock.at >= cutoff) {
+      if (isRecord(lock) && typeof lock.text === "string" && typeof lock.at === "number" && Math.abs(t - lock.at) <= staleMs) {
         live[key] = { text: lock.text, at: lock.at };
       }
     }
@@ -45,9 +59,30 @@ export function createChannel({ get, set, now = Date.now, staleMs = 150000 }) {
   }
 
   return {
-    // request(op): post `{ ...op, id }` for the panel. `id` is a new string on every call.
+    // request(op): post `{ ...op, id, at }` for the panel. `id` is a new string
+    // on every call; `at` is the time it was posted.
     request(op) {
-      set(REQUEST, { ...op, id: makeId() });
+      set(REQUEST, { ...op, id: makeId(), at: now() });
+    },
+
+    // posted() -> request | null: a copy of the request in the slot now.
+    posted() {
+      const stored = get(REQUEST);
+      return isRecord(stored) ? { ...stored } : null;
+    },
+
+    // fresh(req) -> boolean: whether the request was posted at most 10 s ago
+    // (and not more than 10 s ahead of the clock). One without a time is not.
+    fresh(req) {
+      const at = isRecord(req) ? req.at : undefined;
+      return typeof at === "number" && Math.abs(now() - at) <= requestMs;
+    },
+
+    // clearRequest(id): empty the slot while it still holds the request with
+    // this id; a newer request is never wiped.
+    clearRequest(id) {
+      const stored = get(REQUEST);
+      if (id !== undefined && isRecord(stored) && stored.id === id) set(REQUEST, null);
     },
 
     // listen() -> next: start listening now. A request already in the store is
@@ -78,8 +113,8 @@ export function createChannel({ get, set, now = Date.now, staleMs = 150000 }) {
       const key = machineKey(on);
       const live = liveLocks();
       if (!live[key]) return;
-      const { [key]: _released, ...rest } = live;
-      set(BUSY, rest);
+      delete live[key];
+      set(BUSY, { ...live });
     },
 
     // touch(on): refresh the time of machine `on`'s lock, so a long operation
@@ -123,13 +158,13 @@ export function createChannel({ get, set, now = Date.now, staleMs = 150000 }) {
     bump(on) {
       const key = machineKey(on);
       const current = revs();
-      const value = Number.isFinite(current[key]) ? current[key] : 0;
-      set(REV, { ...current, [key]: value + 1 });
+      const value = own(current, key);
+      set(REV, { ...current, [key]: (Number.isFinite(value) ? value : 0) + 1 });
     },
 
     // rev(on) -> number: machine `on`'s revision, 0 when it has none yet.
     rev(on) {
-      const value = revs()[machineKey(on)];
+      const value = own(revs(), machineKey(on));
       return Number.isFinite(value) ? value : 0;
     },
   };

@@ -181,7 +181,8 @@ function utf8Length(text) {
 }
 const tooLarge = (text) => utf8Length(text) > LOCK_LIMIT;
 
-// Reads a lock into `{ lock }`, or `{ skip }` when it is not a version 1 lock.
+// Reads a lock into `{ lock }`, or `{ skip }` when it is not a version 1 lock:
+// "another version" when its version is a number other than 1, else "invalid".
 // Absent or empty text is an empty lock (`empty: true`).
 function readLock(text) {
   if (text == null || String(text).trim() === "") return { lock: { version: 1, skills: {} }, empty: true };
@@ -192,7 +193,9 @@ function readLock(text) {
     return { skip: "invalid" };
   }
   const plain = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
-  if (!plain(lock) || lock.version !== 1 || !plain(lock.skills)) return { skip: "invalid" };
+  if (!plain(lock)) return { skip: "invalid" };
+  if (lock.version !== 1) return { skip: typeof lock.version === "number" ? "another version" : "invalid" };
+  if (!plain(lock.skills)) return { skip: "invalid" };
   return { lock };
 }
 

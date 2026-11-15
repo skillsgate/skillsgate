@@ -257,14 +257,18 @@ export function installedBody(state) {
 }
 
 // "this computer" or the machine's name, inside a sentence.
-const inSentence = (on) => (on == null ? "this computer" : machineLabel(on));
+export const machineInSentence = (on) => (on == null ? "this computer" : machineLabel(on));
+const inSentence = machineInSentence;
+
+// "Can't check vps: <error>": a machine whose scan failed.
+export const cantCheckText = (on, error) => `Can't check ${inSentence(on)}: ${error}`;
 
 // The notice for a failed scan, given the machine's state before the result:
 // only when it had a good scan (otherwise the error view says it) and only
 // when the error is new or changed, so a repeating failure is said once.
 export function scanNotice(on, before, error) {
   if (!before?.skills || before.error === error) return null;
-  return `Can't check ${inSentence(on)}: ${error}`;
+  return cantCheckText(on, error);
 }
 
 // `query` matches a skill's name, folder or description, ignoring case;
@@ -365,6 +369,97 @@ export function shortPath(path, home) {
   if (!base) return path;
   if (path === base) return "~";
   return path.startsWith(base + "/") ? "~" + path.slice(base.length) : path;
+}
+
+// ---- What the skill dialog shows ----
+
+// The Tools tab's rows for a skill: every tool the machine has (detected),
+// plus any tool that already has the skill, in registry order (the scan lists
+// its tools so). `control` is what the row ends with: "switch" for a skill in
+// the shared store, "shared" for Universal holding that skill's shared copy,
+// "none" for every row of a skill outside the store (toolsNote says why).
+// `wanted` (`{ tool, on }`, while requestPending) shows that tool's switch
+// where the person put it until the outcome is read.
+export function toolRows(scan, skill, wanted = null) {
+  const rows = [];
+  for (const { name, detected } of scan?.tools ?? []) {
+    const has = skill.tools.includes(name);
+    if (!detected && !has) continue;
+    const tool = toolByName(TOOLS, name);
+    let control = "none";
+    if (skill.home === "store") control = name === UNIVERSAL ? "shared" : "switch";
+    const on = wanted?.tool === name && typeof wanted.on === "boolean" ? wanted.on : has;
+    rows.push({ name, label: toolLabel(name), shortCode: tool?.shortCode ?? "", program: tool?.program ?? null, on, control });
+  }
+  return rows;
+}
+
+// A tool's mark from Herdr's program table (knownAgents()): `{ icon, tint }`
+// for the program whose key is the tool's `program`, or null to draw the
+// two-letter badge (no program, no icon, or the list is loading or failed).
+export function toolMark(programs, program) {
+  if (!program || !Array.isArray(programs)) return null;
+  const found = programs.find((p) => p?.key === program);
+  return typeof found?.icon === "string" && found.icon ? { icon: found.icon, tint: Boolean(found.tint) } : null;
+}
+
+// Whether a request the dialog sent (`{ rev, at }`: the machine's revision
+// and the time when it was sent) still waits for its outcome. It is answered
+// once the dialog has read the machine again after the panel raised the
+// revision (`readRev`: the revision the dialog's last finished read began
+// at), or, with the machine not busy, when a notice came after it with no
+// change (the request was refused). After 150 s, as for a stale lock, it is
+// given up.
+export function requestPending(sent, { rev, readRev, notice, busy, now }) {
+  if (!sent) return false;
+  if (now - sent.at > 150000) return false;
+  if (readRev > sent.rev) return false;
+  if (!busy && rev === sent.rev && typeof notice?.at === "number" && notice.at >= sent.at) return false;
+  return true;
+}
+
+const ONLY_STORE = "Only skills in the shared store can be added to other tools.";
+
+// Why a skill outside the shared store has no switches, or null for a skill in it.
+export function toolsNote(scan, skill) {
+  if (skill.home === "store") return null;
+  if (skill.home === "external") {
+    return `${ONLY_STORE} This one is linked from ${shortPath(skill.real, scan?.home)}, outside every skills folder.`;
+  }
+  // The tool whose folder holds it: the longest tool folder around it.
+  const holder = (scan?.tools ?? [])
+    .filter((t) => t.dir && skill.real.startsWith(t.dir + "/"))
+    .sort((a, b) => b.dir.length - a.dir.length)[0];
+  const owner = holder ? `${toolLabel(holder.name)}'s` : "a tool's";
+  return `${ONLY_STORE} This one lives in ${owner} own skills folder.`;
+}
+
+// The footer's delete button. The first click arms it; a skill linked from
+// elsewhere keeps its folder, so it is only removed from the tools.
+export function deleteLabel(skill, armed) {
+  if (armed) return "Click again to delete";
+  return skill.home === "external" ? "Remove from all tools" : "Delete skill";
+}
+
+// SKILL.md without its frontmatter block and the blank lines after it, with
+// line ends as "\n". The block is the one parseFrontmatter reads: a first line
+// "---" and a later line "---". Text without a closed block is left whole.
+export function stripFrontmatter(text) {
+  const lines = String(text ?? "").replace(/^﻿/, "").replace(/\r\n?/g, "\n").split("\n");
+  if (lines[0].trim() !== "---") return lines.join("\n");
+  const end = lines.findIndex((line, i) => i > 0 && line.trim() === "---");
+  if (end < 0) return lines.join("\n");
+  let start = end + 1;
+  while (start < lines.length - 1 && !lines[start].trim()) start++;
+  return lines.slice(start).join("\n");
+}
+
+// What the Document tab shows for a read of SKILL.md (`{ text }`, text null
+// when the file is absent, or `{ error }`): the body to render, or a message.
+export function skillDocument(read) {
+  if (read?.error !== undefined) return { message: `Couldn't read SKILL.md: ${read.error}` };
+  if (typeof read?.text !== "string") return { message: "This folder has no SKILL.md." };
+  return { body: stripFrontmatter(read.text) };
 }
 
 // How long ago, from elapsed milliseconds. Seconds go in steps of ten, so a

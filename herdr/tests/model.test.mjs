@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import {
   activeTool,
   ago,
+  cantCheckText,
   clockRegions,
+  deleteLabel,
   dropFromLock,
   effectiveMachine,
   emptyText,
@@ -12,6 +14,7 @@ import {
   installedBody,
   layoutNode,
   lockPath,
+  machineInSentence,
   machineKey,
   machineLabel,
   machineNames,
@@ -24,13 +27,19 @@ import {
   parseScan,
   regionsChanged,
   relativePath,
+  requestPending,
   sanitizeName,
   sections,
   shortPath,
+  skillDocument,
+  stripFrontmatter,
   summaryText,
   toolByName,
   toolChips,
   toolLabel,
+  toolMark,
+  toolRows,
+  toolsNote,
   toolSummary,
 } from "../skillsgate/mods/skillsgate/model.js";
 
@@ -327,4 +336,172 @@ test("regionsChanged redraws only when a clock-driven text changes", () => {
   // A busy text that changes (a stale lock dropping) does redraw.
   assert.equal(regionsChanged(at(22000, null, "Adding…"), at(22000)), true);
   assert.equal(regionsChanged(at(22000, { kind: "warn", text: "Added", at: 21000 }), at(22000, done)), true);
+});
+
+// ---- The skill dialog ----
+
+test("machineInSentence and cantCheckText", () => {
+  assert.equal(machineInSentence(null), "this computer");
+  assert.equal(machineInSentence("vps"), "vps");
+  assert.equal(cantCheckText(null, "sh: timeout"), "Can't check this computer: sh: timeout");
+  assert.equal(cantCheckText("vps", "machine vps is unreachable"), "Can't check vps: machine vps is unreachable");
+});
+
+// A scan as parseScan makes it, in registry order.
+const dialogScan = {
+  home: "/h",
+  git: true,
+  tools: [
+    { name: "claude-code", dir: "/h/.claude/skills", detected: true },
+    { name: "cursor", dir: "/h/.cursor/skills", detected: true },
+    { name: "windsurf", dir: "/h/.windsurf/skills", detected: true },
+    { name: "codex-cli", dir: "/h/.codex/skills", detected: false },
+    { name: "amp", dir: "/h/.amp/skills", detected: false },
+    { name: "universal", dir: "/h/.agents/skills", detected: true },
+  ],
+  entries: [],
+};
+const row = (name, label, shortCode, program, on, control) => ({ name, label, shortCode, program, on, control });
+
+test("toolRows lists detected tools and tools that have the skill, in registry order", () => {
+  const alpha = sk("alpha", "store", ["claude-code", "codex-cli", "universal"], { real: "/h/.agents/skills/alpha" });
+  assert.deepEqual(toolRows(dialogScan, alpha), [
+    row("claude-code", "Claude Code", "CC", "claude", true, "switch"),
+    row("cursor", "Cursor", "CU", "cursor", false, "switch"),
+    row("windsurf", "Windsurf", "WS", null, false, "switch"),
+    row("codex-cli", "Codex CLI", "CX", "codex", true, "switch"), // not detected, but it has the skill
+    row("universal", "Universal", "UA", null, true, "shared"),
+  ]);
+});
+test("toolRows gives a skill outside the shared store no switches", () => {
+  const solo = sk("solo", "tool", ["claude-code"], { real: "/h/.claude/skills/solo" });
+  assert.deepEqual(toolRows(dialogScan, solo), [
+    row("claude-code", "Claude Code", "CC", "claude", true, "none"),
+    row("cursor", "Cursor", "CU", "cursor", false, "none"),
+    row("windsurf", "Windsurf", "WS", null, false, "none"),
+    row("universal", "Universal", "UA", null, false, "none"),
+  ]);
+  const outside = sk("outside", "external", ["cursor"], { real: "/h/ext/outside" });
+  assert.deepEqual(toolRows(dialogScan, outside).map((r) => [r.name, r.on, r.control]), [
+    ["claude-code", false, "none"],
+    ["cursor", true, "none"],
+    ["windsurf", false, "none"],
+    ["universal", false, "none"],
+  ]);
+  // A skill in a grouping folder of the store is not the store's shared copy.
+  const nested = sk("nested", "tool", ["universal"], { real: "/h/.agents/skills/group/nested" });
+  assert.deepEqual(toolRows(dialogScan, nested).at(-1), row("universal", "Universal", "UA", null, true, "none"));
+});
+test("toolRows shows a switch the dialog is waiting on in its wanted position", () => {
+  const alpha = sk("alpha", "store", ["claude-code", "universal"], { real: "/h/.agents/skills/alpha" });
+  const on = (rows) => rows.map((r) => [r.name, r.on]);
+  assert.deepEqual(on(toolRows(dialogScan, alpha, { tool: "cursor", on: true })), [
+    ["claude-code", true],
+    ["cursor", true],
+    ["windsurf", false],
+    ["universal", true],
+  ]);
+  assert.deepEqual(on(toolRows(dialogScan, alpha, { tool: "claude-code", on: false })).slice(0, 2), [
+    ["claude-code", false],
+    ["cursor", false],
+  ]);
+  // A remove request has no tool; nothing changes.
+  assert.deepEqual(toolRows(dialogScan, alpha, {}), toolRows(dialogScan, alpha));
+  assert.deepEqual(toolRows(dialogScan, alpha, null), toolRows(dialogScan, alpha));
+});
+test("toolRows with no scan is empty", () => {
+  assert.deepEqual(toolRows(null, sk("a", "store", ["universal"])), []);
+  assert.deepEqual(toolRows({ tools: [] }, sk("a", "store", ["universal"])), []);
+});
+
+test("toolsNote says why a skill outside the shared store has no switches", () => {
+  const store = "Only skills in the shared store can be added to other tools.";
+  assert.equal(toolsNote(dialogScan, sk("alpha", "store", ["universal"], { real: "/h/.agents/skills/alpha" })), null);
+  assert.equal(
+    toolsNote(dialogScan, sk("solo", "tool", ["claude-code"], { real: "/h/.claude/skills/solo" })),
+    `${store} This one lives in Claude Code's own skills folder.`,
+  );
+  assert.equal(
+    toolsNote(dialogScan, sk("outside", "external", ["cursor"], { real: "/h/ext/outside" })),
+    `${store} This one is linked from ~/ext/outside, outside every skills folder.`,
+  );
+  assert.equal(
+    toolsNote(dialogScan, sk("far", "external", ["cursor"], { real: "/opt/skills/far" })),
+    `${store} This one is linked from /opt/skills/far, outside every skills folder.`,
+  );
+  // The holding folder is the longest tool folder around it.
+  const scan = { ...dialogScan, tools: [...dialogScan.tools, { name: "zed", dir: "/h/.claude/skills/zed-inside", detected: true }] };
+  assert.equal(
+    toolsNote(scan, sk("deep", "tool", ["zed"], { real: "/h/.claude/skills/zed-inside/deep" })),
+    `${store} This one lives in Zed's own skills folder.`,
+  );
+  // No tool folder holds it any more (the scan changed): a plain sentence.
+  assert.equal(
+    toolsNote(dialogScan, sk("lost", "tool", ["claude-code"], { real: "/elsewhere/lost" })),
+    `${store} This one lives in a tool's own skills folder.`,
+  );
+});
+
+test("toolMark finds Herdr's program for a tool, or null for the two-letter badge", () => {
+  const programs = [
+    { key: "claude", icon: "icons/claude.svg", tint: true },
+    { key: "cursor", icon: "icons/cursor.svg", tint: false },
+    { key: "codex", icon: null, tint: true },
+  ];
+  assert.deepEqual(toolMark(programs, "claude"), { icon: "icons/claude.svg", tint: true });
+  assert.deepEqual(toolMark(programs, "cursor"), { icon: "icons/cursor.svg", tint: false });
+  assert.equal(toolMark(programs, "codex"), null, "no icon");
+  assert.equal(toolMark(programs, "amp"), null, "not in the list");
+  assert.equal(toolMark(programs, null), null, "a tool with no program");
+  assert.equal(toolMark(null, "claude"), null, "still loading, or the check failed");
+  assert.equal(toolMark([null, { key: "claude" }], "claude"), null);
+});
+
+test("deleteLabel for each state", () => {
+  assert.equal(deleteLabel(sk("a", "store", ["universal"]), false), "Delete skill");
+  assert.equal(deleteLabel(sk("b", "tool", ["claude-code"]), false), "Delete skill");
+  assert.equal(deleteLabel(sk("c", "external", ["cursor"]), false), "Remove from all tools");
+  assert.equal(deleteLabel(sk("a", "store", ["universal"]), true), "Click again to delete");
+  assert.equal(deleteLabel(sk("c", "external", ["cursor"]), true), "Click again to delete");
+});
+
+test("requestPending: a sent request waits until the dialog has read its outcome", () => {
+  const sent = { tool: "cursor", on: true, rev: 4, at: 1000 };
+  const at = (over) => ({ rev: 4, readRev: 4, notice: null, busy: false, now: 1500, ...over });
+  assert.equal(requestPending(null, at({})), false);
+  assert.equal(requestPending(sent, at({})), true, "just sent");
+  assert.equal(requestPending(sent, at({ busy: true })), true, "running");
+  assert.equal(requestPending(sent, at({ rev: 5 })), true, "done, but the dialog has not read again");
+  assert.equal(requestPending(sent, at({ rev: 5, notice: { kind: "done", text: "Added", at: 1200 } })), true);
+  assert.equal(requestPending(sent, at({ rev: 5, readRev: 5 })), false, "read again after the change");
+  // Answered without a change (refused as busy, or the machine can't be read).
+  assert.equal(requestPending(sent, at({ notice: { kind: "warn", text: "busy", at: 1000 } })), false);
+  assert.equal(requestPending(sent, at({ notice: { kind: "warn", text: "older", at: 999 } })), true);
+  assert.equal(requestPending(sent, at({ busy: true, notice: { kind: "done", text: "other machine", at: 1200 } })), true);
+  // Nothing came back at all: give up after 150 s, as a stale lock does.
+  assert.equal(requestPending(sent, at({ now: 151000 })), true);
+  assert.equal(requestPending(sent, at({ now: 151001 })), false);
+});
+
+test("stripFrontmatter drops the block and the blank lines after it", () => {
+  assert.equal(stripFrontmatter("---\nname: a\ndescription: b\n---\n# Title\nBody\n"), "# Title\nBody\n");
+  assert.equal(stripFrontmatter("---\nname: a\n---\n\n\nBody"), "Body");
+  assert.equal(stripFrontmatter("---\r\nname: a\r\n---\r\n\r\nBody\r\nmore\r\n"), "Body\nmore\n");
+  assert.equal(stripFrontmatter("﻿---\nname: a\n---\nBody"), "Body");
+  assert.equal(stripFrontmatter("---  \nname: a\n---   \nBody"), "Body");
+  assert.equal(stripFrontmatter("---\nname: a\n---"), "");
+});
+test("stripFrontmatter leaves text without a closed block alone", () => {
+  assert.equal(stripFrontmatter("# Title\n\n---\nnot: frontmatter\n---\n"), "# Title\n\n---\nnot: frontmatter\n---\n");
+  assert.equal(stripFrontmatter("---\nname: a\nBody"), "---\nname: a\nBody");
+  assert.equal(stripFrontmatter(""), "");
+  assert.equal(stripFrontmatter(null), "");
+  assert.equal(stripFrontmatter(undefined), "");
+});
+
+test("skillDocument: the text without frontmatter, or a short message", () => {
+  assert.deepEqual(skillDocument({ text: "---\nname: a\n---\nBody\n" }), { body: "Body\n" });
+  assert.deepEqual(skillDocument({ text: "" }), { body: "" });
+  assert.deepEqual(skillDocument({ text: null }), { message: "This folder has no SKILL.md." });
+  assert.deepEqual(skillDocument({ error: "Permission denied" }), { message: "Couldn't read SKILL.md: Permission denied" });
 });

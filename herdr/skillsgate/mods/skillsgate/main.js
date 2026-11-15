@@ -4,22 +4,31 @@
 // One mod, one role per copy (props().role):
 //   (none)  the panel, inside the layout node "skillsgate-panel"
 //   toggle  the tab-bar button that shows and hides that node
-//   skill   a skill's dialog, opened by the panel
+//   skill   a skill's dialog, opened by the panel with props { role, on, key }
 //
 // This is the only file that talks to Herdr. The other modules take Herdr's
 // functions as arguments (the host adapters below), so node --test covers them.
 //
+// Dialogs never change anything themselves (their tasks end when they close).
+// A switch or the delete button posts a request through the channel
+// (channel.js) and only the panel listens: it runs each request with
+// runRequest (requests.js), which takes the machine's lock, operates,
+// re-scans and raises the machine's revision. An open dialog reads its
+// machine again when that revision changes.
+//
 // Layout of this file: host adapters, sizes, window facts, shared pieces, the
 // toggle role, the panel's per-machine data (MachineData), the panel itself
-// (its frame: header, tabs, status line, footer), one view class per tab
-// (InstalledTab, DiscoverTab, MachinesTab), the skill dialog, and the role
-// dispatch.
+// (its frame: header, tabs, status line, footer; its timers; its request
+// loop), one view class per tab (InstalledTab, DiscoverTab, MachinesTab), the
+// skill dialog (SkillDialog: header, Document and Tools tabs, a footer with
+// delete), and the role dispatch.
 
-import { View, div, svg } from "gpui-kit";
-import { v_flex, h_flex, InputState, Input, Scrollbar } from "gpui-base";
+import { View, div, image, svg } from "gpui-kit";
+import { v_flex, h_flex, InputState, Input, Scrollbar, Switch, TextView } from "gpui-base";
 import {
   closeOverlay,
   exec as hostExec,
+  knownAgents,
   layout,
   machines,
   openOverlay,
@@ -36,7 +45,9 @@ import { createChannel } from "./channel.js";
 import { createMachine } from "./machine.js";
 import {
   activeTool,
+  cantCheckText,
   clockRegions,
+  deleteLabel,
   effectiveMachine,
   emptyText,
   filterSkills,
@@ -46,13 +57,20 @@ import {
   machineLabel,
   machineUnavailable,
   regionsChanged,
+  requestPending,
   scanNotice,
   sections,
+  shortPath,
+  skillDocument,
   statusOf,
   toolChips,
   toolLabel,
+  toolMark,
+  toolRows,
+  toolsNote,
   toolSummary,
 } from "./model.js";
+import { runRequest } from "./requests.js";
 
 const MOD = "skillsgate";
 const PANEL = "skillsgate-panel";
@@ -111,6 +129,15 @@ const SIZE = {
   // skeleton bars
   skeletonName: 10,
   skeletonText: 8,
+  // the skill dialog
+  dialogHeader: 64,
+  dialogFooter: 56,
+  toolRow: 44,
+  markBox: 24, // a tool's mark or two-letter badge
+  toolMark: 16,
+  switchWidth: 36,
+  switchHeight: 20,
+  knob: 16,
 };
 const DIALOG = { width: 760, height: 560 };
 
@@ -120,7 +147,7 @@ const DIALOG = { width: 760, height: 560 };
 function textSizes() {
   const size = Number((settings() ?? {}).ui_font_size);
   const base = size > 0 ? size : 13;
-  return { base, small: base - 1, tiny: base - 2 };
+  return { title: base + 2, base, small: base - 1, tiny: base - 2, micro: base - 3 };
 }
 
 // ---- Window facts ----
@@ -169,9 +196,31 @@ function button(id, label, onClick, t, ts, primary = false) {
     .child(label);
 }
 
+// One tab of a tab bar (the panel's and the skill dialog's).
+function tabButton(id, label, active, onClick, t, ts) {
+  return div()
+    .id(id)
+    .h(SIZE.tab)
+    .px(10)
+    .flex()
+    .items_center()
+    .rounded(7)
+    .border_1()
+    .border_color(active ? t.border : t.background)
+    .bg(active ? t.raised : t.background)
+    .text_size(ts.small)
+    .text_color(active ? t.foreground : t.muted)
+    .cursor_pointer()
+    .hover((s) => s.bg(t.hover).text_color(t.foreground))
+    .on_click(onClick)
+    .child(label);
+}
+
 function placeholder(text, t) {
   return div().flex_1().min_h(0).px(14).py(14).text_color(t.dim).child(text);
 }
+
+const errorText = (error) => String(error?.message ?? error);
 
 // ---- Toggle: the tab-bar button ----
 
@@ -218,6 +267,11 @@ class MachineData {
   constructor() {
     // Per machine key: { scan, skills, error, at, loading, unavailable }.
     this.states = new Map();
+    // Per machine key: { running, started, shown }: how many scans run, how
+    // many have started, and which one's result is kept. A request re-scans
+    // while a timer's scan may still run, so an older scan that ends later
+    // must not overwrite a newer one.
+    this.runs = new Map();
   }
 
   state(on) {
@@ -228,6 +282,12 @@ class MachineData {
     return this.states.get(key);
   }
 
+  run(on) {
+    const key = machineKey(on);
+    if (!this.runs.has(key)) this.runs.set(key, { running: 0, started: 0, shown: 0 });
+    return this.runs.get(key);
+  }
+
   // Starts a scan of machine `on` unless one is already running, and says
   // whether it started. It may be called from render: the work begins after
   // the frame. The result redraws by itself; a caller outside render redraws
@@ -236,20 +296,49 @@ class MachineData {
     const state = this.state(on);
     if (state.loading) return false;
     state.loading = true;
+    this.run(on).running++;
     cx.spawn(async (cx) => {
       await cx.sleep(0);
-      try {
-        const r = await machine.scan(on);
-        if (r.ok) Object.assign(state, { scan: r.scan, skills: r.skills, error: null, at: Date.now() });
-        else this.failed(on, state, r.error);
-      } catch (error) {
-        this.failed(on, state, String(error?.message ?? error));
-      } finally {
-        state.loading = false;
-        cx.notify();
-      }
+      await this.load(on, true);
+      cx.notify();
     });
     return true;
+  }
+
+  // Scans machine `on` now and keeps the result unless a scan that started
+  // later has already been kept. Never rejects. `counted`: scan() has already
+  // counted it as running.
+  async load(on, counted = false) {
+    const state = this.state(on);
+    const run = this.run(on);
+    if (!counted) run.running++;
+    state.loading = true;
+    const seq = ++run.started;
+    try {
+      let r;
+      try {
+        r = await machine.scan(on);
+      } catch (error) {
+        r = { ok: false, error: errorText(error) };
+      }
+      if (seq > run.shown) {
+        run.shown = seq;
+        if (r.ok) Object.assign(state, { scan: r.scan, skills: r.skills, error: null, at: Date.now() });
+        else this.failed(on, state, r.error);
+      }
+    } finally {
+      run.running--;
+      state.loading = run.running > 0;
+    }
+  }
+
+  // For the request loop (requests.js `scanOf`): the machine's latest good
+  // scan as { scan, skills }, scanning first when there is none, or now when
+  // `fresh` (after a change); { error } while no scan has worked.
+  async latest(on, fresh) {
+    const state = this.state(on);
+    if (fresh || !state.skills) await this.load(on);
+    return state.skills ? { scan: state.scan, skills: state.skills } : { error: state.error || "No answer" };
   }
 
   // A failed scan keeps the last good result. When there was one, the failure
@@ -266,7 +355,7 @@ class MachineData {
   }
 }
 
-// ---- Panel: the frame and the timers ----
+// ---- Panel: the frame, the timers and the request loop ----
 
 const TABS = [
   ["installed", "Installed"],
@@ -276,6 +365,11 @@ const TABS = [
 const SCAN_EVERY_MS = 30000;
 const TICK_MS = 1000;
 
+// The ids of requests a copy of this build has taken. Copies of one build
+// share module state, so a second panel copy (mod.open puts one anywhere)
+// never runs a request the first one took.
+const takenRequests = new Set();
+
 class Panel {
   init(cx) {
     this.tab = "installed";
@@ -283,6 +377,9 @@ class Panel {
     this.viewedKey = undefined; // the machine the last frame showed
     this.wasHidden = false;
     this.drawn = null; // the clock-driven parts the last frame showed (clockRegions)
+    // Only the panel listens: a request posted before this copy started is
+    // never run (channel.listen).
+    this.next = channel.listen();
     const select = (tab, cx) => this.select(tab, cx);
     const rescan = (on, cx) => this.data.scan(on, cx);
     this.views = { installed: new InstalledTab(select, rescan), discover: new DiscoverTab(), machines: new MachinesTab() };
@@ -291,6 +388,25 @@ class Panel {
       if (this.data.scan(viewedMachine(), cx)) cx.notify();
     });
     cx.timer.every(TICK_MS, (cx) => this.tick(cx));
+  }
+
+  // Runs the request a dialog posted, if there is a new one. Called at the top
+  // of every frame (a post re-renders every mod) and by the 1 s tick, which
+  // keeps running while the panel is hidden, so a request is never left
+  // waiting for the panel to show. The work starts after the frame; once
+  // started it runs to the end even if the panel hides or the dialog closes.
+  pump(cx) {
+    const req = this.next();
+    if (!req || takenRequests.has(req.id)) return;
+    takenRequests.add(req.id);
+    cx.spawn(async (cx) => {
+      await cx.sleep(0);
+      try {
+        await runRequest(req, { channel, machine, scanOf: (on, fresh) => this.data.latest(on, fresh) });
+      } finally {
+        if (!panelHidden()) cx.notify();
+      }
+    });
   }
 
   // At the top of every frame: a change of the viewed machine, or the panel
@@ -308,11 +424,13 @@ class Panel {
     }
   }
 
-  // Every second: while the panel is hidden, only note that it is (so showing
-  // it again rescans). While it shows, redraw only when a part that changes
-  // with the clock alone ("checked 10s ago", a notice running out) would read
-  // differently from the last frame.
+  // Every second: pick up a request (also while hidden: see pump). While the
+  // panel is hidden, only note that it is (so showing it again rescans).
+  // While it shows, redraw only when a part that changes with the clock alone
+  // ("checked 10s ago", a notice running out) would read differently from the
+  // last frame.
   tick(cx) {
+    this.pump(cx);
     if (panelHidden()) {
       this.wasHidden = true;
       return;
@@ -334,6 +452,7 @@ class Panel {
   render(cx) {
     const t = theme();
     const ts = textSizes();
+    this.pump(cx);
     const on = viewedMachine();
     this.watch(on, cx);
     const state = this.data.state(on);
@@ -407,25 +526,7 @@ class Panel {
       .border_b(1)
       .border_color(t.border)
       .children(
-        TABS.map(([id, label]) => {
-          const active = this.tab === id;
-          return div()
-            .id(`sg-tab-${id}`)
-            .h(SIZE.tab)
-            .px(10)
-            .flex()
-            .items_center()
-            .rounded(7)
-            .border_1()
-            .border_color(active ? t.border : t.background)
-            .bg(active ? t.raised : t.background)
-            .text_size(ts.small)
-            .text_color(active ? t.foreground : t.muted)
-            .cursor_pointer()
-            .hover((s) => s.bg(t.hover).text_color(t.foreground))
-            .on_click((_e, cx) => this.select(id, cx))
-            .child(label);
-        }),
+        TABS.map(([id, label]) => tabButton(`sg-tab-${id}`, label, this.tab === id, (_e, cx) => this.select(id, cx), t, ts)),
       );
   }
 
@@ -724,31 +825,388 @@ class MachinesTab {
   }
 }
 
-// ---- Skill dialog (its content arrives with the skill view) ----
+// ---- Skill dialog: one skill's document and tools, and delete ----
+//
+// It reads for itself: a scan of its machine when it opens and again whenever
+// the machine's revision changes (a request finished), and SKILL.md once. A
+// skill that is gone after a scan closes the dialog. Its switches and its
+// delete button post requests; they are disabled while the machine is busy or
+// a request it sent has no outcome yet (requestPending).
+
+const DIALOG_TABS = [
+  ["document", "Document"],
+  ["tools", "Tools"],
+];
+const ARM_MS = 4000; // how long the delete button stays armed
 
 class SkillDialog {
-  init() {}
+  init(cx) {
+    const p = props() ?? {};
+    this.on = typeof p.on === "string" && p.on ? p.on : null; // null: this computer
+    this.key = typeof p.key === "string" ? p.key : "";
+    this.overlay = p.overlay;
+    this.tab = "document";
+    this.scan = null; // the latest good scan of the machine
+    this.skill = null; // the skill in that scan
+    this.error = null; // why the first scan failed
+    this.doc = null; // skillDocument(...) once SKILL.md is read
+    this.docStarted = false;
+    this.programs = null; // knownAgents(), for the tool marks; [] if it failed
+    this.rev = channel.rev(this.on); // the revision the latest read was asked at
+    this.readRev = -1; // the revision the latest finished read began at
+    this.reading = false;
+    this.again = false; // a read was asked for while one ran
+    this.sent = null; // the last request sent: { tool?, on?, rev, at }
+    this.armed = false;
+    this.arms = 0; // which arming the delete button's timer belongs to
+    this.closed = false;
+    this.handle = cx.focus_handle();
+    this.handle.focus();
+    this.read(cx);
+    cx.spawn(async (cx) => {
+      let list = null;
+      try {
+        list = await knownAgents(); // this computer: the icons are its files
+      } catch {
+        // the two-letter badges stay
+      }
+      this.programs = Array.isArray(list) ? list : [];
+      if (!this.closed) cx.notify();
+    });
+  }
 
-  render() {
+  close() {
+    if (this.closed) return;
+    this.closed = true;
+    closeOverlay(this.overlay);
+  }
+
+  // Scans the machine and finds the skill again; asked for while a read runs,
+  // it reads once more after it. It may be called from render: the work
+  // begins after the frame.
+  read(cx) {
+    if (this.reading) {
+      this.again = true;
+      return;
+    }
+    this.reading = true;
+    cx.spawn(async (cx) => {
+      await cx.sleep(0);
+      do {
+        this.again = false;
+        const rev = this.rev;
+        let r;
+        try {
+          r = await machine.scan(this.on);
+        } catch (error) {
+          r = { ok: false, error: errorText(error) };
+        }
+        if (this.closed) return;
+        if (r.ok) {
+          const skill = r.skills.find((s) => s.key === this.key);
+          if (!skill) return this.close();
+          this.scan = r.scan;
+          this.skill = skill;
+          this.error = null;
+        } else if (!this.skill) {
+          this.error = r.error;
+        }
+        this.readRev = rev;
+      } while (this.again);
+      this.reading = false;
+      cx.notify();
+      if (this.skill && !this.docStarted) {
+        this.docStarted = true;
+        this.doc = await this.readDocument(this.skill);
+        if (!this.closed) cx.notify();
+      }
+    });
+  }
+
+  async readDocument(skill) {
+    try {
+      return skillDocument({ text: await readText(skill.real + "/SKILL.md", this.on) });
+    } catch (error) {
+      return skillDocument({ error: errorText(error) });
+    }
+  }
+
+  pending() {
+    return requestPending(this.sent, {
+      rev: channel.rev(this.on),
+      readRev: this.readRev,
+      notice: channel.notice(),
+      busy: channel.busyAt(this.on),
+      now: Date.now(),
+    });
+  }
+
+  // Hands a request to the panel. `wanted` is how the switch should look
+  // until the outcome is read.
+  send(request, wanted = {}) {
+    this.sent = { ...wanted, rev: channel.rev(this.on), at: Date.now() };
+    channel.request(request);
+  }
+
+  toggle(tool, on) {
+    if (channel.busyAt(this.on) || this.pending()) return;
+    this.send({ op: on ? "link" : "unlink", on: this.on, key: this.key, tool }, { tool, on });
+  }
+
+  // The first click arms the button for ARM_MS; a second click in that time
+  // asks the panel to delete the skill.
+  deleteClicked(cx) {
+    if (channel.busyAt(this.on) || this.pending()) return;
+    const arm = ++this.arms;
+    if (!this.armed) {
+      this.armed = true;
+      cx.timer.after(ARM_MS, (cx) => {
+        if (this.closed || this.arms !== arm) return;
+        this.armed = false;
+        cx.notify();
+      });
+    } else {
+      this.armed = false;
+      this.send({ op: "remove", on: this.on, key: this.key });
+    }
+    cx.notify();
+  }
+
+  key(e, cx) {
+    if (e.key !== "escape") return;
+    this.close();
+    cx.stop_propagation();
+  }
+
+  render(cx) {
     const t = theme();
-    return v_flex()
+    const ts = textSizes();
+    const rev = channel.rev(this.on);
+    if (rev !== this.rev) {
+      this.rev = rev;
+      this.read(cx);
+    }
+    const card = v_flex()
       .id("sg-skill")
+      .track_focus(this.handle)
+      .on_key_down((e, cx) => this.key(e, cx))
       .size_full()
+      .min_h(0)
       .rounded(12)
       .overflow_hidden()
       .border_1()
       .border_color(t.border)
       .bg(t.popover)
       .text_color(t.foreground)
+      .text_size(ts.base);
+    const skill = this.skill;
+    if (!skill) {
+      const text = this.error ? cantCheckText(this.on, this.error) : "Loading…";
+      return card
+        .child(this.header(null, t, ts))
+        .child(div().flex_1().min_h(0).flex().items_center().justify_center().p(24).text_color(t.muted).child(text))
+        .child(this.footer(null, false, t, ts));
+    }
+    const waiting = this.pending();
+    const locked = waiting || channel.busyAt(this.on);
+    return card
+      .child(this.header(skill, t, ts))
+      .child(this.tabBar(skill, t, ts))
+      .child(this.tab === "tools" ? this.toolsTab(skill, waiting ? this.sent : null, locked, t, ts) : this.documentTab(skill, t, ts))
+      .child(this.footer(skill, locked, t, ts));
+  }
+
+  // The name, the folder as ~/..., and the machine.
+  header(skill, t, ts) {
+    const place = h_flex().min_w(0).gap(6).text_size(ts.small).text_color(t.muted);
+    return h_flex()
+      .h(SIZE.dialogHeader)
+      .flex_none()
+      .pl(20)
+      .pr(12)
+      .gap(12)
+      .items_center()
+      .border_b(1)
+      .border_color(t.border)
+      .child(
+        v_flex()
+          .flex_1()
+          .min_w(0)
+          .gap(3)
+          .when(Boolean(skill), (el) => el.child(div().truncate().text_size(ts.title).font_semibold().child(skill.name)))
+          .child(
+            place
+              .when(Boolean(skill), (el) =>
+                el
+                  .child(div().min_w(0).truncate().child(shortPath(skill.real, this.scan.home)))
+                  .child(div().flex_none().text_color(t.dim).child("·")),
+              )
+              .child(div().flex_none().child(machineLabel(this.on))),
+          ),
+      )
+      .child(iconButton("sg-skill-close", "close", () => this.close(), t));
+  }
+
+  tabBar(skill, t, ts) {
+    const label = (id, text) => (id === "tools" ? `${text} ${skill.tools.length}` : text);
+    return h_flex()
+      .h(SIZE.tabs)
+      .flex_none()
+      .px(14)
+      .gap(2)
+      .items_center()
+      .border_b(1)
+      .border_color(t.border)
+      .children(
+        DIALOG_TABS.map(([id, text]) =>
+          tabButton(`sg-skill-tab-${id}`, label(id, text), this.tab === id, (_e, cx) => {
+            this.tab = id;
+            cx.notify();
+          }, t, ts),
+        ),
+      );
+  }
+
+  // The description, then SKILL.md rendered without its frontmatter.
+  documentTab(skill, t, ts) {
+    const doc = this.doc;
+    const body = v_flex()
+      .id("sg-skill-doc")
+      .absolute()
+      .inset_0()
+      .overflow_y_scroll()
+      .px(20)
+      .py(16)
+      .gap(14)
+      .when(Boolean(skill.description), (el) => el.child(div().text_color(t.muted).child(skill.description)))
+      .when(!doc, (el) => el.child(div().text_color(t.dim).child("Loading…")))
+      .when(Boolean(doc?.message), (el) => el.child(div().text_size(ts.small).text_color(t.muted).child(doc.message)))
+      .when(Boolean(doc?.body), (el) => el.child(TextView.markdown("sg-skill-md", doc.body).selectable(true)));
+    return div().flex_1().min_h(0).relative().child(body).child(Scrollbar.vertical("sg-skill-doc").absolute().inset_0());
+  }
+
+  toolsTab(skill, wanted, locked, t, ts) {
+    const note = toolsNote(this.scan, skill);
+    const list = v_flex()
+      .id("sg-skill-tools")
+      .absolute()
+      .inset_0()
+      .overflow_y_scroll()
+      .px(12)
+      .py(10)
+      .gap(2)
+      .when(Boolean(note), (el) =>
+        el.child(
+          div().flex_none().mx(8).mb(8).p(12).rounded(8).border_1().border_color(t.border).bg(t.raised).text_size(ts.small).text_color(t.muted).child(note),
+        ),
+      )
+      .children(toolRows(this.scan, skill, wanted).map((row) => this.toolRow(row, locked, t, ts)));
+    return div().flex_1().min_h(0).relative().child(list).child(Scrollbar.vertical("sg-skill-tools").absolute().inset_0());
+  }
+
+  toolRow(row, locked, t, ts) {
+    return h_flex()
+      .id(`sg-skill-tool-${row.name}`)
+      .h(SIZE.toolRow)
+      .flex_none()
+      .px(10)
+      .gap(12)
+      .items_center()
+      .rounded(8)
+      .child(this.mark(row, t, ts))
+      .child(div().flex_1().min_w(0).truncate().child(row.label))
+      .when(row.control === "switch", (el) => el.child(this.switchFor(row, locked, t)))
+      .when(row.control === "shared", (el) => el.child(div().flex_none().text_size(ts.small).text_color(t.muted).child("Shared copy")))
+      .when(row.control === "none" && row.on, (el) => el.child(svg(icon("check")).size(SIZE.icon).flex_none().text_color(t.muted)));
+  }
+
+  // Herdr's own mark for the tool's program, else its two-letter badge.
+  mark(row, t, ts) {
+    const box = div().size(SIZE.markBox).flex_none().flex().items_center().justify_center();
+    const mark = toolMark(this.programs, row.program);
+    if (mark) {
+      return box.child(
+        mark.tint ? svg(mark.icon).size(SIZE.toolMark).text_color(t.foreground) : image(mark.icon).w(SIZE.toolMark).h(SIZE.toolMark),
+      );
+    }
+    return box
+      .rounded(6)
+      .border_1()
+      .border_color(t.border)
+      .bg(t.raised)
+      .text_size(ts.micro)
+      .font_semibold()
+      .text_color(t.muted)
+      .child(row.shortCode);
+  }
+
+  switchFor(row, locked, t) {
+    return Switch.new(`sg-skill-switch-${row.name}`)
+      .checked(row.on)
+      .disabled(locked)
+      .on_change((checked) => this.toggle(row.name, checked))
+      .w(SIZE.switchWidth)
+      .h(SIZE.switchHeight)
+      .flex_none()
+      .flex()
+      .items_center()
+      .p(2)
+      .rounded_full()
+      .bg(row.on ? t.accent : t.hover)
+      .when(row.on, (el) => el.justify_end())
+      .when(locked, (el) => el.opacity(0.5))
+      .when(!locked, (el) => el.cursor_pointer())
+      .child(div().size(SIZE.knob).rounded_full().bg(row.on ? t.accent_foreground : t.muted));
+  }
+
+  // Delete at the left, the machine's running work in the middle, Done at the right.
+  footer(skill, locked, t, ts) {
+    const busy = channel.textAt(this.on);
+    return h_flex()
+      .h(SIZE.dialogFooter)
+      .flex_none()
+      .px(16)
+      .gap(12)
+      .items_center()
+      .border_t(1)
+      .border_color(t.border)
+      .when(Boolean(skill), (el) => el.child(this.deleteButton(skill, locked, t, ts)))
       .child(
         h_flex()
-          .h(SIZE.header)
-          .flex_none()
-          .px(10)
+          .flex_1()
+          .min_w(0)
+          .gap(8)
           .items_center()
-          .justify_end()
-          .child(iconButton("sg-skill-close", "close", () => closeOverlay(props().overlay), t)),
-      );
+          .text_size(ts.small)
+          .text_color(t.muted)
+          .when(Boolean(busy), (el) =>
+            el
+              .child(svg(icon("refresh")).size(SIZE.smallIcon).flex_none().text_color(t.working).spin(900))
+              .child(div().min_w(0).truncate().child(busy)),
+          ),
+      )
+      .child(button("sg-skill-done", "Done", () => this.close(), t, ts, true));
+  }
+
+  deleteButton(skill, locked, t, ts) {
+    const armed = this.armed && !locked;
+    return h_flex()
+      .id("sg-skill-delete")
+      .h(SIZE.button)
+      .px(12)
+      .gap(6)
+      .flex_none()
+      .items_center()
+      .rounded(8)
+      .border_1()
+      .border_color(armed ? t.ansi1 : t.input)
+      .bg(armed ? t.ansi1 : t.raised)
+      .text_size(ts.small)
+      .text_color(armed ? t.background : t.ansi1)
+      .when(locked, (el) => el.opacity(0.5))
+      .when(!locked, (el) => el.cursor_pointer().hover((s) => s.opacity(0.88)).on_click((_e, cx) => this.deleteClicked(cx)))
+      .child(svg(icon("trash")).size(SIZE.smallIcon).flex_none())
+      .child(deleteLabel(skill, armed));
   }
 }
 

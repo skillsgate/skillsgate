@@ -184,9 +184,11 @@ exit 0
 //     start with "." or "-". So `rm -rf` below can only reach a direct child of
 //     the store.
 // Where the skill is looked for, first match wins: skills/<id>,
-// skills/.curated/<id>, skills/.experimental/<id>, <id>, the repo root (each
-// must hold SKILL.md and stay inside the clone), then any <dir>/<id>/SKILL.md,
-// then any SKILL.md whose frontmatter has `name: <id>`.
+// skills/.curated/<id>, skills/.experimental/<id>, <id>, then any
+// <dir>/<id>/SKILL.md, then any SKILL.md whose frontmatter has `name: <id>`,
+// and last the repo root (a single-skill repository). Every route resolves the
+// folder with pwd -P and requires it to be the clone or inside it before it
+// reads or copies anything; a folder name with a newline cannot steer it out.
 // The copy is made in `<store>/.skillsgate-new.<folder name>`, checked, and only
 // then does it replace `<dest>`. That name is hidden (a scan skips it) and no
 // valid folder name starts with ".", so it never equals a real skill's folder.
@@ -237,23 +239,40 @@ if ! git clone -q --depth 1 -- "$url" "$repo" >/dev/null 2>&1; then
 fi
 root=$(cd -P -- "$repo" && pwd -P) || exit 1
 
+# inside <dir>: sets here to the real path of <dir>, and only when that is the
+# clone itself or a folder inside it. Every route below goes through it before
+# anything is read or copied.
+inside() {
+  here=$(cd -P -- "$1" 2>/dev/null && pwd -P) || return 1
+  case "$here" in "$root"|"$root"/*) return 0 ;; esac
+  return 1
+}
+# try <dir>: sets src when <dir> is inside the clone and holds SKILL.md.
+try() {
+  inside "$1" || return 1
+  [ -f "$here/SKILL.md" ] || return 1
+  src=$here
+  return 0
+}
+
 src=
-for cand in "$root/skills/$id" "$root/skills/.curated/$id" "$root/skills/.experimental/$id" "$root/$id" "$root"; do
-  [ -f "$cand/SKILL.md" ] || continue
-  here=$(cd -P -- "$cand" 2>/dev/null && pwd -P) || continue
-  case "$here" in "$root"|"$root"/*) src=$here; break ;; esac
+for cand in "$root/skills/$id" "$root/skills/.curated/$id" "$root/skills/.experimental/$id" "$root/$id"; do
+  if try "$cand"; then break; fi
 done
+# Every SKILL.md in the clone, one path per line. A folder name that holds a
+# newline splits one path into several lines, so only lines of the form
+# ./<dir>/SKILL.md are used, and each is checked by inside as well.
+(cd -- "$root" && find . -path ./.git -prune -o -type f -name SKILL.md -print | sort) > "$tmp/list" || exit 1
 if [ -z "$src" ]; then
-  found=$(cd -- "$root" && find . -path ./.git -prune -o -type f -path "*/$id/SKILL.md" -print | sort | head -n 1)
-  if [ -n "$found" ]; then
-    rel=$(printf '%s\n' "$found" | sed 's|^\./||; s|/SKILL\.md$||')
-    src="$root/$rel"
-  fi
+  while IFS= read -r f; do
+    case "$f" in ./*/"$id"/SKILL.md) ;; *) continue ;; esac
+    if try "$root/$(dirname -- "$f")"; then break; fi
+  done < "$tmp/list"
 fi
 if [ -z "$src" ]; then
-  (cd -- "$root" && find . -path ./.git -prune -o -type f -name SKILL.md -print | sort) > "$tmp/list" || exit 1
   while IFS= read -r f; do
-    rel=$(printf '%s\n' "$f" | sed 's|^\./||; s|/SKILL\.md$||')
+    case "$f" in ./*/SKILL.md) ;; *) continue ;; esac
+    inside "$root/$(dirname -- "$f")" || continue
     if SG_ID="$id" awk '
       BEGIN { sq = sprintf("%c", 39) }
       NR == 1 && $0 !~ /^---[ \r]*$/ { exit }
@@ -269,12 +288,14 @@ if [ -z "$src" ]; then
       }
       NR >= 80 { exit }
       END { exit ok ? 0 : 1 }
-    ' "$root/$rel/SKILL.md" 2>/dev/null; then
-      src="$root/$rel"
+    ' "$here/SKILL.md" 2>/dev/null; then
+      src=$here
       break
     fi
   done < "$tmp/list"
 fi
+# The repo root is the last resort, for a repository that is a single skill.
+if [ -z "$src" ]; then try "$root" || :; fi
 if [ -z "$src" ]; then
   printf 'Skill not found\n' >&2
   exit 5

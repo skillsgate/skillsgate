@@ -14,13 +14,31 @@ const NOW = "2026-11-15T10:00:00.000Z";
 describe("install", { skip: hasGit ? false : "git is not installed on this computer" }, () => {
   let root;
   let repo;
+  let gitHome;
+
+  // Builds a repo from `{ "relative/path": "text" }` (a name may hold newlines)
+  // with an environment that never reads the maintainer's own git configuration.
+  let repoCount = 0;
+  function buildRepo(files) {
+    const dir = path.join(root, `repo-${++repoCount}`);
+    for (const [rel, text] of Object.entries(files)) {
+      fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+      fs.writeFileSync(path.join(dir, rel), text);
+    }
+    const env = { PATH: process.env.PATH, HOME: gitHome, GIT_CONFIG_NOSYSTEM: "1" };
+    const git = (...args) => execFileSync("git", args, { cwd: dir, env, stdio: "pipe" });
+    git("init", "-q", "-b", "main");
+    git("add", "-A");
+    git("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "init");
+    return dir;
+  }
 
   // A fixture repo built with an environment that never reads the maintainer's
   // own git configuration.
   before(() => {
     root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "sg repo.")));
     repo = path.join(root, "acme skills");
-    const gitHome = path.join(root, "git-home");
+    gitHome = path.join(root, "git-home");
     fs.mkdirSync(gitHome);
     const put = (rel, text) => {
       fs.mkdirSync(path.dirname(path.join(repo, rel)), { recursive: true });
@@ -95,6 +113,74 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
     assert.deepEqual(await m.install(null, r.scan, installed("gamma")), { ok: true, folder: "gamma" });
     assert.equal(exists(h.path(".agents/skills/gamma/SKILL.md")), true);
     assert.equal(lockOf(h).skills.gamma.source, SOURCE);
+  });
+  const walk = (dir) =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => [e.name, ...(e.isDirectory() ? walk(path.join(dir, e.name)) : [])]);
+  const fromRepo = (dir) => ({ url: "file://" + dir });
+
+  // Folder names with newlines make `find` print `../..` as a line of its own.
+  const HOSTILE = "a\n../..\nb/alpha/SKILL.md";
+  async function hostileInstall(files) {
+    const s = await setup({ ".agents/skills/other/SKILL.md": SKILL("other") }, fromRepo(buildRepo({ [HOSTILE]: SKILL("alpha"), ...files })));
+    // Outside the clone: a SKILL.md and a private file in TMPDIR itself.
+    fs.writeFileSync(path.join(s.tmp, "SKILL.md"), SKILL("planted"));
+    fs.writeFileSync(path.join(s.tmp, "private.txt"), "private");
+    const result = await s.m.install(null, s.r.scan, installed("alpha"));
+    const inStore = walk(s.h.path(".agents/skills"));
+    assert.equal(inStore.includes("private.txt"), false);
+    assert.equal(inStore.some((n) => n.startsWith("skillsgate-herdr.")), false);
+    assert.deepEqual(s.leftovers(), []);
+    return { ...s, result };
+  }
+  it("install never copies from outside the clone when a path with newlines points there", async () => {
+    const { h, result } = await hostileInstall({});
+    assert.deepEqual(result, { ok: false, error: 'Could not find "alpha" in acme/skills' });
+    assert.deepEqual(fs.readdirSync(h.path(".agents/skills")), ["other"]);
+    assert.equal(exists(h.path(".agents/.skill-lock.json")), false);
+  });
+  it("install takes the real skill from a repo that also holds a path with newlines", async () => {
+    const { h, result } = await hostileInstall({ "legit/deep/alpha/SKILL.md": SKILL("alpha"), "legit/deep/alpha/mine.txt": "mine" });
+    assert.deepEqual(result, { ok: true, folder: "alpha" });
+    assert.equal(read(h.path(".agents/skills/alpha/mine.txt")), "mine");
+    assert.deepEqual(fs.readdirSync(h.path(".agents/skills")).sort(), ["alpha", "other"]);
+  });
+  it("install tries skills/.curated and skills/.experimental", async () => {
+    const dir = buildRepo({
+      "skills/.curated/cur/SKILL.md": SKILL("cur"),
+      "skills/.curated/cur/c.txt": "c",
+      "skills/.experimental/exp/SKILL.md": SKILL("exp"),
+      "skills/.experimental/exp/e.txt": "e",
+    });
+    const { h, m, r } = await setup({}, fromRepo(dir));
+    assert.deepEqual(await m.install(null, r.scan, installed("cur")), { ok: true, folder: "cur" });
+    assert.deepEqual(await m.install(null, r.scan, installed("exp")), { ok: true, folder: "exp" });
+    assert.equal(read(h.path(".agents/skills/cur/c.txt")), "c");
+    assert.equal(read(h.path(".agents/skills/exp/e.txt")), "e");
+  });
+  it("install finds <dir>/<id>/SKILL.md even when its frontmatter name differs", async () => {
+    const dir = buildRepo({ "deep/dir/delta/SKILL.md": SKILL("not-delta"), "deep/dir/delta/d.txt": "d" });
+    const { h, m, r } = await setup({}, fromRepo(dir));
+    assert.deepEqual(await m.install(null, r.scan, installed("delta")), { ok: true, folder: "delta" });
+    assert.equal(read(h.path(".agents/skills/delta/d.txt")), "d");
+  });
+  it("install prefers a skill in the repo over the repo's root SKILL.md", async () => {
+    const dir = buildRepo({
+      "SKILL.md": SKILL("rootskill"),
+      "ROOT_MARKER.txt": "root",
+      "plugins/x/skills/pdf/SKILL.md": SKILL("pdf"),
+      "plugins/x/skills/pdf/nested.txt": "nested",
+    });
+    const { h, m, r } = await setup({}, fromRepo(dir));
+    assert.deepEqual(await m.install(null, r.scan, installed("pdf")), { ok: true, folder: "pdf" });
+    assert.equal(read(h.path(".agents/skills/pdf/nested.txt")), "nested");
+    assert.equal(exists(h.path(".agents/skills/pdf/ROOT_MARKER.txt")), false);
+  });
+  it("install falls back to the repo's root SKILL.md in a single-skill repo", async () => {
+    const dir = buildRepo({ "SKILL.md": SKILL("rootskill"), "ROOT_MARKER.txt": "root" });
+    const { h, m, r } = await setup({}, fromRepo(dir));
+    assert.deepEqual(await m.install(null, r.scan, installed("whatever")), { ok: true, folder: "whatever" });
+    assert.equal(read(h.path(".agents/skills/whatever/ROOT_MARKER.txt")), "root");
+    assert.equal(exists(h.path(".agents/skills/whatever/.git")), false);
   });
   it("install copies a skill folder that is a symlink in the repo as a real folder", async () => {
     const { h, m, r } = await setup();

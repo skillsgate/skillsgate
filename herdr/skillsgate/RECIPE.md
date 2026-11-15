@@ -52,7 +52,7 @@ All sizes are in px at zoom 1; Herdr applies the person's zoom. All colors are H
 
 The mod shows no agent status and reacts to none.
 
-**Show and hide.** The button runs `layout.toggle` and the header's close button runs `layout.hide`, both on the layout node `skillsgate-panel`. Whether the node is hidden belongs to the layout, so it survives a switch of space and a restart. A hidden panel starts no scan, search or timer work.
+**Show and hide.** The button runs `layout.toggle` and the header's close button runs `layout.hide`, both on the layout node `skillsgate-panel`. Whether the node is hidden belongs to the layout, so it survives a switch of space. A hidden panel starts no scan, search or timer work.
 
 **Which machine is viewed.** By default the panel follows the shown space: it views the machine that space lives on (this computer, or a machine Herdr reaches over SSH). A click on a card on the Machines tab views that machine and opens Installed; following stays off until "Follow the shown space" is switched back on. Switching it off keeps viewing the machine shown at that moment. The choice is kept in Herdr's shared store.
 
@@ -153,7 +153,7 @@ The mod is a piece for the person's own window; it adds two layout nodes and doe
 6. Keep the panel's column out of the per-space `panel` stack (the column whose children are the Files and Changes blocks). The stack shows one child at a time and is hidden per space, which would make the SkillsGate panel come and go with the space. The panel needs its own column node so `layout.show`, `layout.hide` and `layout.toggle` can address it by id.
 7. Copy `mods/skillsgate/` to `~/.config/herdr-app/mods/skillsgate`, leaving the recipe and the preview out. If that name is taken, rename the folder and the `mod` names in the two nodes. Run `herdr-app check` on the folder.
 
-The working example is a clone of Herdr's `main` layout in which the toggle is the second child of the `tabs-row` row (after `tabs`, which has weight 1) and the panel is the last child of `work-body`, after Herdr's own `panel` column. Herdr's own `panel` column carries `"hidden": true`; the same field on `skillsgate-panel` would start it closed.
+The working example is a clone of Herdr's `main` layout in which the toggle is the second child of the `tabs-row` row (after `tabs`, which has weight 1) and the panel is the last child of `work-body`, after Herdr's own `panel` column. The nodes carry no `hidden` field: the panel shows when they are added, the button or the header's close button hides it, and Herdr keeps that state.
 
 ### What it calls
 

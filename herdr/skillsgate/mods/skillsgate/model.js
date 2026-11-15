@@ -103,3 +103,24 @@ export function buildSkills(scan) {
   skills.sort((a, b) => (lower(a) < lower(b) ? -1 : lower(a) > lower(b) ? 1 : a.real < b.real ? -1 : a.real > b.real ? 1 : 0));
   return skills;
 }
+
+// Same rule as the desktop app: lower case, every run outside [a-z0-9._]
+// becomes one "-", and leading and trailing "-" are trimmed.
+export function sanitizeName(name) {
+  return String(name ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9._]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+// The relative path that leads from folder `fromDir` to `toPath`; both absolute
+// and already real. A symlink made with it keeps working if the home moves.
+export function relativePath(fromDir, toPath) {
+  const from = fromDir.split("/").filter(Boolean);
+  const to = toPath.split("/").filter(Boolean);
+  let shared = 0;
+  while (shared < from.length && shared < to.length && from[shared] === to[shared]) shared++;
+  return [...from.slice(shared).map(() => ".."), ...to.slice(shared)].join("/");
+}
+
+export const toolByName = (tools, name) => tools.find((tool) => tool.name === name);

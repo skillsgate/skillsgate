@@ -1,21 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createMachine } from "../skillsgate/mods/skillsgate/machine.js";
-import { makeHome } from "./helpers.mjs";
+import { FIXTURE, makeHome } from "./helpers.mjs";
 
-const SKILL = (name) => `---\nname: ${name}\ndescription: About ${name}\n---\nBody\n`;
-const FIXTURE = {
-  ".agents/skills/alpha/SKILL.md": SKILL("alpha"),
-  ".agents/skills/it's odd name/SKILL.md": SKILL("odd"),
-  ".claude/skills/alpha": { link: "../../.agents/skills/alpha" },
-  ".claude/skills/solo/SKILL.md": SKILL("solo"),
-  ".claude/skills/group/nested/SKILL.md": SKILL("nested"),
-  ".claude/skills/broken": { link: "../nowhere" },
-  ".claude/skills/notes/readme.txt": "not a skill",
-  ".codex/config.toml": "",
-  "ext/outside/SKILL.md": SKILL("outside"),
-  ".cursor/skills/outside": { link: "../../ext/outside" },
-};
 test("scan finds tools and skills", async () => {
   const h = makeHome(FIXTURE), m = createMachine(h);
   const r = await m.scan(null);

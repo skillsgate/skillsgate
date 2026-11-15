@@ -68,7 +68,7 @@ export function createMachine({ exec, tools = TOOLS }) {
   // Deletes a skill's folder (unless it lives outside every tool folder) and
   // every link that leads to it.
   async function remove(on, scanResult, skill) {
-    let base = "";
+    let base = "-"; // no base folder: only the links go, never the folder
     if (skill.home !== "external") {
       const holding = scanResult.tools
         .map((t) => t.dir)

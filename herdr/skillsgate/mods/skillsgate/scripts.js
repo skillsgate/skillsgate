@@ -124,16 +124,21 @@ if [ -e "$entry" ]; then exit 3; fi
 exit 0
 `;
 
-// REMOVE <real path> <base folder or empty> <entry path>...
+// REMOVE <real path> <base folder, or -> <entry path>...
+// The second argument is an absolute base folder, or the single character `-`,
+// which means "no base folder". Anything else (empty, relative, any other
+// text) is refused with exit 2 before anything is changed, so the script never
+// depends on how a transport treats an empty argument.
 // Checks first, then removes the entry links, then the folder itself.
-//   - Checks (only when a base folder is given): the path is a real folder, not
-//     a link, strictly inside the base folder, and holds SKILL.md. Otherwise
-//     exit 4 and nothing is changed.
+//   - Checks (only when a base folder is given): the base folder is its own
+//     real path (never a symlink); the path is a real folder, not a link,
+//     strictly inside the base folder, and holds SKILL.md. Otherwise exit 4 and
+//     nothing is changed.
 //   - Entry links: each is removed only if it is a symlink that resolves to the
 //     real path. Anything else is left alone.
 //   - The folder: removed with rm -rf, only when a base folder was given, so
-//     only after the checks above passed. With no base folder (a skill that
-//     lives outside every tool folder) only the entry links go.
+//     only after the checks above passed. With `-` (a skill that lives outside
+//     every tool folder) only the entry links go.
 // Exit: 0 done; 2 bad arguments; 4 changed on disk.
 export const REMOVE = String.raw`unset CDPATH
 bad() { printf 'Bad arguments\n' >&2; exit 2; }
@@ -143,12 +148,13 @@ target=$1
 base=$2
 shift 2
 case "$target" in /?*) ;; *) bad ;; esac
-case "$base" in ""|/?*) ;; *) bad ;; esac
-if [ -n "$base" ]; then
+case "$base" in -|/?*) ;; *) bad ;; esac
+if [ "$base" != - ]; then
   [ ! -L "$target" ] || changed
   real=$(cd -P -- "$target" 2>/dev/null && pwd -P) || changed
   [ "$real" = "$target" ] || changed
   root=$(cd -P -- "$base" 2>/dev/null && pwd -P) || changed
+  [ "$root" = "$base" ] || changed
   case "$real" in "$root"/?*) ;; *) changed ;; esac
   [ -f "$target/SKILL.md" ] || changed
 fi
@@ -158,7 +164,7 @@ for entry in "$@"; do
   [ "$linked" = "$target" ] || continue
   rm -f -- "$entry" || exit 1
 done
-if [ -n "$base" ]; then
+if [ "$base" != - ]; then
   rm -rf -- "$target" || exit 1
 fi
 exit 0

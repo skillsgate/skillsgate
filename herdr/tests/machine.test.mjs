@@ -241,11 +241,42 @@ test("remove script refuses an empty, relative or outside path and changes nothi
 test("remove script leaves a link that points elsewhere", async () => {
   const { h } = await setup();
   const at = (rel) => `${h.home}/${rel}`;
-  const r = await h.exec(REMOVE, [at("ext/outside"), "", at(".claude/skills/alpha"), at(".cursor/skills/outside")], null, 30000);
+  const r = await h.exec(REMOVE, [at("ext/outside"), "-", at(".claude/skills/alpha"), at(".cursor/skills/outside")], null, 30000);
   assert.equal(r.code, 0);
   assert.equal(isLink(h.path(".claude/skills/alpha")), true);
   assert.equal(isLink(h.path(".cursor/skills/outside")), false);
   assert.equal(exists(h.path("ext/outside/SKILL.md")), true);
+});
+test("remove script refuses an empty second argument and changes nothing", async () => {
+  const { h } = await setup();
+  const at = (rel) => `${h.home}/${rel}`;
+  const r = await h.exec(REMOVE, [at("ext/outside"), "", at(".cursor/skills/outside")], null, 30000);
+  assert.notEqual(r.code, 0);
+  assert.equal(isLink(at(".cursor/skills/outside")), true);
+  assert.equal(exists(at("ext/outside/SKILL.md")), true);
+});
+test("remove script refuses arguments shifted as if an empty base had been dropped", async () => {
+  const { h } = await setup();
+  const at = (rel) => `${h.home}/${rel}`;
+  // $1 = the external skill, $2 = a link that leads to it.
+  const r = await h.exec(REMOVE, [at("ext/outside"), at(".cursor/skills/outside")], null, 30000);
+  assert.notEqual(r.code, 0);
+  assert.equal(isLink(at(".cursor/skills/outside")), true);
+  assert.equal(exists(at("ext/outside/SKILL.md")), true);
+});
+test("remove script refuses a base that is a link to the parent of the target", async () => {
+  const { h } = await setup();
+  const at = (rel) => `${h.home}/${rel}`;
+  fs.rmSync(at(".cursor/skills/outside"));
+  fs.symlinkSync("../../ext", at(".cursor/skills/outside")); // now leads to the parent of ext/outside
+  const r = await h.exec(REMOVE, [at("ext/outside"), at(".cursor/skills/outside")], null, 30000);
+  assert.notEqual(r.code, 0);
+  assert.equal(isLink(at(".cursor/skills/outside")), true);
+  assert.equal(exists(at("ext/outside/SKILL.md")), true);
+  // The same refusal when the link is passed as the base alongside entries.
+  const again = await h.exec(REMOVE, [at("ext/outside"), at(".cursor/skills/outside"), at(".cursor/skills/outside")], null, 30000);
+  assert.notEqual(again.code, 0);
+  assert.equal(exists(at("ext/outside/SKILL.md")), true);
 });
 test("remove script handles a name that starts with a dash and holds a newline", async () => {
   const h = makeHome({ ".agents/skills/-dash/SKILL.md": SKILL("dash"), ".agents/skills/two\nlines/SKILL.md": SKILL("two") });

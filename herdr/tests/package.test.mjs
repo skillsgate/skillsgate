@@ -33,7 +33,23 @@ test("tool folders that are not $HOME/.<name>/skills", () => {
 test("mod.json", () =>
   assert.deepEqual(JSON.parse(readFileSync(MOD + "/mod.json", "utf8")), { place: "none", title: "SkillsGate", focusable: true }));
 
-test("only main.js imports Herdr", () => {
-  for (const f of readdirSync(MOD).filter((f) => f.endsWith(".js") && f !== "main.js"))
-    assert.doesNotMatch(readFileSync(`${MOD}/${f}`, "utf8"), /from "(herdr|gpui-kit|gpui-base)"/, f);
+// Logic modules take Herdr's functions as arguments, so node --test covers
+// them. Views draw with Herdr's UI kit and may import Herdr. A new file must
+// be added to one of the two lists.
+const LOGIC = ["registry.js", "scripts.js", "model.js", "machine.js", "catalog.js", "channel.js", "requests.js"];
+const VIEWS = ["main.js", "host.js", "ui.js", "toggle.js", "panel.js", "installed-tab.js", "discover-tab.js", "machines-tab.js", "skill-dialog.js"];
+const source = (f) => readFileSync(`${MOD}/${f}`, "utf8");
+const localImports = (f) => [...source(f).matchAll(/from "\.\/([^"]+)"/g)].map((m) => m[1]);
+
+test("the logic modules import no Herdr code", () => {
+  for (const f of LOGIC) assert.doesNotMatch(source(f), /from "(herdr|gpui-kit|gpui-base)"/, f);
+});
+test("every module in the mod folder is either logic or a view", () => {
+  const files = readdirSync(MOD).filter((f) => f.endsWith(".js")).sort();
+  assert.deepEqual(files, [...LOGIC, ...VIEWS].sort());
+});
+test("logic imports only logic, and host.js and ui.js import no view", () => {
+  for (const f of LOGIC) assert.deepEqual(localImports(f).filter((i) => !LOGIC.includes(i)), [], f);
+  assert.deepEqual(localImports("host.js").filter((i) => !LOGIC.includes(i)), []);
+  assert.deepEqual(localImports("ui.js").filter((i) => !LOGIC.includes(i) && i !== "host.js"), []);
 });

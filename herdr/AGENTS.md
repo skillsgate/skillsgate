@@ -6,9 +6,9 @@ This folder holds SkillsGate for Herdr, a mod for the Herdr desktop app. The sha
 
 `mods/skillsgate/main.js` has a header comment that lists every file and what it owns. Keep it true.
 
-- **Views** draw with Herdr's UI kit and may import `herdr`, `gpui-kit` and `gpui-base`: `main.js`, `host.js`, `ui.js`, `toggle.js`, `panel.js`, `installed-tab.js`, `discover-tab.js`, `machines-tab.js`, `skill-dialog.js`, `catalog-dialog.js`. `host.js` and `ui.js` import no view.
+- **Views** draw with Herdr's UI kit and may import `herdr`, `gpui-kit` and `gpui-base`: `main.js`, `host.js`, `ui.js`, `toggle.js`, `panel.js`, `installed-tab.js`, `discover-tab.js`, `machines-tab.js`, `skill-dialog.js`, `catalog-dialog.js`. `host.js` and `ui.js` import no tab, dialog, panel or toggle file (`ui.js` imports `host.js`).
 - **Logic** never imports Herdr: `registry.js`, `scripts.js`, `model.js`, `view-model.js`, `machine.js`, `catalog.js`, `channel.js`, `requests.js`. Herdr's functions come in as arguments (built in `host.js`), so `node --test` covers them. Logic imports only logic.
-- `herdr/tests/package.test.mjs` enforces this and requires every `.js` file in the mod folder to be listed as logic or a view. A new file goes into one of the two lists there and, for a view, gets its own file.
+- `herdr/tests/package.test.mjs` enforces this and requires every `.js` file in the mod folder to be listed as logic or a view. A new file goes into one of the two lists there (`LOGIC` or `VIEWS`), and a new view is a file of its own, not an addition to an existing view.
 - Put a decision about what a view shows in `view-model.js` with a test. Keep a file under about 500 lines.
 - The tool registry (`registry.js`) is a copy of the desktop app's; a test compares it with `apps/desktop/src/main/ipc-handlers.ts`. Change both together.
 - Every shared key starts with `skillsgate.` and ends with `.v1`. The mod is called `skillsgate` and the layout nodes `skillsgate-toggle` and `skillsgate-panel`.
@@ -17,11 +17,11 @@ This folder holds SkillsGate for Herdr, a mod for the Herdr desktop app. The sha
 ## Scripts that run on a machine
 
 - Every read or write on a machine goes through `exec("sh", ["-c", script, "skillsgate", ...args], { on, timeout })` or `readTextFile(path, { on })`. Never `writeTextFile`, `fs/promises` or `watchFolder`: they work on this computer only.
-- Scripts are POSIX `sh`, in `scripts.js`. Allowed external programs: `mkdir`, `ln`, `rm`, `cp`, `mv`, `find`, `awk`, `sed`, `sort`, `head`, `dirname`, `mktemp`, `grep` and `git`. Shell builtins and parameter expansion (`${x##*/}`) are fine. No `realpath`, `readlink`, `jq`, `node`, `basename`, `tr`, `cat`, `xargs`, `ls`, `echo` or bash syntax. A real path is `$(cd -P -- "$dir" && pwd -P)`.
+- Scripts are POSIX `sh`, in `scripts.js`. The scripts use these external programs: `mkdir`, `ln`, `rm`, `cp`, `mv`, `find`, `awk`, `sort`, `head`, `dirname`, `mktemp` and `git`. `sed` and `grep` are also allowed but no script uses them now. Adding any other program means updating `RECIPE.md` and `README.md`. Shell builtins and parameter expansion (`${x##*/}`) are fine. No `realpath`, `readlink`, `jq`, `node`, `basename`, `tr`, `cat`, `xargs`, `ls`, `echo` or bash syntax. A real path is `$(cd -P -- "$dir" && pwd -P)`.
 - Values that come from a machine, the catalog or the person are passed as positional arguments (`$1`...). Only registry expressions are written into script text.
 - Scripts that run `git` first append `/opt/homebrew/bin:/usr/local/bin` to `PATH` and set `GIT_TERMINAL_PROMPT=0`.
 - `rm -rf` runs only on: a skill folder the same script has just verified (a real folder, inside the base folder passed with it, holding `SKILL.md`); a folder the script made with `mktemp -d`, named `skillsgate-herdr.*`; and an install's own folders, `<store>/.skillsgate-new.<folder>` and `<store>/<folder>`. `REMOVE`'s second argument is an absolute base folder that equals its own real path, or `-` (links only, never `rm -rf`); anything else is refused before anything changes. An install folder that is empty, `.` or `..`, contains `/`, or starts with `.` or `-` is refused in JavaScript and again in `INSTALL`.
-- A repository's symbolic links are never followed or installed.
+- An install never installs a symbolic link and never reads outside the clone: a link inside the skill is refused (exit 7), a `SKILL.md` that is a link is not used, every folder it picks must resolve inside the clone, and a skill folder that is itself a link to a folder inside the clone is copied by its content.
 - Timeouts: 30,000 ms for a scan and for each small operation, 120,000 ms for an install.
 
 ## Tests

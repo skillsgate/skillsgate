@@ -5,6 +5,7 @@ on:
     paths:
       - "apps/desktop/src/main/**"
       - "apps/desktop/tests/skill-lock*.test.ts"
+      - "apps/desktop/tests/ssh.test.ts"
       - "apps/desktop/package.json"
       - ".github/workflows/desktop-lock-tests.yml"
   push:
@@ -12,6 +13,7 @@ on:
     paths:
       - "apps/desktop/src/main/**"
       - "apps/desktop/tests/skill-lock*.test.ts"
+      - "apps/desktop/tests/ssh.test.ts"
       - "apps/desktop/package.json"
       - ".github/workflows/desktop-lock-tests.yml"
 
@@ -34,3 +36,4 @@ jobs:
         with:
           node-version: 22.23.3
       - run: npm run test:lock -w @skillsgate/desktop
+      - run: npm run test:ssh -w @skillsgate/desktop

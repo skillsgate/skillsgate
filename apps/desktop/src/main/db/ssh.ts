@@ -3,6 +3,7 @@ import os from "node:os"
 import path from "node:path"
 import fs from "node:fs"
 import crypto from "node:crypto"
+import net from "node:net"
 import type { RemoteServer } from "./servers"
 import type { RemoteServerStore } from "./servers"
 import type { RemoteSkillStore } from "./skills"
@@ -70,6 +71,71 @@ export function buildSshArgs(server: RemoteServer): string[] {
   return args
 }
 
+// ---------------------------------------------------------------------------
+// macOS local network privacy
+// ---------------------------------------------------------------------------
+
+const LOCAL_NETWORK_HINT =
+  "macOS may be blocking SkillsGate from reaching computers on your local network. " +
+  "Open System Settings > Privacy & Security > Local Network, turn on SkillsGate, then try again."
+
+function isNoRouteToHost(stderr: string): boolean {
+  return /no route to host/i.test(stderr)
+}
+
+/**
+ * On macOS 15 and later, an app needs Local Network permission to reach
+ * computers on the local network, and `ssh` processes it starts are covered
+ * by the app's setting. Without it, connections fail with "No route to host".
+ */
+export function explainSshError(
+  stderr: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const message = stderr.trim()
+  if (platform !== "darwin" || !isNoRouteToHost(message)) return message
+  return `${message}. ${LOCAL_NETWORK_HINT}`
+}
+
+const localNetworkProbes = new Map<string, Promise<void>>()
+
+/**
+ * Open a short TCP connection to the server from the app's own process.
+ * macOS may not ask for Local Network permission when only an `ssh` child
+ * process is blocked; a connection from the app itself gives it the chance to
+ * ask. The result is ignored. Runs at most once per host and port per launch.
+ */
+function probeLocalNetwork(host: string, port: number): Promise<void> {
+  const key = `${host}:${port}`
+  let probe = localNetworkProbes.get(key)
+  if (!probe) {
+    probe = new Promise<void>((resolve) => {
+      const socket = net.connect({ host, port })
+      const done = () => {
+        clearTimeout(timer)
+        socket.destroy()
+        resolve()
+      }
+      // The connection can wait while the permission alert is on screen.
+      const timer = setTimeout(done, 3_000)
+      socket.once("connect", done)
+      socket.once("error", done)
+    })
+    localNetworkProbes.set(key, probe)
+  }
+  return probe
+}
+
+async function describeSshFailure(
+  server: RemoteServer,
+  stderr: string,
+): Promise<string> {
+  if (process.platform === "darwin" && isNoRouteToHost(stderr)) {
+    await probeLocalNetwork(server.host, server.port)
+  }
+  return explainSshError(stderr)
+}
+
 export function sshExec(
   server: RemoteServer,
   command: string,
@@ -87,11 +153,14 @@ export function sshExec(
     proc.stdout.on("data", (chunk: Buffer) => stdoutChunks.push(chunk))
     proc.stderr.on("data", (chunk: Buffer) => stderrChunks.push(chunk))
 
-    proc.on("close", (code) => {
+    proc.on("close", async (code) => {
+      const exitCode = code ?? 1
+      let stderr = Buffer.concat(stderrChunks).toString("utf-8")
+      if (exitCode !== 0) stderr = await describeSshFailure(server, stderr)
       resolve({
         stdout: Buffer.concat(stdoutChunks).toString("utf-8"),
-        stderr: Buffer.concat(stderrChunks).toString("utf-8"),
-        exitCode: code ?? 1,
+        stderr,
+        exitCode,
       })
     })
 
@@ -149,11 +218,12 @@ export async function writeRemoteFile(
       reject(new Error(err.message))
     })
 
-    proc.on("close", (code) => {
+    proc.on("close", async (code) => {
       if ((code ?? 1) === 0) {
         resolve()
       } else {
-        reject(new Error(stderr.trim() || `SSH exited with code ${code ?? 1}`))
+        const message = await describeSshFailure(server, stderr)
+        reject(new Error(message || `SSH exited with code ${code ?? 1}`))
       }
     })
 
@@ -220,6 +290,13 @@ function sha256(content: string): string {
   return crypto.createHash("sha256").update(content, "utf-8").digest("hex")
 }
 
+/**
+ * Split the batched read into files. Each delimiter is written as
+ * "\n<delimiter>\n", so it always sits on its own line, even after a file with
+ * no trailing newline. The lines between two delimiters, joined back with
+ * "\n", are therefore the file's exact bytes, and contentHash matches a hash
+ * of the same file read locally.
+ */
 function parseDelimitedOutput(output: string): ScannedRemoteSkill[] {
   const skills: ScannedRemoteSkill[] = []
   let currentPath: string | null = null
@@ -233,8 +310,8 @@ function parseDelimitedOutput(output: string): ScannedRemoteSkill[] {
     ) {
       // Flush previous skill
       if (currentPath) {
-        const content = currentLines.join("\n").trim()
-        const { name, description } = parseFrontmatter(content)
+        const content = currentLines.join("\n")
+        const { name, description } = parseFrontmatter(content.trim())
         skills.push({
           name,
           description,
@@ -256,8 +333,8 @@ function parseDelimitedOutput(output: string): ScannedRemoteSkill[] {
 
   // Flush last skill
   if (currentPath) {
-    const content = currentLines.join("\n").trim()
-    const { name, description } = parseFrontmatter(content)
+    const content = currentLines.join("\n")
+    const { name, description } = parseFrontmatter(content.trim())
     skills.push({
       name,
       description,
@@ -317,7 +394,7 @@ export async function scanRemoteSkills(
     .map((p) => {
       const escaped = `'${p.replace(/'/g, "'\\''")}'`
       const delimPath = p.replace(/'/g, "'\\''")
-      return `printf '%s\\n' '${DELIMITER_PREFIX}${delimPath}${DELIMITER_SUFFIX}' && cat ${escaped}`
+      return `printf '\\n%s\\n' '${DELIMITER_PREFIX}${delimPath}${DELIMITER_SUFFIX}' && cat ${escaped}`
     })
     .join(" && ")
 
@@ -375,13 +452,14 @@ export async function uploadSkillDir(
     tarLocal.on("error", (err) => reject(err))
     tarRemote.on("error", (err) => reject(err))
 
-    tarRemote.on("close", (code) => {
+    tarRemote.on("close", async (code) => {
       if ((code ?? 1) === 0) {
         resolve()
       } else {
+        const remoteMessage = await describeSshFailure(server, remoteStderr)
         reject(
           new Error(
-            remoteStderr.trim() ||
+            remoteMessage ||
               localStderr.trim() ||
               `tar pipeline exited with code ${code ?? 1}`,
           ),

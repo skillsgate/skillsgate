@@ -23,6 +23,12 @@ mac:
     - zip
   entitlements: resources/entitlements.mac.plist
   entitlementsInherit: resources/entitlements.mac.plist
+  extendInfo:
+    # macOS 15 and later show this when asking to let SkillsGate reach
+    # computers on the local network. Servers on the local network (such as
+    # name.local) need that permission for SSH; without it ssh reports
+    # "No route to host".
+    NSLocalNetworkUsageDescription: SkillsGate connects over SSH to computers on your local network to sync your skills.
   # Builds are signed with Developer ID but not notarized. Notarization needs
   # an active Apple Developer Program membership; without one the notary
   # service answers 403 and the build fails. Set back to true once a

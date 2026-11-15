@@ -7,6 +7,7 @@ import { ManagePopover } from "../components/manage-popover"
 import {
   computeServerStatus,
   type DotColor,
+  type LinkStatusForStatus,
   type LocalSkillForStatus,
   type RemoteSkillForStatus,
 } from "../lib/server-status"
@@ -281,6 +282,9 @@ export function Servers() {
   const [manageOpenFor, setManageOpenFor] = useState<string | null>(null)
   const manageAnchorRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const [localSkills, setLocalSkills] = useState<LocalSkillForStatus[]>([])
+  const [linkStatusByServer, setLinkStatusByServer] = useState<
+    Record<string, LinkStatusForStatus | null>
+  >({})
   const [remoteSkillsByServer, setRemoteSkillsByServer] = useState<
     Record<string, RemoteSkillForStatus[]>
   >({})
@@ -315,6 +319,23 @@ export function Servers() {
       cancelled = true
     }
   }, [])
+
+  // Tool link differences per server (stored server state vs local links),
+  // refreshed whenever the server list reloads.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const statuses = await electronAPI.serversLinkStatus()
+        if (!cancelled) setLinkStatusByServer(statuses)
+      } catch {
+        // Non-fatal: the status falls back to skills only.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [servers])
 
   // Refresh per-server cached remote skills whenever the server list reloads.
   useEffect(() => {
@@ -543,6 +564,7 @@ export function Servers() {
                       server,
                       localSkills,
                       remoteSkillsByServer[server.id] ?? [],
+                      linkStatusByServer[server.id],
                     )
                     const dotClass: Record<DotColor, string> = {
                       green: "text-emerald-400",

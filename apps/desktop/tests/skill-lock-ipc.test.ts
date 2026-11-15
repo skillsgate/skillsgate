@@ -43,7 +43,9 @@ test("skill mutations preflight the lock and preserve supported entries", async 
     "./db/ssh": `export const testConnection = () => {}; export const syncRemoteServer = () => {};
       export const readRemoteFile = () => {}; export const writeRemoteFile = () => {};`,
     "./db/push": `export const planPush = () => {}; export const applyPush = () => {};
-      export const listLocalPushCandidates = async () => [];`,
+      export const listLocalPushCandidates = async () => [];
+      export const readRemoteLinkState = async () => ({ home: "", dirs: {} });
+      export const computeLinkStatuses = async () => ({});`,
     "./auto-updater": `export const checkForAppUpdates = () => {}; export const getUpdateState = () => {};
       export const quitAndInstallUpdate = () => {};`,
   }

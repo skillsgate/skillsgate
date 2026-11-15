@@ -17,6 +17,15 @@ export interface LocalSkillForStatus {
   contentHash: string
 }
 
+export interface LinkStatusForStatus {
+  /** Local tool links the remote is missing (Push adds them). */
+  toAdd: number
+  /** Remote tool links into the skills folder that no local tool has (Mirror removes them). */
+  onlyOnRemote: number
+  /** Something other than the expected link is in the way. */
+  blocked: number
+}
+
 type ServerLike = { lastSyncAt: string | null; lastSyncError: string | null }
 
 /**
@@ -25,6 +34,8 @@ type ServerLike = { lastSyncAt: string | null; lastSyncError: string | null }
  *
  * - localSkills: the local skills Push sends (listLocalPushCandidates in main)
  * - remoteSkills: the cached `remote_skills` rows for this server
+ * - links: tool link differences from the server's stored tool-folder state,
+ *   or null/undefined when it has not been read yet (skills only)
  *
  * `remoteSkills` is matched to local by folder name (the basename of the path
  * before "/SKILL.md") to tolerate "~/.agents/skills" vs "$HOME/..." differences.
@@ -33,6 +44,7 @@ export function computeServerStatus(
   server: ServerLike,
   localSkills: LocalSkillForStatus[],
   remoteSkills: RemoteSkillForStatus[],
+  links?: LinkStatusForStatus | null,
 ): ServerStatus {
   if (server.lastSyncError) {
     return { dotColor: "red", text: "sync failed" }
@@ -70,23 +82,26 @@ export function computeServerStatus(
   }
 
   const localCount = localSkills.length
+  const skills = `${localCount} skill${localCount === 1 ? "" : "s"}`
+  const toolLinks = (n: number) => `${n} tool link${n === 1 ? "" : "s"}`
+  const linksToAdd = links?.toAdd ?? 0
+  const linksOnlyOnRemote = links?.onlyOnRemote ?? 0
+  const linksBlocked = links?.blocked ?? 0
 
-  if (pendingPush > 0) {
-    return {
-      dotColor: "amber",
-      text: `${localCount} skill${localCount === 1 ? "" : "s"} · ${pendingPush} not yet pushed`,
-    }
+  if (pendingPush > 0 || linksToAdd > 0) {
+    const parts: string[] = []
+    if (pendingPush > 0) parts.push(`${pendingPush} not yet pushed`)
+    if (linksToAdd > 0) parts.push(`${toolLinks(linksToAdd)} not yet pushed`)
+    return { dotColor: "amber", text: [skills, ...parts].join(" · ") }
   }
 
-  if (onlyOnRemote > 0) {
-    return {
-      dotColor: "grey",
-      text: `${localCount} skill${localCount === 1 ? "" : "s"} · ${onlyOnRemote} only on remote`,
-    }
+  if (onlyOnRemote > 0 || linksOnlyOnRemote > 0 || linksBlocked > 0) {
+    const parts: string[] = []
+    if (onlyOnRemote > 0) parts.push(`${onlyOnRemote} only on remote`)
+    if (linksOnlyOnRemote > 0) parts.push(`${toolLinks(linksOnlyOnRemote)} only on remote`)
+    if (linksBlocked > 0) parts.push(`${toolLinks(linksBlocked)} blocked`)
+    return { dotColor: "grey", text: [skills, ...parts].join(" · ") }
   }
 
-  return {
-    dotColor: "green",
-    text: `${localCount} skill${localCount === 1 ? "" : "s"} · in sync`,
-  }
+  return { dotColor: "green", text: `${skills} · in sync` }
 }

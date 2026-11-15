@@ -694,6 +694,11 @@ test("the catalog preview and the skill's document are capped", () => {
   assert.equal(preview.body, "z".repeat(200000) + "\n\n" + SHORTENED);
   assert.deepEqual(skillDocument({ text: big }), { body: "z".repeat(200000) + "\n\n" + SHORTENED });
 });
+test("catalogPreview caps the description like any other", () => {
+  const preview = catalogPreview(`---\nname: big\ndescription: ${"d".repeat(3 * 1024 * 1024)}\n---\n# Body\n`);
+  assert.equal(preview.description, "d".repeat(1000));
+  assert.equal(preview.body, "# Body\n");
+});
 test("catalogPreview: the description and the body, or Preview unavailable", () => {
   assert.deepEqual(catalogPreview("---\nname: pdf\ndescription: Read PDFs\n---\n# PDF\nBody\n"), { description: "Read PDFs", body: "# PDF\nBody\n" });
   assert.deepEqual(catalogPreview("# Just a body"), { description: "", body: "# Just a body" });

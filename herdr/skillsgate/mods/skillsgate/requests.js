@@ -30,7 +30,7 @@
 //            Defaults to machine.scan.
 
 import { validSkillId, validSource } from "./catalog.js";
-import { machineInSentence, machineLabel, toolLabel } from "./model.js";
+import { machineInSentence, machineLabel, plainName, toolLabel } from "./model.js";
 import { cantCheckText, inStore } from "./view-model.js";
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -78,8 +78,9 @@ const OPS = {
 // share this computer's lock key while naming another machine, so it is
 // refused. An install's source and skill id must pass the catalog's checks,
 // its tools must be a list of names, and `replace` must say what the dialog
-// showed (true: Update, false: Install); its `name` is only shown (the skill
-// id stands in for a missing one).
+// showed (true: Update, false: Install); its `name` is only shown, as one
+// plain line of at most 200 characters (plainName), and the skill id stands
+// in for a missing or empty one.
 function readRequest(req) {
   if (!isRecord(req) || typeof req.op !== "string" || !Object.hasOwn(OPS, req.op)) return null;
   const op = OPS[req.op];
@@ -89,7 +90,7 @@ function readRequest(req) {
     const { source, skillId, tools, replace } = req;
     if (!validSource(source) || !validSkillId(skillId) || !Array.isArray(tools) || !tools.every(filled)) return null;
     if (typeof replace !== "boolean") return null;
-    return { op, on, source, skillId, tools: [...tools], replace, name: filled(req.name) ? req.name : skillId };
+    return { op, on, source, skillId, tools: [...tools], replace, name: plainName(req.name) || skillId };
   }
   if (!filled(req.key)) return null;
   if (op.tool && !filled(req.tool)) return null;

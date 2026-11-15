@@ -1,6 +1,7 @@
 // The public skills.sh catalog: search it, preview a skill's SKILL.md from
 // GitHub, and check that a source and a skill id are safe to hand to git and
 // to a regular expression. `fetch` is injected, so tests never reach a network.
+import { plainName } from "./model.js";
 
 const SEARCH = "https://skills.sh/api/search";
 const RAW = "https://raw.githubusercontent.com";
@@ -54,7 +55,7 @@ export function createCatalog({ fetch }) {
       id: s.id,
       source: s.source,
       skillId: s.skillId,
-      name: s.name,
+      name: plainName(s.name), // one plain line, at most 200 characters ("" if not a string)
       installs: Number(s.installs) || 0,
       installable: validSource(s.source) && validSkillId(s.skillId),
     }));

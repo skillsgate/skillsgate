@@ -13,9 +13,34 @@ const dequote = (value) => {
   return v;
 };
 
+const NAME_MAX = 200;
+const DESCRIPTION_MAX = 1000;
+
+// `text` cut at `max` UTF-16 code units, never inside a surrogate pair.
+export function capText(text, max) {
+  const whole = String(text ?? "");
+  if (whole.length <= max) return whole;
+  const cut = whole.slice(0, max);
+  const last = cut.charCodeAt(cut.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
+}
+
+// A name from outside (a catalog row, a request) as one plain line: control
+// characters removed, each run of whitespace one space, trimmed, and cut at
+// 200 characters. Anything but a string is "".
+export function plainName(value) {
+  if (typeof value !== "string") return "";
+  const line = value
+    .replace(/[\u0000-\u0008\u000e-\u001f\u007f-\u009f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return capText(line, NAME_MAX).trim();
+}
+
 // Reads `name` and `description` from the frontmatter block at the top of a
 // SKILL.md. Values may be plain, quoted, folded (`>`) or literal (`|`); a value
-// that continues on indented lines is joined with single spaces.
+// that continues on indented lines is joined with single spaces. The name is
+// cut at 200 characters and the description at 1,000.
 export function parseFrontmatter(head, fallback) {
   const lines = String(head ?? "").replace(/\r\n?/g, "\n").split("\n");
   const out = { name: fallback, description: "" };
@@ -43,8 +68,8 @@ export function parseFrontmatter(head, fallback) {
     if (/^[>|][+-]?\d*$/.test(first)) return rest.join(" ").trim();
     return dequote([first, ...rest].join(" "));
   };
-  out.name = read("name") || fallback;
-  out.description = read("description");
+  out.name = capText(read("name"), NAME_MAX) || fallback;
+  out.description = capText(read("description"), DESCRIPTION_MAX);
   return out;
 }
 
@@ -221,7 +246,7 @@ export function shortPath(path, home) {
 // line ends as "\n". The block is the one parseFrontmatter reads: a first line
 // "---" and a later line "---". Text without a closed block is left whole.
 export function stripFrontmatter(text) {
-  const lines = String(text ?? "").replace(/^﻿/, "").replace(/\r\n?/g, "\n").split("\n");
+  const lines = String(text ?? "").replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n");
   if (lines[0].trim() !== "---") return lines.join("\n");
   const end = lines.findIndex((line, i) => i > 0 && line.trim() === "---");
   if (end < 0) return lines.join("\n");

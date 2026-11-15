@@ -14,20 +14,30 @@ const expr = (value) => `"${value}"`;
 //   H  home (real path), git (1 or 0)
 //   T  tool name, skills folder, detected (1 or 0); one per tool, registry order
 //   S  tool name, entry path, real path, link (1 or 0), SKILL.md frontmatter
+// The frontmatter is at most 80 lines, each cut at 2,000 characters, with
+// \x1e and \x1f removed. An entry whose path or real path holds \x1e or \x1f
+// is skipped: it would forge records, and it can't be a skill folder the mod
+// could act on. A tool folder that holds either is printed empty and not
+// listed.
 export function scanScript(tools) {
   const calls = tools
     .map((tool) => ["scan_tool", tool.name, expr(tool.dir), ...tool.detect.map(expr)].join(" "))
     .join("\n");
-  return `HOME=$(cd -P -- "$HOME" && pwd -P) || { printf 'Home folder not found\\n' >&2; exit 1; }
+  return `unset CDPATH
+RS=$(printf '\\036')
+US=$(printf '\\037')
+HOME=$(cd -P -- "$HOME" && pwd -P) || { printf 'Home folder not found\\n' >&2; exit 1; }
+case "$HOME" in *"$RS"*|*"$US"*) printf 'Home folder not usable\\n' >&2; exit 1 ;; esac
 export HOME
 PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"
 
 # emit_entry <tool> <entry path> <link 1|0>: one S record for a folder holding SKILL.md
 emit_entry() {
   real=$(cd -P -- "$2" && pwd -P) || return 0
+  case "$2$real" in *"$RS"*|*"$US"*) return 0 ;; esac
   head=$(awk '
     NR == 1 && $0 !~ /^---[ \\r]*$/ { exit }
-    { line = $0; gsub(/[\\036\\037]/, "", line); print line }
+    { line = substr($0, 1, 2000); gsub(/[\\036\\037]/, "", line); print line }
     NR > 1 && $0 ~ /^---[ \\r]*$/ { exit }
     NR >= 80 { exit }
   ' "$real/SKILL.md" 2>/dev/null)
@@ -40,12 +50,13 @@ scan_tool() {
   dir=$2
   shift 2
   if [ -d "$dir" ]; then dir=$(cd -P -- "$dir" && pwd -P); fi
+  case "$dir" in *"$RS"*|*"$US"*) dir= ;; esac
   found=0
   for probe in "$@"; do
     if [ -d "$probe" ]; then found=1; fi
   done
   printf 'T\\037%s\\037%s\\037%s\\036' "$tool" "$dir" "$found"
-  [ -d "$dir" ] || return 0
+  [ -n "$dir" ] && [ -d "$dir" ] || return 0
   for entry in "$dir"/*; do
     [ -d "$entry" ] || continue
     link=0

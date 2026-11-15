@@ -546,6 +546,17 @@ test("an install over a folder that is not a shared-store skill is refused by th
   assert.deepEqual(fs.readdirSync(s.h.path(".agents/skills")), ["beta"]);
 });
 
+test("an install's name is one plain line of at most 200 characters in the lock text and the notice", withGit, async () => {
+  const s = setup({ files: {} });
+  await runRequest(install("beta", { name: `Beta\n\u001b[2J  skill${"!".repeat(400)}` }), s.deps);
+  const shown = `Beta [2J skill${"!".repeat(400)}`.slice(0, 200);
+  assert.deepEqual(s.claims, [{ on: null, text: `Installing ${shown}…` }]);
+  assert.deepEqual(notice(s.channel), { kind: "done", text: `Installed ${shown}` });
+  // A name with nothing left in it is named by the skill id.
+  await runRequest(install("alpha", { name: "\u0000\n\t " }), s.deps);
+  assert.deepEqual(notice(s.channel), { kind: "done", text: "Installed alpha" });
+});
+
 test("an install whose lock file can't be rewritten says so as a warning", withGit, async () => {
   const s = setup({ files: { ".agents/.skill-lock.json": "{nope" } });
   const result = await runRequest(install("beta"), s.deps);

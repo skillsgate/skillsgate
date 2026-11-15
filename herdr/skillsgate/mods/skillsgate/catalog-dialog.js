@@ -16,7 +16,7 @@ import { closeOverlay, knownAgents, props, setShared, shared, theme } from "herd
 import { TARGETS, catalog, channel, errorText, machine } from "./host.js";
 import { SIZE, button, dialogCard, icon, iconButton, markdownView, spinner, textSizes, toolMarkBox } from "./ui.js";
 import { validSkillId, validSource } from "./catalog.js";
-import { machineInSentence } from "./model.js";
+import { machineInSentence, plainName } from "./model.js";
 import { catalogPreview, checklist, formatInstalls, installAction, startTargets, storeNote, withTargets } from "./view-model.js";
 
 const stringOr = (value) => (typeof value === "string" ? value : "");
@@ -27,7 +27,7 @@ export default class CatalogDialog {
     const row = p.row !== null && typeof p.row === "object" ? p.row : {};
     this.on = typeof p.on === "string" && p.on ? p.on : null; // null: this computer
     this.row = { source: stringOr(row.source), skillId: stringOr(row.skillId), installs: Number(row.installs) || 0 };
-    this.row.name = stringOr(row.name) || this.row.skillId;
+    this.row.name = plainName(row.name) || this.row.skillId;
     this.row.installable = validSource(this.row.source) && validSkillId(this.row.skillId);
     this.overlay = p.overlay;
     this.preview = null; // catalogPreview(...) once SKILL.md is fetched (or not)

@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   dropFromLock,
   lockPath,
@@ -9,6 +10,7 @@ import {
   mergeLock,
   parseFrontmatter,
   parseScan,
+  plainName,
   relativePath,
   sanitizeName,
   shortPath,
@@ -22,6 +24,30 @@ test("parseFrontmatter reads name and description", () => {
 });
 test("parseFrontmatter joins a folded description and takes CRLF", () => {
   assert.deepEqual(parseFrontmatter("---\r\nname: a\r\ndescription: >-\r\n  one\r\n  two\r\n---\r\n", "x"), { name: "a", description: "one two" });
+});
+test("parseFrontmatter caps the name at 200 characters and the description at 1,000", () => {
+  const long = "n".repeat(5000);
+  const out = parseFrontmatter(`---\nname: ${long}\ndescription: ${"d".repeat(5000)}\n---\n`, "x");
+  assert.equal(out.name, "n".repeat(200));
+  assert.equal(out.description, "d".repeat(1000));
+  // A folded value joined from many lines is capped once joined.
+  const folded = parseFrontmatter(`---\nname: a\ndescription: >\n${"  word\n".repeat(400)}---\n`, "x");
+  assert.equal(folded.description.length, 1000);
+  // Never half of a surrogate pair at the cut.
+  assert.equal(parseFrontmatter(`---\nname: ${"a".repeat(199)}😀\n---\n`, "x").name, "a".repeat(199));
+  assert.deepEqual(parseFrontmatter("---\nname: short\ndescription: also short\n---\n", "x"), { name: "short", description: "also short" });
+});
+test("plainName: one plain line of at most 200 characters", () => {
+  assert.equal(plainName("  PDF\n\ttools  "), "PDF tools");
+  assert.equal(plainName("a\u0000b\u001bc\u007fd\u0085e\u009ff"), "abcdef");
+  assert.equal(plainName("one \u0007 two\r\nthree"), "one two three");
+  assert.equal(plainName("x".repeat(500)), "x".repeat(200));
+  assert.equal(plainName("a ".repeat(150)), "a ".repeat(100).trim());
+  assert.equal(plainName(`${"a".repeat(199)}😀z`), "a".repeat(199));
+  for (const bad of [null, undefined, 7, {}, ["a"]]) assert.equal(plainName(bad), "", String(bad));
+});
+test("model.js writes the byte order mark as an escape", () => {
+  assert.equal(readFileSync("herdr/skillsgate/mods/skillsgate/model.js", "utf8").includes("\uFEFF"), false);
 });
 test("parseFrontmatter falls back to the folder", () => {
   assert.deepEqual(parseFrontmatter("# Title\n", "my-folder"), { name: "my-folder", description: "" });
@@ -109,7 +135,7 @@ test("stripFrontmatter drops the block and the blank lines after it", () => {
   assert.equal(stripFrontmatter("---\nname: a\ndescription: b\n---\n# Title\nBody\n"), "# Title\nBody\n");
   assert.equal(stripFrontmatter("---\nname: a\n---\n\n\nBody"), "Body");
   assert.equal(stripFrontmatter("---\r\nname: a\r\n---\r\n\r\nBody\r\nmore\r\n"), "Body\nmore\n");
-  assert.equal(stripFrontmatter("﻿---\nname: a\n---\nBody"), "Body");
+  assert.equal(stripFrontmatter("\uFEFF---\nname: a\n---\nBody"), "Body");
   assert.equal(stripFrontmatter("---  \nname: a\n---   \nBody"), "Body");
   assert.equal(stripFrontmatter("---\nname: a\n---"), "");
 });

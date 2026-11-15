@@ -57,6 +57,16 @@ test("search maps rows", async () => {
   });
 });
 
+test("search makes each row's name one plain line of at most 200 characters", async () => {
+  const names = ["  pdf\n\ttools ", "evil\u0000\u001b[31mred\u007f", "x".repeat(5000), null, 42];
+  const { fetch } = fakeFetch({
+    ok: true,
+    json: async () => ({ skills: names.map((name, i) => ({ id: `a/b/s${i}`, source: "a/b", skillId: `s${i}`, name, installs: 1 })) }),
+  });
+  const rows = await createCatalog({ fetch }).search("x");
+  assert.deepEqual(rows.map((r) => r.name), ["pdf tools", "evil[31mred", "x".repeat(200), "", ""]);
+});
+
 test("search defaults installs to 0 and yields [] without a skills array", async () => {
   const one = fakeFetch({ ok: true, json: async () => ({ skills: [{ id: "a/b/c", source: "a/b", skillId: "c", name: "c" }] }) });
   const rows = await createCatalog({ fetch: one.fetch }).search("c");

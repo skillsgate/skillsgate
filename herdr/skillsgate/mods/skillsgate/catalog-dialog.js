@@ -119,6 +119,7 @@ export default class CatalogDialog {
   // `replace` is the decision that drew the button's label and the replace
   // line.
   install() {
+    if (this.closed) return; // a second click before the dialog went away
     const action = this.action();
     if (action.reason) return;
     const tools = checklist(this.seen.scan, this.checked)

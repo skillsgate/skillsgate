@@ -1,7 +1,7 @@
 // The public skills.sh catalog: search it, preview a skill's SKILL.md from
 // GitHub, and check that a source and a skill id are safe to hand to git and
 // to a regular expression. `fetch` is injected, so tests never reach a network.
-import { plainName } from "./model.js";
+import { parseFrontmatter, plainName } from "./model.js";
 
 const SEARCH = "https://skills.sh/api/search";
 const RAW = "https://raw.githubusercontent.com";
@@ -61,12 +61,19 @@ export function createCatalog({ fetch }) {
     }));
   }
 
+  // The SKILL.md the dialog previews, or null. The repo root's SKILL.md (the
+  // last place tried) counts only when its frontmatter name is the skill id:
+  // an install searches the whole repository before it falls back to the
+  // root, so a root file of another skill is not the one it would install.
   async function content(source, skillId) {
     if (!validSource(source) || !validSkillId(skillId)) return null;
-    for (const url of contentUrls(source, skillId)) {
+    const urls = contentUrls(source, skillId);
+    for (const url of urls) {
       try {
         const res = await fetch(url);
-        if (res.ok) return await res.text();
+        if (!res.ok) continue;
+        const text = await res.text();
+        if (url !== urls.at(-1) || parseFrontmatter(text, "").name === skillId) return text;
       } catch {
         // A failed request means "not here"; try the next layout.
       }

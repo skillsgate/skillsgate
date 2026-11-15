@@ -6,7 +6,8 @@
 import { exec as hostExec, layout, readTextFile, setShared, shared, spaces } from "herdr";
 import { createCatalog } from "./catalog.js";
 import { createChannel } from "./channel.js";
-import { createMachine } from "./machine.js";
+import { adaptExec, adaptReadText, createMachine } from "./machine.js";
+import { withoutHerdrPrefix } from "./model.js";
 import { effectiveMachine, layoutNode } from "./view-model.js";
 
 export const MOD = "skillsgate";
@@ -18,17 +19,13 @@ export const TARGETS = "skillsgate.targets.v1"; // { [machineKey]: tool names }:
 
 // Runs `script` with sh on machine `on` (null: this computer). Never rejects:
 // a program that can't start or a machine that can't be reached comes back
-// as code -1 with the reason in stderr.
-export const exec = (script, args, on, timeout) =>
-  hostExec("sh", ["-c", script, "skillsgate", ...args], { on, timeout }).catch((error) => ({
-    code: -1,
-    stdout: "",
-    stderr: String(error?.message ?? error),
-  }));
+// as code -1 with the reason in stderr, without Herdr's "`herdr.exec`: ".
+export const exec = adaptExec(hostExec);
 
 // Resolves the text, null only when the file is absent, and rejects on any
-// other failure: Herdr's readTextFile already behaves so, so nothing is caught.
-export const readText = (path, on) => readTextFile(path, { on });
+// other failure (Herdr's readTextFile already behaves so), with Herdr's
+// "`herdr.readTextFile`: " dropped from the reason.
+export const readText = adaptReadText(readTextFile);
 
 export const channel = createChannel({ get: shared, set: setShared });
 export const machine = createMachine({ exec, readText });
@@ -36,7 +33,7 @@ export const machine = createMachine({ exec, readText });
 // `text()` catalog.js reads.
 export const catalog = createCatalog({ fetch: (url, options) => fetch(url, options) });
 
-export const errorText = (error) => String(error?.message ?? error);
+export const errorText = (error) => withoutHerdrPrefix(error?.message ?? error);
 
 // ---- Window facts ----
 

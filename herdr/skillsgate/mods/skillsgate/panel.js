@@ -95,10 +95,11 @@ class MachineData {
     return state?.skills ? { scan: state.scan, skills: state.skills } : null;
   }
 
-  // A failed scan keeps the last good result. When there was one, the failure
-  // is said once as a notice (again only if the error changes).
+  // A failed scan keeps the last good result. When there was one and it is the
+  // viewed machine, the failure is said once as a notice (again only if the
+  // error changes); another machine's shows on its card only.
   failed(on, state, error) {
-    const notice = scanNotice(on, state, error);
+    const notice = scanNotice(on, state, error, viewedMachine());
     state.error = error;
     if (notice) channel.say("error", notice);
   }

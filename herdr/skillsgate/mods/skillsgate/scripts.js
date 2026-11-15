@@ -245,6 +245,11 @@ exit 0
 // The last check and the rename are two steps: something made at `<dest>` in
 // that instant would receive the copy inside it; nothing is deleted either way.
 //
+// The clone allows the https, file and ssh transports: the URL is always
+// https:// or file:///, so only the person's own git config (a
+// url.<base>.insteadOf rewrite) can make it ssh. When the clone fails, git's
+// reason is the one line the script prints on stderr.
+//
 // Exit: 0 installed; 1 failed; 2 the clone failed; 3 `<dest>` is not what the
 // caller said (nothing changed); 5 the skill is not in the repository; 7 the
 // skill holds symbolic links; 64 bad arguments; 127 no git.
@@ -257,7 +262,7 @@ export const INSTALL = String.raw`unset CDPATH
 PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"
 export PATH
 GIT_TERMINAL_PROMPT=0
-GIT_ALLOW_PROTOCOL=https:file
+GIT_ALLOW_PROTOCOL=https:file:ssh
 export GIT_TERMINAL_PROMPT GIT_ALLOW_PROTOCOL
 bad() { printf 'Bad arguments\n' >&2; exit 64; }
 taken() { printf 'The destination is not what the install was told to expect\n' >&2; exit 3; }
@@ -339,8 +344,15 @@ tmpbase=$TMPDIR
 case "$tmpbase" in /?*) ;; *) tmpbase=/tmp ;; esac
 tmp=$(mktemp -d "$tmpbase/skillsgate-herdr.XXXXXX") || exit 1
 repo="$tmp/repo"
-if ! git clone -q --depth 1 -- "$url" "$repo" >/dev/null 2>&1; then
-  printf 'Could not download\n' >&2
+if ! git clone -q --depth 1 -- "$url" "$repo" >/dev/null 2>"$tmp/git.err"; then
+  # git's reason, as one line on stderr: its first "fatal:" line without that
+  # word (git follows it with advice), else its last line; at most 300 characters.
+  awk '
+    { sub(/\r$/, "") }
+    reason == "" && /^fatal: / { reason = substr($0, 8) }
+    NF { last = $0 }
+    END { if (reason == "") reason = last; if (reason != "") print substr(reason, 1, 300) }
+  ' "$tmp/git.err" >&2
   exit 2
 fi
 root=$(cd -P -- "$repo" && pwd -P) || exit 1

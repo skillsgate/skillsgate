@@ -227,6 +227,10 @@ export function dropFromLock(text, folder) {
 
 // ---- Names, labels and paths ----
 
+// An error from Herdr's exec or readTextFile without the function's name in
+// front ("`herdr.exec`: unknown machine ..." reads "unknown machine ...").
+export const withoutHerdrPrefix = (text) => String(text ?? "").replace(/^`[^`]*`:\s*/, "");
+
 // "this computer" or the machine's name, inside a sentence.
 export const machineInSentence = (on) => (on == null ? "this computer" : machineLabel(on));
 

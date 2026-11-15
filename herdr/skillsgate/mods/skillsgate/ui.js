@@ -1,12 +1,12 @@
 // Sizes, text sizes and the small widgets several views share: buttons, tabs,
-// switches, the dialog card, a tool's mark, the spinner, skeleton rows and the
-// status line. It imports no view.
+// switches, the dialog card, a tool's mark, the spinner, skeleton rows, the
+// status line and the same status inline. It imports no view.
 
 import { div, image, svg } from "gpui-kit";
 import { h_flex, v_flex, Switch, TextView } from "gpui-base";
 import { settings } from "herdr";
 import { MOD } from "./host.js";
-import { openableLink, toolMark } from "./view-model.js";
+import { openableHref, toolMark } from "./view-model.js";
 
 export const MARK = `mods/${MOD}/mark.svg`;
 export const icon = (name) => `mods/${MOD}/icons/${name}.svg`;
@@ -181,22 +181,39 @@ export function spinner(t) {
   return svg(icon("refresh")).size(SIZE.smallIcon).flex_none().text_color(t.working).spin(900);
 }
 
+// The color and the leading mark of a status (statusOf): the spinner and
+// muted text for work running, a check in the done color, or a dot in the
+// warning or error color.
+function statusLook(status, t) {
+  if (status.kind === "busy") return { color: t.muted, mark: spinner(t) };
+  const color = status.kind === "done" ? t.done : status.kind === "warn" ? t.blocked : t.ansi1;
+  const mark =
+    status.kind === "done" ? svg(icon("check")).size(SIZE.smallIcon).flex_none() : div().size(SIZE.dot).flex_none().rounded_full().bg(color);
+  return { color, mark };
+}
+
 // `status` is statusOf(...): work running on the viewed machine, or a notice.
 export function statusLine(status, t, ts) {
-  const line = h_flex().h(SIZE.status).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border).text_size(ts.small);
-  const text = div().flex_1().min_w(0).truncate().child(status.text);
-  if (status.kind === "busy") {
-    return line.text_color(t.muted).child(spinner(t)).child(text);
-  }
-  const color = status.kind === "done" ? t.done : status.kind === "warn" ? t.blocked : t.ansi1;
-  return line
+  const { color, mark } = statusLook(status, t);
+  return h_flex()
+    .h(SIZE.status)
+    .flex_none()
+    .px(14)
+    .gap(8)
+    .items_center()
+    .border_b(1)
+    .border_color(t.border)
+    .text_size(ts.small)
     .text_color(color)
-    .child(
-      status.kind === "done"
-        ? svg(icon("check")).size(SIZE.smallIcon).flex_none()
-        : div().size(SIZE.dot).flex_none().rounded_full().bg(color),
-    )
-    .child(text);
+    .child(mark)
+    .child(div().flex_1().min_w(0).truncate().child(status.text));
+}
+
+// The same status inside a row (the skill dialog's footer): the mark and one
+// line of text, cut with an ellipsis.
+export function statusInline(status, t) {
+  const { color, mark } = statusLook(status, t);
+  return h_flex().min_w(0).gap(8).items_center().text_color(color).child(mark).child(div().min_w(0).truncate().child(status.text));
 }
 
 // A dialog's own card (dialogs open with frame "none"), holding the keyboard
@@ -219,15 +236,17 @@ export function dialogCard(id, handle, onKeyDown, t, ts) {
 
 // Markdown the mod did not write (a skill's SKILL.md, capped by the caller),
 // rendered selectable. A link click replaces TextView's own opener: only a
-// URL openableLink allows goes to cx.open_url, which applies Herdr's http(s)
-// guard too; a URL it refuses does nothing, and so does every other link.
+// URL openableHref allows goes to cx.open_url, as its parsed href (never the
+// raw string), and Herdr's http(s) guard applies too; a URL it refuses does
+// nothing, and so does every other link.
 export function markdownView(id, text) {
   return TextView.markdown(id, text)
     .selectable(true)
     .on_link_click((url, cx) => {
-      if (!openableLink(url)) return;
+      const href = openableHref(url);
+      if (!href) return;
       try {
-        cx.open_url(url);
+        cx.open_url(href);
       } catch {
         // refused: the click does nothing
       }

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { createMachine } from "../skillsgate/mods/skillsgate/machine.js";
+import { adaptExec, adaptReadText, createMachine } from "../skillsgate/mods/skillsgate/machine.js";
 import { LINK, REMOVE, UNLINK } from "../skillsgate/mods/skillsgate/scripts.js";
 import { FIXTURE, SKILL, makeHome } from "./helpers.mjs";
 
@@ -29,6 +29,29 @@ const isLink = (p) => {
   }
 };
 
+test("the exec adapter never rejects and drops Herdr's function name from the reason", async () => {
+  const calls = [];
+  const exec = adaptExec(async (program, args, options) => {
+    calls.push([program, args, options]);
+    if (options.on === "gone") throw new Error('`herdr.exec`: unknown machine "gone"');
+    if (options.on === "odd") throw "plain text";
+    return { code: 0, stdout: "out", stderr: "" };
+  });
+  assert.deepEqual(await exec("echo x", ["a"], null, 30000), { code: 0, stdout: "out", stderr: "" });
+  assert.deepEqual(calls[0], ["sh", ["-c", "echo x", "skillsgate", "a"], { on: null, timeout: 30000 }]);
+  assert.deepEqual(await exec("s", [], "gone", 1), { code: -1, stdout: "", stderr: 'unknown machine "gone"' });
+  assert.deepEqual(await exec("s", [], "odd", 1), { code: -1, stdout: "", stderr: "plain text" });
+});
+test("the readText adapter keeps its contract and drops Herdr's function name from a rejection", async () => {
+  const readText = adaptReadText(async (path, options) => {
+    if (path === "/absent") return null;
+    if (path === "/denied") throw new Error("`herdr.readTextFile`: permission denied");
+    return `${path} on ${options.on}`;
+  });
+  assert.equal(await readText("/f", "vps"), "/f on vps");
+  assert.equal(await readText("/absent", null), null);
+  await assert.rejects(readText("/denied", null), (error) => error.message === "permission denied");
+});
 test("link adds a relative symlink", async () => {
   const { h, m, r, skill } = await setup();
   assert.deepEqual(await m.link(null, r.scan, skill("alpha"), "cursor"), { ok: true });

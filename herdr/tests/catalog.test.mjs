@@ -99,6 +99,26 @@ test("content returns the first file found, null when none, and survives a faile
   assert.deepEqual(missing.urls, urls);
 });
 
+test("content shows the repo root's SKILL.md only when its frontmatter name is the skill id", async () => {
+  const urls = contentUrls("acme/skills", "pdf");
+  const notFound = urls.slice(0, -1).map(() => ({ ok: false, status: 404 }));
+  const root = (text) => fakeFetch(...notFound, { ok: true, text: async () => text });
+  // Another skill at the root: an install would not pick it, so no preview.
+  const other = root("---\nname: docx\n---\n# Word\n");
+  assert.equal(await createCatalog({ fetch: other.fetch }).content("acme/skills", "pdf"), null);
+  assert.deepEqual(other.urls, urls);
+  for (const text of ["# No frontmatter\n", "---\nname: \"pdf-tools\"\n---\n", ""]) {
+    assert.equal(await createCatalog({ fetch: root(text).fetch }).content("acme/skills", "pdf"), null, JSON.stringify(text));
+  }
+  // The skill itself at the root (a repository that is one skill).
+  const same = "---\nname: pdf\ndescription: Read PDFs\n---\n# PDF\n";
+  assert.equal(await createCatalog({ fetch: root(same).fetch }).content("acme/skills", "pdf"), same);
+  assert.equal(await createCatalog({ fetch: root("---\nname: 'pdf'\n---\n").fetch }).content("acme/skills", "pdf"), "---\nname: 'pdf'\n---\n");
+  // A fixed folder is shown as it is, whatever its name says.
+  const fixed = fakeFetch({ ok: true, text: async () => "---\nname: other\n---\n" });
+  assert.equal(await createCatalog({ fetch: fixed.fetch }).content("acme/skills", "pdf"), "---\nname: other\n---\n");
+});
+
 test("content makes no request for an invalid source or skill id", async () => {
   const { fetch, urls } = fakeFetch({ ok: true, text: async () => "text" });
   const catalog = createCatalog({ fetch });

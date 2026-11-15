@@ -13,17 +13,21 @@ import {
   stripFrontmatter,
   toolByName,
   toolLabel,
+  withoutHerdrPrefix,
 } from "./model.js";
 
 // ---- What the panel shows ----
 
+// A machine's name as the panel keys it: a non-empty string, else null (this
+// computer). "" would share this computer's key while naming another machine.
+const machineName = (on) => (typeof on === "string" && on !== "" ? on : null);
+
 // The machine the panel views. `pref` is the stored choice
 // (`{ follow, on }`); anything but an explicit `follow: false` follows the
-// shown space's machine.
+// shown space's machine. An empty or non-string name is this computer.
 export function effectiveMachine(pref, shownSpaceMachine) {
   const chosen = pref !== null && typeof pref === "object" && pref.follow === false;
-  if (chosen) return typeof pref.on === "string" ? pref.on : null;
-  return typeof shownSpaceMachine === "string" ? shownSpaceMachine : null;
+  return machineName(chosen ? pref.on : shownSpaceMachine);
 }
 
 // By name without case, then by UTF-16 code unit so the order is total. Not
@@ -40,15 +44,15 @@ function byName(a, b) {
 // on, once each, by name.
 export function machineNames(machines, spaces) {
   const names = new Set();
-  for (const m of machines ?? []) if (typeof m?.name === "string") names.add(m.name);
-  for (const s of spaces ?? []) if (typeof s?.machine === "string") names.add(s.machine);
+  for (const m of machines ?? []) if (machineName(m?.name)) names.add(m.name);
+  for (const s of spaces ?? []) if (machineName(s?.machine)) names.add(s.machine);
   return [null, ...[...names].sort(byName)];
 }
 
 // Whether Herdr's `machines()` reports the machine with this machine key as
 // unavailable (offline, or its layout could not be read).
 export function machineUnavailable(machines, key) {
-  return (machines ?? []).some((m) => machineKey(m?.name) === key && m.layout === "unavailable");
+  return (machines ?? []).some((m) => machineKey(m?.name) === key && m?.layout === "unavailable");
 }
 
 // The layout node with this id, searched depth first, or null.
@@ -80,10 +84,13 @@ const inSentence = machineInSentence;
 // "Can't check vps: <error>": a machine whose scan failed.
 export const cantCheckText = (on, error) => `Can't check ${inSentence(on)}: ${error}`;
 
-// The notice for a failed scan, given the machine's state before the result:
-// only when it had a good scan (otherwise the error view says it) and only
-// when the error is new or changed, so a repeating failure is said once.
-export function scanNotice(on, before, error) {
+// The notice for a failed scan, given the machine's state before the result
+// and the machine the panel views: only for the viewed machine (another
+// machine's problem shows on its card only), only when it had a good scan
+// (otherwise the error view says it) and only when the error is new or
+// changed, so a repeating failure is said once.
+export function scanNotice(on, before, error, viewed) {
+  if (machineKey(on) !== machineKey(viewed)) return null;
   if (!before?.skills || before.error === error) return null;
   return cantCheckText(on, error);
 }
@@ -165,12 +172,15 @@ export function clockRegions(state, busy, notice, now) {
   return { footer: footerText(state, now), status: statusOf(busy, notice, now) };
 }
 
+// Whether two statuses (statusOf) draw the same: both none, or the same kind
+// and text.
+export const sameStatus = (a, b) => (a === null ? b === null : b !== null && a.kind === b.kind && a.text === b.text);
+
 // Whether the panel's clock tick has anything new to draw. Herdr redraws the
 // whole window on every notify, so the tick notifies only when this is true.
 export function regionsChanged(drawn, next) {
   if (!drawn) return true;
-  const same = (a, b) => (a === null ? b === null : b !== null && a.kind === b.kind && a.text === b.text);
-  return drawn.footer !== next.footer || !same(drawn.status, next.status);
+  return drawn.footer !== next.footer || !sameStatus(drawn.status, next.status);
 }
 
 // ---- What the Machines tab shows ----
@@ -188,7 +198,8 @@ export function regionsChanged(drawn, next) {
 const UNREACHABLE =
   /^unknown machine\b| took longer than .+ on .+ and was stopped$|^\S+ (is not connected|is unreachable|didn't answer within|sent nothing for)\b|^(still connecting to|lost the line to) |^machine\b/i;
 const NO_SHELL = /^cannot (start|run) sh\b|(^|[\s'"`])sh(\.exe)?['"`]?(:| is) (command )?(not found|not recognized)/i;
-const herdrText = (error) => String(error ?? "").replace(/^`[^`]*`:\s*/, ""); // without "`herdr.exec`: "
+// The host adapters already drop "`herdr.exec`: "; an error kept from before is read the same.
+const herdrText = withoutHerdrPrefix;
 
 export function scanFailure(error) {
   const text = herdrText(error);
@@ -241,8 +252,8 @@ export function machineCards({ machines, spaces, viewed, stateOf }) {
 // the machine viewed now); what a card writes (its machine, until following
 // is switched back on).
 export const following = (pref) => !(pref !== null && typeof pref === "object" && pref.follow === false);
-export const followChoice = (follow, viewedNow) => (follow ? { follow: true } : { follow: false, on: viewedNow ?? null });
-export const viewChoice = (on) => ({ follow: false, on: on ?? null });
+export const followChoice = (follow, viewedNow) => (follow ? { follow: true } : { follow: false, on: machineName(viewedNow) });
+export const viewChoice = (on) => ({ follow: false, on: machineName(on) });
 
 // Whether the tab scans every machine now: when it opens (`at` is null while
 // it is not shown), then 60 s after the last time.
@@ -325,13 +336,18 @@ export function deleteLabel(skill, armed) {
 // paths, anchors, "") is ignored. This is the mod's own rule, checked before
 // Herdr's open_url applies its guard. URL is used only inside the try: a URL
 // that does not parse is not opened.
-export function openableLink(url) {
-  if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return false;
+export const openableLink = (url) => openableHref(url) !== null;
+
+// What a click on a link opens: the parsed URL's href when openableLink allows
+// it, else null. The parsed form, never the raw string, so whitespace or a
+// control character the parser drops is not passed on.
+export function openableHref(url) {
+  if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return null;
   try {
     const parsed = new URL(url);
-    return (parsed.protocol === "http:" || parsed.protocol === "https:") && parsed.hostname !== "";
+    return (parsed.protocol === "http:" || parsed.protocol === "https:") && parsed.hostname !== "" ? parsed.href : null;
   } catch {
-    return false;
+    return null;
   }
 }
 

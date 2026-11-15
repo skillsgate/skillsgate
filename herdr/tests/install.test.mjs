@@ -529,11 +529,38 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
     assert.match(result.warn, /skill lock was not updated \(large\)/);
     assert.equal(read(h.path(".agents/.skill-lock.json")), big);
   });
-  it("install reports a failed download", async () => {
+  it("install reports a failed download with git's reason", async () => {
     const { h, m, r, leftovers } = await setup({}, { url: "file:///nowhere" });
-    assert.deepEqual(await m.install(null, r.scan, installed("alpha")), { ok: false, error: "Could not download acme/skills" });
+    const result = await m.install(null, r.scan, installed("alpha"));
+    assert.equal(result.ok, false);
+    // git says "fatal: '/nowhere' does not appear to be a git repository", then
+    // advice; its reason is what the person reads.
+    assert.match(result.error, /^Could not download acme\/skills: .*\/nowhere.*$/);
+    assert.doesNotMatch(result.error, /fatal:|repository exists/);
     assert.equal(exists(h.path(".agents")), false);
     assert.deepEqual(leftovers(), []);
+  });
+  it("the INSTALL script prints git's reason for a failed clone as its one line on stderr", async () => {
+    const { h, tmp } = await setup();
+    const env = { HOME: h.path(""), PATH: process.env.PATH, TMPDIR: tmp };
+    const r = await run(INSTALL, ["file:///nowhere", "alpha", h.path(".agents/skills"), "alpha", "new"], env);
+    assert.equal(r.code, 2);
+    assert.equal(r.stderr.split("\n").filter(Boolean).length, 1, r.stderr);
+    assert.match(r.stderr, /\/nowhere/);
+  });
+  it("install says git's reason, or only that the download failed when git gave none", async () => {
+    const scan = { home: "/h", git: true, tools: [{ name: "universal", dir: "/h/.agents/skills", detected: true }], entries: [] };
+    const answer = (stderr) => createMachine({ exec: async () => ({ code: 2, stdout: "", stderr }), readText: async () => null, ...sources() });
+    assert.deepEqual(await answer("transport 'ssh' not allowed\n").install(null, scan, installed("alpha")), {
+      ok: false,
+      error: "Could not download acme/skills: transport 'ssh' not allowed",
+    });
+    assert.deepEqual(await answer("").install(null, scan, installed("alpha")), { ok: false, error: "Could not download acme/skills" });
+  });
+  it("the INSTALL script lets the person's own git config fetch GitHub over ssh", () => {
+    // The URL passed is always https://; only a rewrite in the person's git
+    // config (url.<base>.insteadOf) can turn it into ssh.
+    assert.match(INSTALL, /\nGIT_ALLOW_PROTOCOL=https:file:ssh\n/);
   });
   it("install refuses an id it can't pass safely", async () => {
     const { m, r, calls } = await setup();

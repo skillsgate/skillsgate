@@ -31,9 +31,11 @@ import {
   machineNames,
   machineUnavailable,
   noticeShown,
+  openableHref,
   openableLink,
   regionsChanged,
   requestPending,
+  sameStatus,
   scanFailure,
   scanNotice,
   searchErrorText,
@@ -75,6 +77,19 @@ test("effectiveMachine reads a malformed choice as following", () => {
 test("machineNames", () => {
   assert.deepEqual(machineNames([{ name: null }, { name: "vps" }], [{ machine: "box" }, { machine: null }, { machine: "vps" }]), [null, "box", "vps"]);
 });
+test("an empty or non-string machine name is this computer wherever the choice is read or written", () => {
+  assert.equal(effectiveMachine({ follow: false, on: "" }, "vps"), null);
+  assert.equal(effectiveMachine({ follow: false, on: "" }, null), null);
+  assert.equal(effectiveMachine(undefined, ""), null);
+  assert.equal(effectiveMachine({ follow: true }, 7), null);
+  assert.deepEqual(followChoice(false, ""), { follow: false, on: null });
+  assert.deepEqual(viewChoice(""), { follow: false, on: null });
+  assert.deepEqual(viewChoice(7), { follow: false, on: null });
+  assert.deepEqual(machineNames([{ name: "" }], [{ machine: "" }]), [null]);
+  // So the stored { follow: false, on: "" } gives one Viewing card: this computer's.
+  const cards = machineCards({ machines: [{ name: null }], spaces: [], viewed: effectiveMachine({ follow: false, on: "" }, "vps"), stateOf: () => undefined });
+  assert.deepEqual(cards.map((c) => [c.on, c.viewing]), [[null, true]]);
+});
 test("machineNames with no machines or spaces is this computer only", () => {
   assert.deepEqual(machineNames([], []), [null]);
   assert.deepEqual(machineNames([{ name: "zz" }, { name: "aa" }], []), [null, "aa", "zz"]);
@@ -90,6 +105,11 @@ test("machineUnavailable reads Herdr's machines() by machine key", () => {
   assert.equal(machineUnavailable(list, "box"), false);
   assert.equal(machineUnavailable(list, "gone"), false);
   assert.equal(machineUnavailable([{ name: null, layout: "unavailable" }], ""), true);
+});
+test("machineUnavailable takes a list with a null entry without throwing", () => {
+  assert.equal(machineUnavailable([null], ""), false);
+  assert.equal(machineUnavailable([null, undefined, { name: "vps", layout: "unavailable" }], "vps"), true);
+  assert.equal(machineUnavailable([null, { name: null, layout: "unavailable" }], ""), true);
 });
 test("layoutNode finds a node by id anywhere in the layout", () => {
   const tree = {
@@ -125,14 +145,23 @@ test("installedBody: rows once a scan worked, the error only before any good sca
 });
 test("scanNotice reports a failed re-scan once per new error", () => {
   const good = { skills: [sk("a", "store", ["universal"])], error: null };
-  assert.equal(scanNotice(null, good, "sh: timeout"), "Can't check this computer: sh: timeout");
-  assert.equal(scanNotice("vps", good, "machine vps is unreachable"), "Can't check vps: machine vps is unreachable");
+  assert.equal(scanNotice(null, good, "sh: timeout", null), "Can't check this computer: sh: timeout");
+  assert.equal(scanNotice("vps", good, "machine vps is unreachable", "vps"), "Can't check vps: machine vps is unreachable");
   // The same error again says nothing; a different one does.
-  assert.equal(scanNotice("vps", { ...good, error: "machine vps is unreachable" }, "machine vps is unreachable"), null);
-  assert.equal(scanNotice("vps", { ...good, error: "machine vps is unreachable" }, "Unreadable scan"), "Can't check vps: Unreadable scan");
+  assert.equal(scanNotice("vps", { ...good, error: "machine vps is unreachable" }, "machine vps is unreachable", "vps"), null);
+  assert.equal(scanNotice("vps", { ...good, error: "machine vps is unreachable" }, "Unreadable scan", "vps"), "Can't check vps: Unreadable scan");
   // No good scan yet: the error view says it, not a notice.
-  assert.equal(scanNotice("vps", { skills: null, error: null }, "machine vps is unreachable"), null);
-  assert.equal(scanNotice("vps", undefined, "machine vps is unreachable"), null);
+  assert.equal(scanNotice("vps", { skills: null, error: null }, "machine vps is unreachable", "vps"), null);
+  assert.equal(scanNotice("vps", undefined, "machine vps is unreachable", "vps"), null);
+});
+test("scanNotice says a failed scan only for the viewed machine", () => {
+  const good = { skills: [sk("a", "store", ["universal"])], error: null };
+  assert.equal(scanNotice("vps", good, "machine vps is unreachable", "vps"), "Can't check vps: machine vps is unreachable");
+  assert.equal(scanNotice(null, good, "sh: timeout", null), "Can't check this computer: sh: timeout");
+  // A background scan of another machine shows its problem on its card only.
+  assert.equal(scanNotice("vps", good, "machine vps is unreachable", null), null);
+  assert.equal(scanNotice(null, good, "sh: timeout", "vps"), null);
+  assert.equal(scanNotice("box", good, "machine box is unreachable", "vps"), null);
 });
 test("statusOf: work in progress, else a notice that has not run out", () => {
   const done = { kind: "done", text: "Added", at: 0 };
@@ -141,6 +170,18 @@ test("statusOf: work in progress, else a notice that has not run out", () => {
   assert.equal(statusOf(null, done, 4000), null);
   assert.deepEqual(statusOf("", { kind: "error", text: "Failed", at: 0 }, 7000), { kind: "error", text: "Failed" });
   assert.equal(statusOf(null, null, 0), null);
+});
+test("sameStatus: whether two statuses draw the same", () => {
+  assert.equal(sameStatus(null, null), true);
+  assert.equal(sameStatus(null, { kind: "done", text: "Added" }), false);
+  assert.equal(sameStatus({ kind: "done", text: "Added" }, null), false);
+  assert.equal(sameStatus({ kind: "done", text: "Added" }, { kind: "done", text: "Added" }), true);
+  assert.equal(sameStatus({ kind: "warn", text: "Added" }, { kind: "done", text: "Added" }), false);
+  assert.equal(sameStatus({ kind: "busy", text: "Adding…" }, { kind: "busy", text: "Deleting…" }), false);
+  // The skill dialog's footer: a refused delete says why there, until the notice runs out.
+  const refused = { kind: "error", text: '"alpha" changed on disk. Refresh and try again.', at: 0 };
+  assert.equal(sameStatus(statusOf(null, refused, 7999), { kind: "error", text: refused.text }), true);
+  assert.equal(sameStatus(statusOf(null, refused, 7999), statusOf(null, refused, 8000)), false);
 });
 test("filterSkills by text and by tool", () => {
   const skills = [
@@ -665,6 +706,16 @@ test("openableLink: only absolute http(s) URLs with a host", () => {
     {},
   ];
   for (const url of ignored) assert.equal(openableLink(url), false, String(url));
+});
+test("openableHref: the parsed URL is what is opened, never the raw string", () => {
+  assert.equal(openableHref("https://example.com"), "https://example.com/");
+  assert.equal(openableHref("https://example.com/a b"), "https://example.com/a%20b");
+  assert.equal(openableHref("https://example.com/  "), "https://example.com/");
+  assert.equal(openableHref("https://exa\tmple.com/x\n"), "https://example.com/x");
+  assert.equal(openableHref("HTTPS://Example.com/x"), "https://example.com/x");
+  for (const url of ["javascript:alert(1)", "file:///etc/passwd", " https://example.com", "https://", "", null, 42]) {
+    assert.equal(openableHref(url), null, String(url));
+  }
 });
 
 const SHORTENED = "_Shortened: only the first 200,000 characters are shown._";

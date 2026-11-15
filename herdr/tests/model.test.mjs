@@ -17,6 +17,7 @@ import {
   stripFrontmatter,
   toolByName,
   toolLabel,
+  withoutHerdrPrefix,
 } from "../skillsgate/mods/skillsgate/model.js";
 
 test("parseFrontmatter reads name and description", () => {
@@ -45,6 +46,13 @@ test("plainName: one plain line of at most 200 characters", () => {
   assert.equal(plainName("a ".repeat(150)), "a ".repeat(100).trim());
   assert.equal(plainName(`${"a".repeat(199)}😀z`), "a".repeat(199));
   for (const bad of [null, undefined, 7, {}, ["a"]]) assert.equal(plainName(bad), "", String(bad));
+});
+test("withoutHerdrPrefix drops the Herdr function's name from an error once", () => {
+  assert.equal(withoutHerdrPrefix('`herdr.exec`: unknown machine "vps"'), 'unknown machine "vps"');
+  assert.equal(withoutHerdrPrefix("`herdr.readTextFile`: permission denied"), "permission denied");
+  assert.equal(withoutHerdrPrefix("sh: 1: awk: not found"), "sh: 1: awk: not found");
+  assert.equal(withoutHerdrPrefix("`a`: `b`: c"), "`b`: c");
+  assert.equal(withoutHerdrPrefix(undefined), "");
 });
 test("model.js writes the byte order mark as an escape", () => {
   assert.equal(readFileSync("herdr/skillsgate/mods/skillsgate/model.js", "utf8").includes("\uFEFF"), false);

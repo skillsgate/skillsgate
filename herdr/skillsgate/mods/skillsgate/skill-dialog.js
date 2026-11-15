@@ -5,7 +5,10 @@
 // the machine's revision changes (a request finished), and SKILL.md once. A
 // skill that is gone after a scan closes the dialog. Its switches and its
 // delete button post requests; they are disabled while the machine is busy or
-// a request it sent has no outcome yet (requestPending).
+// a request it sent has no outcome yet (requestPending). Its footer shows
+// what the panel's status line shows (statusOf): the machine's running work,
+// else the current notice, so a refused switch or delete says why where the
+// person is looking. A 1 s timer redraws only when that status changes.
 
 import { div, svg } from "gpui-kit";
 import { h_flex, v_flex, Scrollbar } from "gpui-base";
@@ -18,20 +21,30 @@ import {
   icon,
   iconButton,
   markdownView,
-  spinner,
+  statusInline,
   tabButton,
   textSizes,
   toggleSwitch,
   toolMarkBox,
 } from "./ui.js";
 import { machineLabel, shortPath } from "./model.js";
-import { cantCheckText, deleteLabel, requestPending, skillDocument, toolRows, toolsNote } from "./view-model.js";
+import {
+  cantCheckText,
+  deleteLabel,
+  requestPending,
+  sameStatus,
+  skillDocument,
+  statusOf,
+  toolRows,
+  toolsNote,
+} from "./view-model.js";
 
 const DIALOG_TABS = [
   ["document", "Document"],
   ["tools", "Tools"],
 ];
 const ARM_MS = 4000; // how long the delete button stays armed
+const STATUS_TICK_MS = 1000;
 
 export default class SkillDialog {
   init(cx) {
@@ -54,9 +67,14 @@ export default class SkillDialog {
     this.armed = false;
     this.arms = 0; // which arming the delete button's timer belongs to
     this.closed = false;
+    this.drawnStatus = null; // the footer's status as the last frame drew it
     this.handle = cx.focus_handle();
     this.handle.focus();
     this.read(cx);
+    // A notice runs out, or a stale lock drops, with nothing else to redraw.
+    cx.timer.every(STATUS_TICK_MS, (cx) => {
+      if (!this.closed && !sameStatus(this.drawnStatus, this.status())) cx.notify();
+    });
     cx.spawn(async (cx) => {
       let list = null;
       try {
@@ -123,6 +141,11 @@ export default class SkillDialog {
     } catch (error) {
       return skillDocument({ error: errorText(error) });
     }
+  }
+
+  // What the footer shows now: the machine's running work, else the notice.
+  status() {
+    return statusOf(channel.textAt(this.on), channel.notice(), Date.now());
   }
 
   pending() {
@@ -307,9 +330,11 @@ export default class SkillDialog {
     return toggleSwitch(`sg-skill-switch-${row.name}`, row.on, locked, (checked) => this.toggle(row.name, checked), t);
   }
 
-  // Delete at the left, the machine's running work in the middle, Done at the right.
+  // Delete at the left, the status in the middle (the machine's running work,
+  // else the notice), Done at the right.
   footer(skill, locked, t, ts) {
-    const busy = channel.textAt(this.on);
+    const status = this.status();
+    this.drawnStatus = status;
     return h_flex()
       .h(SIZE.dialogFooter)
       .flex_none()
@@ -323,11 +348,9 @@ export default class SkillDialog {
         h_flex()
           .flex_1()
           .min_w(0)
-          .gap(8)
           .items_center()
           .text_size(ts.small)
-          .text_color(t.muted)
-          .when(Boolean(busy), (el) => el.child(spinner(t)).child(div().min_w(0).truncate().child(busy))),
+          .when(Boolean(status), (el) => el.child(statusInline(status, t))),
       )
       .child(button("sg-skill-done", "Done", () => this.close(), t, ts, true));
   }

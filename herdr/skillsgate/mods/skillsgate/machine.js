@@ -1,7 +1,8 @@
-// Operations on one machine. `exec` and `readText` are Herdr's functions,
-// passed in by main.js (and faked in tests), so this file imports no Herdr code.
-// `readText(path, on)` resolves the text, resolves null ONLY when the file is
-// absent, and rejects on any other failure.
+// Operations on one machine. `exec` and `readText` are built on Herdr's
+// functions by adaptExec and adaptReadText below (host.js passes Herdr's in;
+// tests pass fakes), so this file imports no Herdr code. `readText(path, on)`
+// resolves the text, resolves null ONLY when the file is absent, and rejects
+// on any other failure.
 import { TOOLS, UNIVERSAL } from "./registry.js";
 import { INSTALL, LINK, REMOVE, UNLINK, WRITE, scanScript } from "./scripts.js";
 import {
@@ -14,6 +15,7 @@ import {
   relativePath,
   sanitizeName,
   toolByName,
+  withoutHerdrPrefix,
 } from "./model.js";
 import { cloneUrl as githubCloneUrl, validSkillId, validSource } from "./catalog.js";
 
@@ -33,6 +35,25 @@ const lastLine = (text) =>
     .pop();
 
 const failure = (r) => ({ ok: false, error: lastLine(r.stderr) || `Exited with code ${r.code}` });
+
+// The host adapters, built on Herdr's functions (host.js passes them in). Each
+// drops Herdr's "`herdr.exec`: " from an error once, here, so no notice or
+// view shows it.
+// exec(script, args, on, timeout) runs `script` with sh on machine `on` (null:
+// this computer) and never rejects: a program that can't start or a machine
+// that can't be reached comes back as code -1 with the reason in stderr.
+export const adaptExec = (hostExec) => (script, args, on, timeout) =>
+  Promise.resolve()
+    .then(() => hostExec("sh", ["-c", script, "skillsgate", ...args], { on, timeout }))
+    .catch((error) => ({ code: -1, stdout: "", stderr: withoutHerdrPrefix(error?.message ?? error) }));
+// readText(path, on) resolves the text, null ONLY when the file is absent, and
+// rejects on any other failure, as Herdr's readTextFile does.
+export const adaptReadText = (readTextFile) => (path, on) =>
+  Promise.resolve()
+    .then(() => readTextFile(path, { on }))
+    .catch((error) => {
+      throw new Error(withoutHerdrPrefix(error?.message ?? error));
+    });
 const changed = (skill) => ({ ok: false, error: `"${skill.name}" changed on disk. Refresh and try again.` });
 const universalHolds = (skill) => ({
   ok: false,
@@ -149,7 +170,10 @@ export function createMachine({
     const r = await exec(INSTALL, [cloneUrl(source), skillId, store, folder, replace ? "replace" : "new"], on, INSTALL_TIMEOUT_MS);
     if (r.code === 127) return gitMissing;
     if (r.code === 3) return { ok: false, error: `"${folder}" already exists in the shared store on ${machineInSentence(on)} and was not replaced` };
-    if (r.code === 2) return { ok: false, error: `Could not download ${source}` };
+    if (r.code === 2) {
+      const why = lastLine(r.stderr); // git's reason, when it gave one
+      return { ok: false, error: why ? `Could not download ${source}: ${why}` : `Could not download ${source}` };
+    }
     if (r.code === 5) return { ok: false, error: `Could not find "${skillId}" in ${source}` };
     if (r.code === 7) return { ok: false, error: `"${skillId}" in ${source} contains symbolic links and was not installed` };
     if (r.code === 64) return { ok: false, error: `Can't install "${skillId}" from ${source}` };

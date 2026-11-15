@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { TOOLS, UNIVERSAL } from "../skillsgate/mods/skillsgate/registry.js";
 
 const MOD = "herdr/skillsgate/mods/skillsgate"; // tests run from the repo root
@@ -108,4 +108,13 @@ test("the class scan reads methods and fields", () => {
   assert.deepEqual(classesOf("class A {\n  get x() {}\n  y() { this.x = 1; }\n}\n").map((c) => [...c.fields].filter((n) => c.methods.has(n))), [["x"]]);
   const names = VIEWS.flatMap((f) => classesOf(source(f)).map((c) => c.name)).sort();
   assert.deepEqual(names, ["CatalogDialog", "DiscoverTab", "InstalledTab", "MachineData", "MachinesTab", "Panel", "SkillDialog", "SkillsGate", "Toggle"]);
+});
+
+test("the share folder is complete", () => {
+  for (const f of ["RECIPE.md", "README.md", "preview.png", "mods/skillsgate/main.js", "mods/skillsgate/mod.json", "mods/skillsgate/mark.svg"])
+    assert.ok(existsSync(`herdr/skillsgate/${f}`), f);
+  const recipe = readFileSync("herdr/skillsgate/RECIPE.md", "utf8");
+  for (const h of ["## What you see", "## How it behaves", "## Built from", "## Watch out", "## Done when"]) assert.ok(recipe.includes(h), h);
+  assert.ok(recipe.includes("![SkillsGate](preview.png)"));
+  assert.ok(recipe.includes('"id": "skillsgate-toggle"') && recipe.includes('"id": "skillsgate-panel"'));
 });

@@ -36,11 +36,14 @@ export function makeHome(files) {
         resolve({ code, stdout: String(stdout), stderr: String(stderr || (err && err.message) || "") });
       });
     });
+  // The adapter contract: the text when the file exists, null ONLY when it is
+  // absent, and a rejection on any other failure.
   const readText = async (file, on) => {
     try {
       return fs.readFileSync(file, "utf8");
-    } catch {
-      return null;
+    } catch (error) {
+      if (error?.code === "ENOENT") return null;
+      throw error;
     }
   };
   return { home: fs.realpathSync(homeDir), exec, readText, path: at };

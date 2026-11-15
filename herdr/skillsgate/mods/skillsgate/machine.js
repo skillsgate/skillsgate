@@ -1,5 +1,7 @@
 // Operations on one machine. `exec` and `readText` are Herdr's functions,
 // passed in by main.js (and faked in tests), so this file imports no Herdr code.
+// `readText(path, on)` resolves the text, resolves null ONLY when the file is
+// absent, and rejects on any other failure.
 import { TOOLS, UNIVERSAL } from "./registry.js";
 import { INSTALL, LINK, REMOVE, UNLINK, WRITE, scanScript } from "./scripts.js";
 import {
@@ -109,7 +111,8 @@ export function createMachine({
       try {
         const lock = lockPath(scanResult);
         const dropped = dropFromLock(await readText(lock, on), skill.folder);
-        if (dropped.text !== undefined) await exec(WRITE, [lock, dropped.text], on, OP_TIMEOUT_MS);
+        // A rejected read throws into the catch below: nothing is written.
+        if (dropped.text !== undefined) await exec(WRITE, [lock, dropped.text, "replace"], on, OP_TIMEOUT_MS);
       } catch {
         // see above
       }
@@ -151,13 +154,29 @@ export function createMachine({
       if (!linked.ok) warnings.push(`Installed, but not added to ${tool.displayName}: ${linked.error}`);
     }
 
+    const notUpdated = (reason) => warnings.push(`Installed, but the skill lock was not updated (${reason})`);
     const lock = lockPath(scanResult);
-    const merged = mergeLock(await readText(lock, on), folder, source, now());
-    if (merged.skip) {
-      warnings.push(`Installed, but the skill lock was not updated (${merged.skip})`);
+    // `readText` resolves null only for an absent file and rejects on any other
+    // failure; a lock that can't be read is never written over.
+    let text;
+    let readable = true;
+    try {
+      text = await readText(lock, on);
+    } catch {
+      readable = false;
+    }
+    if (!readable) {
+      notUpdated("unreadable");
     } else {
-      const w = await exec(WRITE, [lock, merged.text], on, OP_TIMEOUT_MS);
-      if (w.code !== 0) warnings.push(`Installed, but the skill lock was not updated (${lastLine(w.stderr) || "could not write it"})`);
+      const merged = mergeLock(text, folder, source, now());
+      if (merged.skip) {
+        notUpdated(merged.skip);
+      } else {
+        // `new` refuses when a lock is there after all (we read it as absent).
+        const w = await exec(WRITE, [lock, merged.text, text == null ? "new" : "replace"], on, OP_TIMEOUT_MS);
+        if (w.code === 3) notUpdated("changed");
+        else if (w.code !== 0) notUpdated(lastLine(w.stderr) || "could not write it");
+      }
     }
     return warnings.length ? { ok: true, folder, warn: warnings.join("; ") } : { ok: true, folder };
   }

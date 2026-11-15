@@ -187,17 +187,19 @@ exit 0
 // skills/.curated/<id>, skills/.experimental/<id>, <id>, the repo root (each
 // must hold SKILL.md and stay inside the clone), then any <dir>/<id>/SKILL.md,
 // then any SKILL.md whose frontmatter has `name: <id>`.
-// The copy is made as `<dest>.new`, checked, and only then does it replace
-// `<dest>`. A failure anywhere removes `<dest>.new` and the temp folder and
-// leaves `<dest>` as it was. A folder that already has the `.new` name is not
-// ours to delete, so the install stops (exit 6) instead.
-// Exit: 0 installed; 1 failed; 6 the `.new` name is taken; 64 bad arguments;
-// 127 no git; 2 the clone failed; 5 the skill is not in the repository.
+// The copy is made in `<store>/.skillsgate-new.<folder name>`, checked, and only
+// then does it replace `<dest>`. That name is hidden (a scan skips it) and no
+// valid folder name starts with ".", so it never equals a real skill's folder.
+// A stale one left by a killed run is removed before the copy. A failure
+// anywhere removes the staging folder and the temp folder and leaves `<dest>`
+// as it was.
+// Exit: 0 installed; 1 failed; 64 bad arguments; 127 no git; 2 the clone
+// failed; 5 the skill is not in the repository.
 //
 // `rm -rf` runs only on: the temp folder this script made with mktemp -d (its
-// name is checked), and `<store>/<folder>` and `<store>/<folder>.new` once the
-// folder name has passed the checks above. A symlink at `<dest>` is removed
-// with `rm -f`, never followed.
+// name is checked); `<store>/.skillsgate-new.<folder>` and the `.git` inside
+// it; and `<store>/<folder>`, once the folder name has passed the checks above.
+// A symlink at `<dest>` is removed with `rm -f`, never followed.
 export const INSTALL = String.raw`unset CDPATH
 PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"
 export PATH
@@ -220,7 +222,7 @@ tmp=
 staged=
 cleanup() {
   case "$tmp" in */skillsgate-herdr.??????) rm -rf -- "$tmp" ;; esac
-  case "$staged" in /?*/?*.new) rm -rf -- "$staged" ;; esac
+  case "$staged" in /?*/.skillsgate-new.?*) rm -rf -- "$staged" ;; esac
 }
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
@@ -282,11 +284,8 @@ mkdir -p -- "$store" || exit 1
 realstore=$(cd -P -- "$store" && pwd -P) || exit 1
 case "$realstore" in /?*) ;; *) bad ;; esac
 dest="$realstore/$folder"
-new="$dest.new"
-if [ -e "$new" ] || [ -L "$new" ]; then
-  printf 'A folder named %s is in the way\n' "$new" >&2
-  exit 6
-fi
+new="$realstore/.skillsgate-new.$folder"
+if [ -e "$new" ] || [ -L "$new" ]; then rm -rf -- "$new" || exit 1; fi
 mkdir -- "$new" || exit 1
 staged=$new
 cp -R -- "$src"/. "$new"/ || exit 1
@@ -303,26 +302,43 @@ printf '%s\n' "$dest"
 exit 0
 `;
 
-// WRITE <path> <text>
+// WRITE <path> <text> <new|replace>
 // Writes the text to a temp file in the target's own folder, then moves it over
 // the target, so a reader sees the old file or the new one, never half of it.
-// Makes the parent folder. Exit: 0 written; 1 failed; 2 bad arguments (a
-// relative path, a path ending in "/", or empty text).
+// The temp file is made with a plain redirect, so its mode follows the umask.
+// Makes the parent folder.
+// The third argument says what the caller believes about the target: `new`
+// means it is absent, and the script refuses (exit 3) when something is there,
+// so a file that appeared since the caller looked is never replaced; `replace`
+// means the caller read the current text.
+// Exit: 0 written; 1 failed; 2 bad arguments (a relative path, a path ending in
+// "/", empty text, or a third argument other than new or replace); 3 `new`
+// and the target exists.
+// `rm -f` runs only on the temp file this script named itself.
 export const WRITE = String.raw`unset CDPATH
 bad() { printf 'Bad arguments\n' >&2; exit 2; }
-[ "$#" -ge 2 ] || bad
+[ "$#" -ge 3 ] || bad
 path=$1
 text=$2
+mode=$3
 case "$path" in /?*) ;; *) bad ;; esac
 case "$path" in */) bad ;; esac
 [ -n "$text" ] || bad
+case "$mode" in new|replace) ;; *) bad ;; esac
 dir=$(dirname -- "$path")
 mkdir -p -- "$dir" || exit 1
 tmp=
-cleanup() { if [ -n "$tmp" ]; then rm -f -- "$tmp"; fi; }
+cleanup() {
+  case "$tmp" in /?*.skillsgate-tmp.*) rm -f -- "$tmp" ;; esac
+}
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
-tmp=$(mktemp "$dir/.skillsgate-herdr.XXXXXX") || exit 1
+if [ "$mode" = new ] && { [ -e "$path" ] || [ -L "$path" ]; }; then
+  printf 'The file already exists\n' >&2
+  exit 3
+fi
+tmp="$path.skillsgate-tmp.$$"
+rm -f -- "$tmp" || exit 1
 printf '%s' "$text" > "$tmp" || exit 1
 mv -- "$tmp" "$path" || exit 1
 tmp=

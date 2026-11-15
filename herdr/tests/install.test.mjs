@@ -254,15 +254,42 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
     assert.deepEqual(fs.readdirSync(h.path(".agents/skills")), ["nope"]);
     assert.deepEqual(leftovers(), []);
   });
-  it("install does not delete a folder that already has the staging name", async () => {
+  it("install leaves a real skill named like the old staging name alone", async () => {
     const { h, m, r } = await setup({
       ".agents/skills/alpha/SKILL.md": SKILL("old"),
       ".agents/skills/alpha.new/SKILL.md": SKILL("a skill of its own"),
+      ".agents/skills/alpha.new/own.txt": "mine",
     });
-    const result = await m.install(null, r.scan, installed("alpha"));
-    assert.equal(result.ok, false);
-    assert.equal(read(h.path(".agents/skills/alpha/SKILL.md")), SKILL("old"));
+    assert.deepEqual(await m.install(null, r.scan, installed("alpha")), { ok: true, folder: "alpha" });
     assert.equal(read(h.path(".agents/skills/alpha.new/SKILL.md")), SKILL("a skill of its own"));
+    assert.equal(read(h.path(".agents/skills/alpha.new/own.txt")), "mine");
+    assert.equal(read(h.path(".agents/skills/alpha/extra.txt")), "extra");
+    assert.deepEqual(fs.readdirSync(h.path(".agents/skills")).sort(), ["alpha", "alpha.new"]);
+  });
+  it("install removes a stale staging folder and succeeds", async () => {
+    const { h, m, r } = await setup({
+      ".agents/skills/.skillsgate-new.alpha/junk.txt": "junk",
+      ".agents/skills/.skillsgate-new.alpha/deeper/more.txt": "junk",
+    });
+    assert.deepEqual(await m.install(null, r.scan, installed("alpha")), { ok: true, folder: "alpha" });
+    assert.deepEqual(fs.readdirSync(h.path(".agents/skills")), ["alpha"]);
+    assert.equal(exists(h.path(".agents/skills/alpha/junk.txt")), false);
+  });
+  it("no install, successful or failed, leaves a staging entry in the store", async () => {
+    const stagingIn = (h) => fs.readdirSync(h.path(".agents/skills")).filter((n) => n.startsWith(".skillsgate-new."));
+    const ok = await setup({ ".agents/skills/other/SKILL.md": SKILL("other") });
+    assert.equal((await ok.m.install(null, ok.r.scan, installed("alpha"))).ok, true);
+    assert.deepEqual(stagingIn(ok.h), []);
+    const missing = await setup({ ".agents/skills/other/SKILL.md": SKILL("other") });
+    assert.equal((await missing.m.install(null, missing.r.scan, installed("nope"))).ok, false);
+    assert.deepEqual(stagingIn(missing.h), []);
+    const down = await setup({ ".agents/skills/other/SKILL.md": SKILL("other") }, { url: "file:///nowhere" });
+    assert.equal((await down.m.install(null, down.r.scan, installed("alpha"))).ok, false);
+    assert.deepEqual(stagingIn(down.h), []);
+  });
+  it("a scan does not list a staging folder that holds a SKILL.md", async () => {
+    const { r } = await setup({ ".agents/skills/.skillsgate-new.x/SKILL.md": SKILL("x"), ".agents/skills/real/SKILL.md": SKILL("real") });
+    assert.deepEqual(r.skills.map((s) => s.folder), ["real"]);
   });
   it("the INSTALL script refuses bad arguments before it touches anything", async () => {
     const { h, tmp, leftovers } = await setup({ ".agents/skills/precious/SKILL.md": SKILL("p"), ".agents/precious.txt": "p" });
@@ -321,17 +348,81 @@ describe("install", { skip: hasGit ? false : "git is not installed on this compu
   it("the WRITE script writes beside the target, makes the folder and leaves no temp file", async () => {
     const { h } = await setup();
     const file = h.path("new dir/.skill-lock.json");
-    assert.equal((await h.exec(WRITE, [file, "one\ntwo 'quoted' $HOME `x`\n"], null, 30000)).code, 0);
+    assert.equal((await h.exec(WRITE, [file, "one\ntwo 'quoted' $HOME `x`\n", "new"], null, 30000)).code, 0);
     assert.equal(read(file), "one\ntwo 'quoted' $HOME `x`\n");
-    assert.equal((await h.exec(WRITE, [file, "replaced"], null, 30000)).code, 0);
+    assert.equal((await h.exec(WRITE, [file, "replaced", "replace"], null, 30000)).code, 0);
     assert.equal(read(file), "replaced");
     assert.deepEqual(fs.readdirSync(h.path("new dir")), [".skill-lock.json"]);
   });
+  it("the WRITE script with new refuses an existing target, with replace it replaces it", async () => {
+    const { h } = await setup({ "d/lock.json": "original" });
+    const file = h.path("d/lock.json");
+    const refused = await h.exec(WRITE, [file, "other", "new"], null, 30000);
+    assert.equal(refused.code, 3);
+    assert.equal(read(file), "original");
+    assert.deepEqual(fs.readdirSync(h.path("d")), ["lock.json"]);
+    // A dangling link counts as "something is there".
+    fs.symlinkSync("nowhere", h.path("d/dangling.json"));
+    assert.equal((await h.exec(WRITE, [h.path("d/dangling.json"), "x", "new"], null, 30000)).code, 3);
+    assert.deepEqual(fs.readdirSync(h.path("d")).sort(), ["dangling.json", "lock.json"]);
+    assert.equal((await h.exec(WRITE, [file, "other", "replace"], null, 30000)).code, 0);
+    assert.equal(read(file), "other");
+    assert.deepEqual(fs.readdirSync(h.path("d")).sort(), ["dangling.json", "lock.json"]);
+  });
   it("the WRITE script refuses bad arguments", async () => {
-    const { h } = await setup();
-    for (const args of [[], [h.path("x")], ["relative.json", "text"], ["", "text"], [h.path("x/"), "text"], [h.path("x"), ""]]) {
+    const { h } = await setup({ "keep.txt": "keep" });
+    const target = h.path("x");
+    const cases = [[], [target], [target, "text"], ["relative.json", "text", "new"], ["", "text", "new"], [h.path("x/"), "text", "new"], [target, "", "new"], [target, "text", ""], [target, "text", "NEW"], [target, "text", "other"]];
+    for (const args of cases) {
       assert.equal((await h.exec(WRITE, args, null, 30000)).code, 2, JSON.stringify(args));
     }
-    assert.equal(exists(h.path("x")), false);
+    assert.equal(exists(target), false);
+    assert.deepEqual(fs.readdirSync(h.home).sort(), ["keep.txt"]);
+  });
+  it("a lock the mod writes gets the umask's mode, not 0600", async () => {
+    const { h, m, r } = await setup();
+    assert.equal((await m.install(null, r.scan, installed("alpha"))).ok, true);
+    assert.equal(fs.statSync(h.path(".agents/.skill-lock.json")).mode & 0o777, 0o666 & ~process.umask());
+  });
+  it("install leaves the lock alone when it can't be read", async () => {
+    const h = makeHome({ ".agents/.skill-lock.json": '{"version":1,"skills":{"keep":{}}}' });
+    const before = read(h.path(".agents/.skill-lock.json"));
+    const calls = [];
+    const exec = (script, ...rest) => {
+      calls.push(script);
+      return h.exec(script, ...rest);
+    };
+    const readText = async () => {
+      throw new Error("permission denied");
+    };
+    const m = createMachine({ exec, readText, ...sources() });
+    const scan = (await m.scan(null)).scan;
+    const result = await m.install(null, scan, installed("alpha"));
+    assert.equal(result.ok, true);
+    assert.equal(result.folder, "alpha");
+    assert.match(result.warn, /skill lock was not updated \(unreadable\)/);
+    assert.equal(read(h.path(".agents/.skill-lock.json")), before);
+    assert.equal(calls.includes(WRITE), false);
+    assert.equal(exists(h.path(".agents/skills/alpha/SKILL.md")), true);
+  });
+  it("install does not replace a lock that appeared after it was read as absent", async () => {
+    const lock = '{"version":1,"skills":{"keep":{}}}';
+    const h = makeHome({ ".agents/.skill-lock.json": lock });
+    const m = createMachine({ exec: h.exec, readText: async () => null, ...sources() }); // wrongly "absent"
+    const scan = (await m.scan(null)).scan;
+    const result = await m.install(null, scan, installed("alpha"));
+    assert.equal(result.ok, true);
+    assert.match(result.warn, /skill lock was not updated \(changed\)/);
+    assert.equal(read(h.path(".agents/.skill-lock.json")), lock);
+    assert.deepEqual(fs.readdirSync(h.path(".agents")).sort(), [".skill-lock.json", "skills"]);
+  });
+  it("remove leaves the lock alone when it can't be read", async () => {
+    const lock = '{"version":1,"skills":{"alpha":{}}}';
+    const h = makeHome({ ".agents/skills/alpha/SKILL.md": SKILL("alpha"), ".agents/.skill-lock.json": lock });
+    const m = createMachine({ exec: h.exec, readText: async () => { throw new Error("denied"); }, ...sources() });
+    const scan = await m.scan(null);
+    assert.deepEqual(await m.remove(null, scan.scan, scan.skills.find((s) => s.folder === "alpha")), { ok: true });
+    assert.equal(exists(h.path(".agents/skills/alpha")), false);
+    assert.equal(read(h.path(".agents/.skill-lock.json")), lock);
   });
 });

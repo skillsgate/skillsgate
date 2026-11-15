@@ -1,5 +1,6 @@
-// Pure functions: parsing the scan output and grouping it into skills.
-import { UNIVERSAL } from "./registry.js";
+// Pure functions: parsing the scan output, grouping it into skills, the lock
+// file, and what the panel shows.
+import { TOOLS, UNIVERSAL } from "./registry.js";
 
 const RS = "\x1e"; // ends a record
 const US = "\x1f"; // separates fields
@@ -136,8 +137,23 @@ export const lockPath = (scan) => scan.home + "/.agents/.skill-lock.json";
 // capped at 128 KiB on Linux, so a bigger lock is left alone. Counted in UTF-8
 // bytes, since that is what the limit counts.
 const LOCK_LIMIT = 96 * 1024;
-const encoder = new TextEncoder();
-const tooLarge = (text) => encoder.encode(text).length > LOCK_LIMIT;
+
+// UTF-8 bytes of `text`, counted by hand: Herdr's QuickJS has no TextEncoder.
+// A lone surrogate counts 3, as the U+FFFD that replaces it.
+function utf8Length(text) {
+  let n = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (c < 0x80) n += 1;
+    else if (c < 0x800) n += 2;
+    else if (c >= 0xd800 && c <= 0xdbff && (text.charCodeAt(i + 1) & 0xfc00) === 0xdc00) {
+      n += 4;
+      i++;
+    } else n += 3;
+  }
+  return n;
+}
+const tooLarge = (text) => utf8Length(text) > LOCK_LIMIT;
 
 // Reads a lock into `{ lock }`, or `{ skip }` when it is not a version 1 lock.
 // Absent or empty text is an empty lock (`empty: true`).
@@ -178,4 +194,111 @@ export function dropFromLock(text, folder) {
   const out = JSON.stringify(read.lock, null, 2);
   if (tooLarge(out)) return { skip: "large" };
   return { text: out };
+}
+
+// ---- What the panel shows ----
+
+// The machine the panel views. `pref` is the stored choice
+// (`{ follow, on }`); anything but an explicit `follow: false` follows the
+// shown space's machine.
+export function effectiveMachine(pref, shownSpaceMachine) {
+  const chosen = pref !== null && typeof pref === "object" && pref.follow === false;
+  if (chosen) return typeof pref.on === "string" ? pref.on : null;
+  return typeof shownSpaceMachine === "string" ? shownSpaceMachine : null;
+}
+
+// This computer (null) first, then every machine Herdr knows or a space lives
+// on, once each, by name.
+export function machineNames(machines, spaces) {
+  const names = new Set();
+  for (const m of machines ?? []) if (typeof m?.name === "string") names.add(m.name);
+  for (const s of spaces ?? []) if (typeof s?.machine === "string") names.add(s.machine);
+  return [null, ...[...names].sort()];
+}
+
+// `query` matches a skill's name, folder or description, ignoring case;
+// `tool` keeps the skills that tool has.
+export function filterSkills(skills, { query, tool } = {}) {
+  const q = String(query ?? "").trim().toLowerCase();
+  return skills.filter((s) => {
+    if (tool && !s.tools.includes(tool)) return false;
+    if (!q) return true;
+    return [s.name, s.folder, s.description].some((text) => String(text ?? "").toLowerCase().includes(q));
+  });
+}
+
+const SECTIONS = [
+  { id: "store", title: "SHARED" },
+  { id: "tool", title: "IN ONE TOOL" },
+  { id: "external", title: "LINKED FROM ELSEWHERE" },
+];
+
+// The Installed list's groups, in a fixed order, leaving out empty ones.
+export function sections(skills) {
+  return SECTIONS.map(({ id, title }) => ({ id, title, rows: skills.filter((s) => s.home === id) })).filter((s) => s.rows.length > 0);
+}
+
+// One chip per tool that has at least one skill, in registry order (the scan
+// lists its tools in registry order).
+export function toolChips(scan, skills) {
+  const chips = [];
+  for (const { name } of scan?.tools ?? []) {
+    const count = skills.filter((s) => s.tools.includes(name)).length;
+    if (count === 0) continue;
+    const tool = toolByName(TOOLS, name);
+    chips.push({ name, displayName: tool?.displayName ?? name, shortCode: tool?.shortCode ?? "", count });
+  }
+  return chips;
+}
+
+// A tool's name as the panel prints it: the display name without a trailing
+// note in parentheses ("Universal (.agents/skills)" reads "Universal").
+export function toolLabel(name) {
+  const displayName = toolByName(TOOLS, name)?.displayName ?? name;
+  return displayName.replace(/\s*\([^)]*\)$/, "");
+}
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+// A row's right side: the one tool's name, or how many tools have the skill.
+export function toolSummary(skill) {
+  return skill.tools.length === 1 ? toolLabel(skill.tools[0]) : plural(skill.tools.length, "tool");
+}
+
+// "42 skills · 12 tools": the tools counted are the ones with a skill.
+export function summaryText(scan, skills) {
+  return `${plural(skills.length, "skill")} · ${plural(toolChips(scan, skills).length, "tool")}`;
+}
+
+// The footer's text for a machine's state `{ scan, skills, at, loading }`.
+export function footerText(state, now) {
+  if (!state?.scan) return state?.loading ? "Checking…" : "";
+  return `${summaryText(state.scan, state.skills)} · checked ${ago(now - state.at)}`;
+}
+
+export function emptyText(on) {
+  return `No skills on ${on == null ? "this computer" : on} yet`;
+}
+
+// A done notice shows for 4 s, a warning or an error for 8 s.
+export function noticeShown(notice, now) {
+  if (!notice || typeof notice.text !== "string" || !notice.text || typeof notice.at !== "number") return false;
+  return now - notice.at < (notice.kind === "done" ? 4000 : 8000);
+}
+
+// `path` with the home folder written as `~`.
+export function shortPath(path, home) {
+  const base = String(home ?? "").replace(/\/+$/, "");
+  if (!base) return path;
+  if (path === base) return "~";
+  return path.startsWith(base + "/") ? "~" + path.slice(base.length) : path;
+}
+
+// How long ago, from elapsed milliseconds.
+export function ago(ms) {
+  const s = Math.floor(ms / 1000);
+  if (s < 5) return "just now";
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  return `${Math.floor(s / 3600)}h ago`;
 }

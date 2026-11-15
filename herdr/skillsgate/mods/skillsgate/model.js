@@ -1,0 +1,105 @@
+// Pure functions: parsing the scan output and grouping it into skills.
+import { UNIVERSAL } from "./registry.js";
+
+const RS = "\x1e"; // ends a record
+const US = "\x1f"; // separates fields
+
+const dequote = (value) => {
+  const v = value.trim();
+  if (v.length >= 2 && v.startsWith('"') && v.endsWith('"')) return v.slice(1, -1).replace(/\\(["\\])/g, "$1");
+  if (v.length >= 2 && v.startsWith("'") && v.endsWith("'")) return v.slice(1, -1).replace(/''/g, "'");
+  return v;
+};
+
+// Reads `name` and `description` from the frontmatter block at the top of a
+// SKILL.md. Values may be plain, quoted, folded (`>`) or literal (`|`); a value
+// that continues on indented lines is joined with single spaces.
+export function parseFrontmatter(head, fallback) {
+  const lines = String(head ?? "").replace(/\r\n?/g, "\n").split("\n");
+  const out = { name: fallback, description: "" };
+  if (lines[0].trim() !== "---") return out;
+  const fields = {};
+  let key = null;
+  for (const line of lines.slice(1)) {
+    if (line.trim() === "---") break;
+    const top = /^([A-Za-z0-9_-]+):(.*)$/.exec(line);
+    if (top) {
+      key = top[1];
+      fields[key] = [top[2].trim()];
+    } else if (key && /^\s+\S/.test(line)) {
+      fields[key].push(line.trim());
+    } else if (!line.trim()) {
+      // a blank line inside a block ends nothing; keep the current key
+    } else {
+      key = null;
+    }
+  }
+  const read = (name) => {
+    const parts = fields[name];
+    if (!parts) return "";
+    const [first, ...rest] = parts;
+    if (/^[>|][+-]?\d*$/.test(first)) return rest.join(" ").trim();
+    return dequote([first, ...rest].join(" "));
+  };
+  out.name = read("name") || fallback;
+  out.description = read("description");
+  return out;
+}
+
+// Turns the scan script's stdout into `{ home, git, tools, entries }`.
+export function parseScan(stdout) {
+  const scan = { home: "", git: false, tools: [], entries: [] };
+  let header = false;
+  for (const record of String(stdout ?? "").split(RS)) {
+    const f = record.split(US);
+    const type = f[0].trim();
+    if (type === "H" && f.length >= 3) {
+      header = true;
+      scan.home = f[1];
+      scan.git = f[2] === "1";
+    } else if (type === "T" && f.length >= 4) {
+      scan.tools.push({ name: f[1], dir: f[2], detected: f[3] === "1" });
+    } else if (type === "S" && f.length >= 6) {
+      scan.entries.push({ tool: f[1], path: f[2], real: f[3], link: f[4] === "1", head: f[5] });
+    }
+  }
+  if (!header) throw new Error("Unreadable scan");
+  return scan;
+}
+
+const lastSlash = (path) => path.lastIndexOf("/");
+
+// Groups scan entries by real folder into skills, sorted by name then real path.
+export function buildSkills(scan) {
+  const order = new Map(scan.tools.map((t, i) => [t.name, i]));
+  const universalDir = scan.tools.find((t) => t.name === UNIVERSAL)?.dir;
+  const toolDirs = scan.tools.map((t) => t.dir).filter(Boolean);
+  const byReal = new Map();
+  for (const e of scan.entries) {
+    if (!byReal.has(e.real)) byReal.set(e.real, []);
+    byReal.get(e.real).push(e);
+  }
+  const skills = [];
+  for (const [real, group] of byReal) {
+    group.sort((a, b) => (order.get(a.tool) ?? 0) - (order.get(b.tool) ?? 0));
+    const folder = real.slice(lastSlash(real) + 1);
+    const { name, description } = parseFrontmatter(group[0].head, folder);
+    const parent = real.slice(0, lastSlash(real));
+    let home = "external";
+    if (universalDir && parent === universalDir) home = "store";
+    else if (toolDirs.some((dir) => real.startsWith(dir + "/"))) home = "tool";
+    skills.push({
+      key: real,
+      real,
+      folder,
+      name,
+      description,
+      home,
+      tools: [...new Set(group.map((e) => e.tool))],
+      entries: group.map((e) => ({ tool: e.tool, path: e.path, link: e.link })),
+    });
+  }
+  const lower = (s) => s.name.toLowerCase();
+  skills.sort((a, b) => (lower(a) < lower(b) ? -1 : lower(a) > lower(b) ? 1 : a.real < b.real ? -1 : a.real > b.real ? 1 : 0));
+  return skills;
+}
